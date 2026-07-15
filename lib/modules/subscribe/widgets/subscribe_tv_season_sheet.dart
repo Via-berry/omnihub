@@ -322,7 +322,6 @@ class _SubscribeTvSeasonSheetState extends State<SubscribeTvSeasonSheet> {
     final theme = Theme.of(context);
     final s = state.seasonInfo;
     final seasonNum = s.season_number ?? -1;
-    final canSelect = true;
     final selected = _subscribedItems.containsKey(seasonNum);
     final isUpdating = _updatingSeasons.contains(seasonNum);
     final imageUrl = ImageUtil.convertMediaSeasonImageUrl(s.poster_path ?? '');
@@ -349,7 +348,7 @@ class _SubscribeTvSeasonSheetState extends State<SubscribeTvSeasonSheet> {
       padding: const EdgeInsets.only(bottom: 12),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 180),
-        opacity: canSelect ? 1 : 0.58,
+        opacity: 1,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOut,
@@ -425,33 +424,35 @@ class _SubscribeTvSeasonSheetState extends State<SubscribeTvSeasonSheet> {
                                     ? _buildSubscribedPill(theme)
                                     : state.isMissing
                                     ? _buildMissingPill(theme)
-                                    : Row(
-                                        children: [
-                                          Icon(
-                                            Icons.event_rounded,
-                                            size: 14,
-                                            color: theme
-                                                .colorScheme
-                                                .onSurfaceVariant
-                                                .withValues(alpha: 0.72),
-                                          ),
-                                          const SizedBox(width: 5),
-                                          Expanded(
-                                            child: Text(
-                                              airDate.isEmpty
-                                                  ? '暂无首播日期'
-                                                  : airDate,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: theme.textTheme.bodySmall
-                                                  ?.copyWith(
-                                                    color: theme
-                                                        .colorScheme
-                                                        .onSurfaceVariant,
-                                                  ),
+                                    : Flexible(
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.event_rounded,
+                                              size: 14,
+                                              color: theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant
+                                                  .withValues(alpha: 0.72),
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 5),
+                                            Expanded(
+                                              child: Text(
+                                                airDate.isEmpty
+                                                    ? '暂无首播日期'
+                                                    : airDate,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      color: theme
+                                                          .colorScheme
+                                                          .onSurfaceVariant,
+                                                    ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                 Spacer(),
                                 Semantics(
@@ -473,13 +474,9 @@ class _SubscribeTvSeasonSheetState extends State<SubscribeTvSeasonSheet> {
                                         )
                                       : Switch(
                                           value: selected,
-                                          onChanged: canSelect
-                                              ? (value) => _toggleSubscription(
-                                                  s,
-                                                  value,
-                                                )
-                                              : null,
-                                          activeColor:
+                                          onChanged: (value) =>
+                                              _toggleSubscription(s, value),
+                                          activeThumbColor:
                                               theme.colorScheme.primary,
                                           activeTrackColor: theme
                                               .colorScheme
@@ -506,7 +503,7 @@ class _SubscribeTvSeasonSheetState extends State<SubscribeTvSeasonSheet> {
                                   2: Text('全集洗版'),
                                 },
                                 onValueChanged: (value) {
-                                  if (!canSelect || selected || value == null) {
+                                  if (selected || value == null) {
                                     return;
                                   }
                                   setState(

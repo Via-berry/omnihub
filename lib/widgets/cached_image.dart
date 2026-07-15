@@ -99,9 +99,11 @@ class CachedImage extends StatelessWidget {
       memCacheHeight: effectiveMemCacheHeight,
       fadeInDuration: fadeInDuration,
       fadeOutDuration: fadeOutDuration,
-      errorListener: kIsWeb
-          ? null
-          : (_) => _evictBrokenImage(manager, cacheKey!),
+      errorListener: (_) {
+        if (cacheKey != null) {
+          _evictBrokenImage(manager, cacheKey);
+        }
+      },
       errorWidget: (context, url, error) {
         return errorWidget ?? _buildDefaultErrorWidget(error);
       },
