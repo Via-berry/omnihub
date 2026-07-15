@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/discover/controllers/discover_controller.dart';
 import 'package:moviepilot_mobile/modules/discover/widgets/discover_filter_sheet.dart';
-import 'package:moviepilot_mobile/modules/discover/widgets/discover_media_card.dart';
 import 'package:moviepilot_mobile/modules/recommend/models/recommend_api_item.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/utils/grid_layout.dart';
@@ -108,7 +107,7 @@ class DiscoverPage extends GetView<DiscoverController> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildHero(context, isWide: isWide),
-          _buildFilterSummary(context, isWide: isWide),
+          _buildSourceBar(context),
           _buildSection(context),
         ],
       ),
@@ -213,7 +212,7 @@ class DiscoverPage extends GetView<DiscoverController> {
         ? hero!.overview!.trim()
         : '从 ${source.label} 中发现下一部值得停留的作品';
     final meta = _compactHeroMeta(hero, source);
-    final heroHeight = isWide ? 340.0 : 310.0;
+    final heroHeight = isWide ? 326.0 : 286.0;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -226,25 +225,20 @@ class DiscoverPage extends GetView<DiscoverController> {
           height: heroHeight,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(
-                alpha: isDark ? 0.36 : 0.56,
-              ),
-            ),
             boxShadow: [
               BoxShadow(
                 color: colorScheme.primary.withValues(
-                  alpha: isDark ? 0.20 : 0.12,
+                  alpha: isDark ? 0.16 : 0.09,
                 ),
-                blurRadius: 34,
-                offset: const Offset(0, 18),
+                blurRadius: 30,
+                offset: const Offset(0, 14),
               ),
               BoxShadow(
                 color: colorScheme.shadow.withValues(
-                  alpha: isDark ? 0.42 : 0.16,
+                  alpha: isDark ? 0.32 : 0.12,
                 ),
-                blurRadius: 28,
-                offset: const Offset(0, 18),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
@@ -289,8 +283,8 @@ class DiscoverPage extends GetView<DiscoverController> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0x22000000), Color(0x66000000), Color(0xF2050506)],
-              stops: [0.12, 0.48, 1],
+              colors: [Color(0x14000000), Color(0x5A000000), Color(0xEE050506)],
+              stops: [0.08, 0.48, 1],
             ),
           ),
         ),
@@ -384,103 +378,88 @@ class DiscoverPage extends GetView<DiscoverController> {
     );
   }
 
-  Widget _buildFilterSummary(BuildContext context, {bool isWide = false}) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final parts = _summaryParts(controller.currentSummaryText());
-    final visibleParts = parts.take(5).toList();
-    final remaining = parts.length - visibleParts.length;
-
+  Widget _buildSourceBar(BuildContext context) {
+    final sources = controller.sourceEntries.toList();
+    if (sources.isEmpty) return const SizedBox(height: 12);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: InkWell(
-            onTap: () => _openFilterSheet(context),
-            borderRadius: BorderRadius.circular(24),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colorScheme.surface.withValues(
-                  alpha: isDark ? 0.72 : 0.92,
-                ),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.72),
-                ),
-              ),
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildFilterLeadingIcon(context),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: isWide
-                        ? Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              for (final part in visibleParts)
-                                _buildSummaryChip(context, part),
-                              if (remaining > 0)
-                                _buildSummaryChip(context, '+$remaining'),
-                            ],
-                          )
-                        : SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(),
-                            child: Row(
-                              children: [
-                                for (final part in visibleParts)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: _buildSummaryChip(context, part),
-                                  ),
-                                if (remaining > 0)
-                                  _buildSummaryChip(context, '+$remaining'),
-                              ],
-                            ),
-                          ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.keyboard_arrow_right_rounded,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                  for (var i = 0; i < sources.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 6),
+                    _buildSourceChip(context, sources[i]),
+                  ],
                 ],
               ),
             ),
           ),
-        ),
+          const SizedBox(width: 10),
+          Tooltip(
+            message: '调整筛选条件',
+            child: _GlassButton(
+              icon: Icons.tune_rounded,
+              label: '筛选',
+              compact: true,
+              onTap: () => _openFilterSheet(context),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildFilterLeadingIcon(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      width: 38,
-      height: 38,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.primary,
-            Color.lerp(colorScheme.primary, colorScheme.secondary, 0.58)!,
-          ],
+  Widget _buildSourceChip(BuildContext context, DiscoverSourceEntry source) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final selected = controller.selectedSource.value == source;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '探索来源 ${source.label}',
+      child: InkWell(
+        onTap: () => controller.selectSource(source),
+        borderRadius: BorderRadius.circular(999),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 11),
+          decoration: BoxDecoration(
+            color: selected
+                ? colorScheme.primary.withValues(alpha: 0.14)
+                : colorScheme.surface.withValues(alpha: 0.28),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                selected
+                    ? Icons.check_rounded
+                    : source.isDynamic
+                    ? Icons.auto_awesome_rounded
+                    : Icons.movie_filter_outlined,
+                size: 15,
+                color: selected
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                source.label,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: selected ? colorScheme.primary : colorScheme.onSurface,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: const Icon(
-        Icons.local_movies_rounded,
-        color: Colors.white,
-        size: 20,
       ),
     );
   }
@@ -494,11 +473,6 @@ class DiscoverPage extends GetView<DiscoverController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          context,
-          title: 'Now Discovering',
-          subtitle: items.isEmpty ? '按当前条件探索片单' : '${items.length} 部作品已就绪',
-        ),
         if (items.isEmpty && isLoading)
           _buildLoadingGrid(context)
         else if (items.isEmpty && errorText != null)
@@ -506,87 +480,240 @@ class DiscoverPage extends GetView<DiscoverController> {
         else if (items.isEmpty)
           _buildEmptyRail(context, '当前条件暂时没有匹配作品')
         else
-          _buildItemsGrid(context, gridItems),
+          _buildItemsList(context, gridItems),
       ],
     );
   }
 
-  Widget _buildSectionHeader(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 18, 0, 14),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 34,
+  Widget _buildItemsList(BuildContext context, List<RecommendApiItem> items) {
+    return ListView.separated(
+      padding: const EdgeInsets.only(top: 2),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        switch (index % 3) {
+          case 0:
+            return _buildWideListCard(context, item);
+          case 1:
+            return _buildInfoListCard(context, item, imageOnLeft: true);
+          default:
+            return _buildInfoListCard(context, item, imageOnLeft: false);
+        }
+      },
+    );
+  }
+
+  Widget _buildWideListCard(BuildContext context, RecommendApiItem item) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final title = _bestTitle(item) ?? 'Untitled';
+    final imageUrl = _imageUrl(item, preferBackdrop: true);
+    return Semantics(
+      button: true,
+      label: '打开 $title',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openDetail(item),
+          borderRadius: BorderRadius.circular(26),
+          child: Container(
+            height: 214,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [colorScheme.primary, colorScheme.secondary],
-              ),
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.primary.withValues(alpha: 0.16),
+                  blurRadius: 26,
+                  offset: const Offset(0, 12),
                 ),
               ],
             ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (imageUrl.isNotEmpty)
+                  CachedImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: const _HeroPlaceholder(),
+                    errorWidget: const _HeroPlaceholder(),
+                  )
+                else
+                  const _HeroPlaceholder(),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0x11000000),
+                        Color(0xB8000000),
+                        Color(0xF0050506),
+                      ],
+                      stops: [0.22, 0.62, 1],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 18,
+                  right: 18,
+                  bottom: 16,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        _itemMeta(item),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (item.vote_average != null && item.vote_average! > 0)
+                  Positioned(
+                    top: 14,
+                    right: 14,
+                    child: _ListRatingPill(value: item.vote_average!),
+                  ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildItemsGrid(BuildContext context, List<RecommendApiItem> items) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final layout = _discoverGridLayout(constraints.maxWidth);
-        return GridView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: _gridPadding),
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: items.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: layout.crossAxisCount,
-            crossAxisSpacing: _gridSpacing,
-            mainAxisSpacing: _gridSpacing,
-            childAspectRatio: _cardAspectRatio,
-          ),
-          itemBuilder: (context, index) {
-            final item = items[index];
-            return DiscoverMediaCard(
-              item: item,
-              onTap: () => _openDetail(item),
-            );
-          },
-        );
-      },
+  Widget _buildInfoListCard(
+    BuildContext context,
+    RecommendApiItem item, {
+    required bool imageOnLeft,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final title = _bestTitle(item) ?? 'Untitled';
+    final image = _imageUrl(item);
+    final poster = SizedBox(
+      width: 92,
+      height: 132,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: image.isEmpty
+            ? const _DiscoverListPosterPlaceholder()
+            : CachedImage(
+                imageUrl: image,
+                fit: BoxFit.cover,
+                placeholder: const _DiscoverListPosterPlaceholder(),
+                errorWidget: const _DiscoverListPosterPlaceholder(),
+              ),
+      ),
     );
+    final copy = Expanded(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: imageOnLeft ? 14 : 0,
+          right: imageOnLeft ? 0 : 14,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _itemMeta(item),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colorScheme.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (item.overview?.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 8),
+              Text(
+                item.overview!.trim(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+    return Semantics(
+      button: true,
+      label: '打开 $title',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openDetail(item),
+          borderRadius: BorderRadius.circular(22),
+          child: Ink(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.shadow.withValues(alpha: 0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: imageOnLeft
+                  ? [poster, copy]
+                  : [copy, const SizedBox(width: 4), poster],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _itemMeta(RecommendApiItem item) {
+    final year = item.year?.trim() ?? item.title_year?.trim() ?? '';
+    final type = item.type?.trim() ?? '';
+    final vote = item.vote_average;
+    return [
+      if (year.isNotEmpty) year,
+      if (type.isNotEmpty) type,
+      if (vote != null && vote > 0) '★ ${vote.toStringAsFixed(1)}',
+    ].join(' · ');
   }
 
   Widget _buildLoadingGrid(BuildContext context) {
@@ -623,9 +750,6 @@ class DiscoverPage extends GetView<DiscoverController> {
         decoration: BoxDecoration(
           color: colorScheme.surface.withValues(alpha: isDark ? 0.66 : 0.94),
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.72),
-          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -699,40 +823,6 @@ class DiscoverPage extends GetView<DiscoverController> {
       result.selectedSource,
       result.filtersBySource,
       result.dynamicFiltersBySource,
-    );
-  }
-
-  List<String> _summaryParts(String summary) {
-    return summary
-        .split(' · ')
-        .map((part) => part.trim())
-        .where((part) => part.isNotEmpty)
-        .toList();
-  }
-
-  Widget _buildSummaryChip(BuildContext context, String label) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.black.withValues(alpha: 0.28)
-            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
-        ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: colorScheme.onSurface,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
     );
   }
 
@@ -819,19 +909,16 @@ class _GlassButton extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(999),
           child: Container(
-            height: compact ? 38 : 44,
+            height: compact ? 34 : 44,
             padding: EdgeInsets.symmetric(
               horizontal: compact ? 12 : 14,
               vertical: 8,
             ),
             decoration: BoxDecoration(
               color: colorScheme.surface.withValues(
-                alpha: isDark ? 0.72 : 0.92,
+                alpha: isDark ? 0.56 : 0.72,
               ),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.72),
-              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -839,7 +926,7 @@ class _GlassButton extends StatelessWidget {
                 Icon(
                   icon,
                   color: colorScheme.onSurface,
-                  size: compact ? 18 : 19,
+                  size: compact ? 16 : 19,
                 ),
                 if (!compact) ...[
                   const SizedBox(width: 8),
@@ -1010,9 +1097,6 @@ class _DiscoverCardSkeleton extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surface.withValues(alpha: isDark ? 0.66 : 0.94),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.7),
-        ),
       ),
       child: Stack(
         children: [
@@ -1061,6 +1145,48 @@ class _DiscoverCardSkeleton extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ListRatingPill extends StatelessWidget {
+  const _ListRatingPill({required this.value});
+
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '★ ${value.toStringAsFixed(1)}',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscoverListPosterPlaceholder extends StatelessWidget {
+  const _DiscoverListPosterPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      color: colorScheme.surfaceContainerHighest,
+      child: Icon(
+        Icons.movie_creation_outlined,
+        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.42),
+        size: 32,
       ),
     );
   }
