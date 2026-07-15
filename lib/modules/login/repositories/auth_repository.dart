@@ -7,6 +7,7 @@ import 'package:hive_ce/hive.dart';
 import 'package:moviepilot_mobile/applog/app_log.dart';
 import 'package:moviepilot_mobile/modules/profile/models/user_info.dart';
 import 'package:moviepilot_mobile/modules/profile/models/user_global_config.dart';
+import 'package:moviepilot_mobile/modules/agent/controllers/agent_controller.dart';
 import 'package:moviepilot_mobile/modules/site/controllers/site_controller.dart';
 import 'package:moviepilot_mobile/modules/system_message/controllers/system_message_controller.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
@@ -190,6 +191,56 @@ class AuthRepository extends GetxService {
     _appService.restoreSessionFromProfile(profile);
     _api.setBaseUrl(normalizedServer);
     _api.setToken(profile.accessToken);
+  }
+
+  /// 激活已保存的登录档案，并完整切换服务端会话。
+  Future<void> switchProfile(LoginProfile profile) async {
+    final normalizedServer = _normalizeServer(profile.server);
+    if (normalizedServer.isEmpty || profile.accessToken.isEmpty) {
+      throw StateError('登录档案缺少有效的服务器地址或访问令牌');
+    }
+
+    if (Get.isRegistered<AgentController>()) {
+      await Get.find<AgentController>().clearForLogout();
+    }
+    if (Get.isRegistered<SystemMessageController>()) {
+      Get.find<SystemMessageController>().clearForLogout();
+    }
+
+    // Cookie 与 baseUrl 都是会话的一部分，切换前必须一并清理旧会话。
+    await _api.clearSessionCookies();
+    _api.setToken('');
+    _appService.clearCookie();
+    _appService.restoreSessionFromProfile(profile);
+    _api.setBaseUrl(normalizedServer);
+    _api.setToken(profile.accessToken);
+
+    profile.updatedAt = DateTime.now();
+    await _loginBox.put(profile.id, profile);
+
+    await _iosSharedSessionService.syncSession(
+      server: normalizedServer,
+      accessToken: profile.accessToken,
+    );
+    await getUserGlobalConfig(
+      server: normalizedServer,
+      accessToken: profile.accessToken,
+    );
+
+    final role = profile.userName.trim().isNotEmpty
+        ? profile.userName.trim()
+        : profile.username.trim();
+    final userInfo = await getUserInfoByRole(role: role);
+    if (userInfo == null) {
+      throw StateError('切换账号失败：无法获取当前账号信息');
+    }
+
+    if (Get.isRegistered<SiteController>()) {
+      Get.delete<SiteController>(force: true);
+    }
+    await _iosSharedSessionService.reloadWidgets();
+    _syncSystemMessagePolling();
+    unawaited(_warmSiteWidgetData());
   }
 
   Future<void> _warmSiteWidgetData() async {
