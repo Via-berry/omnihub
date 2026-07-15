@@ -173,6 +173,8 @@ class SubscribeService extends GetxService {
     int? season = 0,
     String? tmdbid,
     String? year = '',
+    int bestVersion = 0,
+    int bestVersionFull = 1,
   }) async {
     final payload = {
       'doubanid': doubanid,
@@ -182,7 +184,8 @@ class SubscribeService extends GetxService {
       'season': season,
       'tmdbid': tmdbid,
       'year': year,
-      'best_version': 0,
+      'best_version': bestVersion,
+      'best_version_full': bestVersionFull,
       'type': '电视剧',
     };
     return await submitSubscribe('tv', payload: payload);

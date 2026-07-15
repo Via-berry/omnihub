@@ -3,7 +3,6 @@ import 'package:moviepilot_mobile/applog/app_log.dart';
 import 'package:moviepilot_mobile/modules/media_detail/models/media_detail_model.dart';
 import 'package:moviepilot_mobile/modules/media_detail/models/media_notexists.dart';
 import 'package:moviepilot_mobile/modules/media_detail/models/season_episode_detail.dart';
-import 'package:moviepilot_mobile/modules/subscribe/controllers/subscribe_controller.dart';
 import 'package:moviepilot_mobile/modules/subscribe/controllers/subscribe_service.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
@@ -67,6 +66,51 @@ class MediaDetailService extends GetxService {
           .toList();
     } catch (e) {
       _log.handle(e, message: '获取季信息失败');
+      return [];
+    }
+  }
+
+  /// GET /api/v1/media/seasons 获取媒体可订阅的季度列表。
+  /// mediaid 使用详情页原始媒体标识（如 tmdb:2734、douban:xxxx），
+  /// 不在客户端拆分或重组，避免不同来源的参数规则被混用。
+  Future<List<SeasonInfo>> getMediaSeasons({
+    required String mediaId,
+    required String title,
+    required String year,
+  }) async {
+    try {
+      final query = <String, dynamic>{
+        'mediaid': mediaId,
+        if (title.trim().isNotEmpty) 'title': title.trim(),
+        if (year.trim().isNotEmpty) 'year': year.trim(),
+      };
+      final response = await _apiClient.get<dynamic>(
+        '/api/v1/media/seasons',
+        queryParameters: query,
+      );
+      if (response.statusCode != 200) {
+        throw ApiAuthException(
+          response.statusCode ?? 0,
+          response.statusMessage,
+        );
+      }
+      final data = response.data;
+      final rawList = data is List
+          ? data
+          : data is Map
+          ? (data['data'] ??
+                data['results'] ??
+                data['items'] ??
+                data['seasons'])
+          : null;
+      if (rawList is! List) return [];
+      return rawList
+          .whereType<Map>()
+          .map((e) => SeasonInfo.fromJson(Map<String, dynamic>.from(e)))
+          .where((e) => e.season_number != null)
+          .toList();
+    } catch (e) {
+      _log.handle(e, message: '获取媒体季度列表失败');
       return [];
     }
   }

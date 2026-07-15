@@ -12,6 +12,7 @@ import 'package:moviepilot_mobile/modules/media_detail/widgets/media_detail_seas
 import 'package:moviepilot_mobile/modules/search/pages/search_mid_sheet.dart';
 import 'package:moviepilot_mobile/modules/recommend/models/recommend_api_item.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
+import 'package:moviepilot_mobile/modules/subscribe/widgets/subscribe_tv_season_sheet.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/theme/app_theme.dart';
 import 'package:moviepilot_mobile/utils/http_path_builder_util.dart';
@@ -1030,7 +1031,7 @@ class MediaDetailPage extends GetWidget<MediaDetailController> {
         : 0.92;
     final useThreePagePager = seasons.length >= 3;
     final perPage = useThreePagePager ? (seasons.length / 3).ceil() : 1;
-    final compactItemHeight = 104.0;
+    final compactItemHeight = 112.0;
     final dividerBlockHeight = 13.0; // 6 + 1 + 6
     final threePagerHeight =
         perPage * compactItemHeight + (perPage - 1) * dividerBlockHeight;
@@ -1252,17 +1253,29 @@ class MediaDetailPage extends GetWidget<MediaDetailController> {
       final movieSubscribed = controller.movieSubscribeItem.value != null;
       final seasons = detail.season_info;
       if (isTv && seasons?.isNotEmpty == true) {
-        if (!canSearch) return const SizedBox.shrink();
-        return _buildHeaderActionGroup(
-          children: [
+        final actions = <Widget>[];
+        if (canSubscribe) {
+          actions.add(
+            _buildSubscribeButton(
+              context,
+              detail,
+              isLoading,
+              controller.seasonSubscribeMap.isNotEmpty,
+            ),
+          );
+        }
+        if (canSearch) {
+          actions.add(
             _buildPrimaryAction(
               label: '搜索资源',
               icon: CupertinoIcons.search,
               onPressed: isLoading ? null : () => _openSearch(context),
               accentColor: Theme.of(context).colorScheme.secondary,
             ),
-          ],
-        );
+          );
+        }
+        if (actions.isEmpty) return const SizedBox.shrink();
+        return _buildHeaderActionGroup(children: actions);
       }
       final actions = <Widget>[];
       if (canSubscribe) {
@@ -1334,12 +1347,18 @@ class MediaDetailPage extends GetWidget<MediaDetailController> {
         );
       }
       return _buildPrimaryAction(
-        label: isSubscribed ? '已订阅' : '订阅',
+        label: _isTv(detail)
+            ? (controller.seasonSubscribeMap.isNotEmpty ? '已订阅' : '订阅')
+            : (isSubscribed ? '已订阅' : '订阅'),
         icon: isSubscribed
             ? CupertinoIcons.heart_slash_fill
             : CupertinoIcons.heart_fill,
         onPressed: () async {
           try {
+            if (_isTv(detail)) {
+              await _openTvSubscribeSheet(context, detail);
+              return;
+            }
             final (success, isTv, subscribeId) = await controller
                 .handleSubscribe();
             if (!success) {
@@ -1379,6 +1398,42 @@ class MediaDetailPage extends GetWidget<MediaDetailController> {
             : Theme.of(context).colorScheme.primary,
       );
     });
+  }
+
+  Future<void> _openTvSubscribeSheet(
+    BuildContext context,
+    MediaDetail detail,
+  ) async {
+    await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      showDragHandle: false,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.92,
+        minChildSize: 0.36,
+        maxChildSize: 1,
+        builder: (context, scrollController) => ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: SubscribeTvSeasonSheet(
+            mediaKey: controller.args.path,
+            tmdbId: detail.tmdb_id?.toString(),
+            title: detail.title,
+            year: detail.year,
+            season: detail.season?.toString(),
+            itemInfo: detail.toJson(),
+            scrollController: scrollController,
+            subscribedItems: Map<int, SubscribeItem>.from(
+              controller.seasonSubscribeMap,
+            ),
+          ),
+        ),
+      ),
+    );
+    await controller.fetchDetail();
   }
 
   Widget _buildExternalLinks(
