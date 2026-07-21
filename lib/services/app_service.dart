@@ -12,6 +12,7 @@ import 'package:moviepilot_mobile/utils/prefs_keys.dart';
 import 'package:moviepilot_mobile/modules/login/models/login_response.dart';
 import 'package:moviepilot_mobile/modules/profile/models/user_info.dart';
 import 'package:moviepilot_mobile/services/hive_service.dart';
+import 'package:moviepilot_mobile/services/app_icon_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 应用全局服务
@@ -31,6 +32,8 @@ class AppService extends GetxService {
   final llmSupportAudioOutput = false.obs;
   final aiRecommendEnabled = false.obs;
   final agentCacheScopeKey = ''.obs;
+  final selectedAppIconId = 'default'.obs;
+  final appIconService = AppIconService();
 
   // 背景图设置
   final backgroundImageBytes = Rxn<Uint8List>();
@@ -63,6 +66,7 @@ class AppService extends GetxService {
         : prefs.getBool('useExternalBrowser') ?? false;
     enableFetchMediaserverLibraryStatus.value =
         prefs.getBool('enableFetchMediaserverLibraryStatus') ?? false;
+    selectedAppIconId.value = prefs.getString('selectedAppIconId') ?? 'default';
 
     // 背景图设置
     backgroundImageEnabled.value =
@@ -119,6 +123,15 @@ class AppService extends GetxService {
     prefs.setInt('primaryColorG', g);
     prefs.setInt('primaryColorB', b);
     Get.forceAppUpdate();
+  }
+
+  Future<bool> updateAppIcon(String iconId) async {
+    final changed = await appIconService.setIcon(iconId);
+    if (!changed) return false;
+    selectedAppIconId.value = iconId;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('selectedAppIconId', iconId);
+    return true;
   }
 
   Future<void> updateShowSearchButton(bool value) async {
