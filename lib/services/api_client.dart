@@ -311,6 +311,16 @@ class ApiClient extends g.GetxController {
     _log.info('更新 API Token');
   }
 
+  /// 清理当前传输层会话，避免切换账号时复用上一个账号的 Cookie。
+  Future<void> clearSessionCookies() async {
+    _cachedCookieHeader = null;
+    _cachedCookieUri = null;
+    _cachedCookieAt = null;
+    try {
+      await _cookieJar.deleteAll();
+    } catch (_) {}
+  }
+
   Future<Response<T>> request<T>(
     String url,
     RequestMethod method,

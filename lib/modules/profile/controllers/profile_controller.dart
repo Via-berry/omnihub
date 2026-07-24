@@ -28,6 +28,8 @@ class ProfileController extends GetxController {
   /// 是否正在加载
   final isLoading = false.obs;
 
+  final availableProfiles = <LoginProfile>[].obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -51,7 +53,31 @@ class ProfileController extends GetxController {
         return;
       }
       profiles.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      availableProfiles.assignAll(profiles);
       currentProfile.value = profiles.first;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> loadAvailableProfiles() async {
+    final profiles = await _authRepository.getProfilesAsync();
+    profiles.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    availableProfiles.assignAll(profiles);
+  }
+
+  Future<bool> switchAccount(LoginProfile profile) async {
+    if (currentProfile.value?.id == profile.id) return true;
+    try {
+      isLoading.value = true;
+      await _authRepository.switchProfile(profile);
+      currentProfile.value = profile;
+      currentUserInfo.value = _appService.userInfo;
+      availableProfiles.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return true;
+    } catch (e) {
+      _talker.warning('切换账号失败: $e');
+      return false;
     } finally {
       isLoading.value = false;
     }

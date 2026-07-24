@@ -335,10 +335,7 @@ class MultifunctionController extends GetxController {
         final settingConfig = setting?['config'] is Map
             ? Map<String, dynamic>.from(setting!['config'] as Map)
             : const <String, dynamic>{};
-        host = _firstNonEmpty([
-          settingConfig['host'],
-          setting?['host'],
-        ]);
+        host = _firstNonEmpty([settingConfig['host'], setting?['host']]);
         username = _firstNonEmpty([
           username,
           settingConfig['username'],
@@ -368,10 +365,7 @@ class MultifunctionController extends GetxController {
         },
       );
     } else {
-      await Get.toNamed(
-        '/downloader',
-        parameters: {'name': client.name},
-      );
+      await Get.toNamed('/downloader', parameters: {'name': client.name});
     }
     if (!isClosed) {
       await refreshDownloaderSection();
@@ -647,10 +641,7 @@ class MultifunctionController extends GetxController {
       final settingConfig = setting?['config'] is Map
           ? Map<String, dynamic>.from(setting!['config'] as Map)
           : const <String, dynamic>{};
-      final type = _firstNonEmpty([
-        client['type'],
-        setting?['type'],
-      ]);
+      final type = _firstNonEmpty([client['type'], setting?['type']]);
       final host = _firstNonEmpty([
         clientConfig['host'],
         settingConfig['host'],
@@ -707,7 +698,8 @@ class MultifunctionController extends GetxController {
     return true;
   }
 
-  Future<Map<String, Map<String, dynamic>>> _loadDownloaderSettingsByName() async {
+  Future<Map<String, Map<String, dynamic>>>
+  _loadDownloaderSettingsByName() async {
     try {
       final response = await _apiClient.get<dynamic>(
         '/api/v1/system/setting/Downloaders',

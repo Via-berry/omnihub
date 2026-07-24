@@ -9,6 +9,7 @@ import 'package:moviepilot_mobile/modules/search/models/app_update_info.dart';
 import 'package:moviepilot_mobile/modules/search/services/app_update_installer.dart';
 import 'package:moviepilot_mobile/modules/search/services/app_update_service.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
+import 'package:moviepilot_mobile/models/app_icon_option.dart';
 import 'package:moviepilot_mobile/utils/open_url.dart';
 import 'package:moviepilot_mobile/utils/size_formatter.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
@@ -17,6 +18,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 class AppSettingController extends GetxController {
   final themeMode = ThemeMode.system.obs;
   final primaryColor = Color(0xFF007AFF).obs;
+  final selectedAppIconId = 'default'.obs;
+  final isChangingAppIcon = false.obs;
   final service = Get.find<AppService>();
   final version = '1.0.0'.obs;
   final showSearchButton = true.obs;
@@ -46,6 +49,7 @@ class AppSettingController extends GetxController {
     super.onInit();
     themeMode.value = service.themeMode.value;
     primaryColor.value = service.primaryColor.value;
+    selectedAppIconId.value = service.selectedAppIconId.value;
     showSearchButton.value = service.showSearchButton.value;
     enableDownloaderManager.value = service.enableDownloaderManager.value;
     enableSpecialDownload.value = service.enableSpecialDownload.value;
@@ -104,6 +108,22 @@ class AppSettingController extends GetxController {
   void updatePrimaryColor(Color color) {
     primaryColor.value = color;
     service.updatePrimaryColor(color);
+  }
+
+  Future<void> updateAppIcon(AppIconOption option) async {
+    if (isChangingAppIcon.value || selectedAppIconId.value == option.id) return;
+    isChangingAppIcon.value = true;
+    try {
+      final changed = await service.updateAppIcon(option.id);
+      if (changed) {
+        selectedAppIconId.value = option.id;
+        Get.rawSnackbar(message: '已切换为「${option.name}」图标');
+      } else {
+        Get.rawSnackbar(message: '当前平台暂不支持更换应用图标');
+      }
+    } finally {
+      isChangingAppIcon.value = false;
+    }
   }
 
   void updateShowSearchButton(bool value) {

@@ -12,6 +12,7 @@ class DiscoverMediaCard extends StatelessWidget {
     this.cardAspectRatio = 0.62,
     this.previewMinWidth = 160,
     this.previewMaxWidth = 240,
+    this.visualVariant = 0,
   });
 
   final RecommendApiItem item;
@@ -19,6 +20,7 @@ class DiscoverMediaCard extends StatelessWidget {
   final double cardAspectRatio;
   final double previewMinWidth;
   final double previewMaxWidth;
+  final int visualVariant;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +52,7 @@ class DiscoverMediaCard extends StatelessWidget {
                 vote: vote,
                 year: year,
                 type: item.type,
+                visualVariant: visualVariant,
               ),
             ),
           );
@@ -86,6 +89,7 @@ class DiscoverCardSurface extends StatelessWidget {
     required this.type,
     this.surfaceColor,
     this.ratingColor,
+    this.visualVariant = 0,
   });
 
   final String imageUrl;
@@ -95,25 +99,33 @@ class DiscoverCardSurface extends StatelessWidget {
   final String? type;
   final Color? surfaceColor;
   final Color? ratingColor;
+  final int visualVariant;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final effectiveRatingColor = ratingColor ?? colorScheme.secondary;
+    final variant = visualVariant % 3;
+    final effectiveRatingColor =
+        ratingColor ??
+        (variant == 1 ? colorScheme.primary : colorScheme.secondary);
+    final borderColor = variant == 2
+        ? colorScheme.primary.withValues(alpha: 0.62)
+        : colorScheme.outlineVariant.withValues(alpha: 0.7);
+    final shadowColor = variant == 1
+        ? colorScheme.primary.withValues(alpha: isDark ? 0.24 : 0.16)
+        : Colors.black.withValues(alpha: isDark ? 0.32 : 0.12);
     return Container(
       decoration: BoxDecoration(
         color: surfaceColor ?? colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.7),
-        ),
+        border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.32 : 0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+            color: shadowColor,
+            blurRadius: variant == 1 ? 24 : 18,
+            offset: Offset(0, variant == 1 ? 12 : 10),
           ),
         ],
       ),
@@ -144,6 +156,45 @@ class DiscoverCardSurface extends StatelessWidget {
               ),
             ),
           ),
+          if (variant == 1)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [colorScheme.primary, colorScheme.secondary],
+                  ),
+                ),
+              ),
+            ),
+          if (variant == 2 && (type ?? '').trim().isNotEmpty)
+            Positioned(
+              top: 10,
+              left: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: colorScheme.surface.withValues(alpha: 0.78),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  ),
+                ),
+                child: Text(
+                  type!.trim(),
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
           if (vote != null && vote! > 0)
             Positioned(
               top: 10,

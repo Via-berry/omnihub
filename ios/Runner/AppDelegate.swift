@@ -32,6 +32,21 @@ private let appWidgetLog = Logger(subsystem: "com.altman.moviepilot", category: 
     }
     GeneratedPluginRegistrant.register(with: self)
     if let controller = window?.rootViewController as? FlutterViewController {
+      let appIconChannel = FlutterMethodChannel(
+        name: "org.moviepilot/app_icon",
+        binaryMessenger: controller.binaryMessenger
+      )
+      appIconChannel.setMethodCallHandler { call, result in
+        guard call.method == "setAppIcon",
+          let arguments = call.arguments as? [String: Any],
+          let iconId = arguments["iconId"] as? String
+        else {
+          result(false)
+          return
+        }
+        self.setAlternateAppIcon(iconId: iconId, result: result)
+      }
+
       let channel = FlutterMethodChannel(
         name: "org.moviepilot/ios_shared_session",
         binaryMessenger: controller.binaryMessenger
@@ -87,6 +102,30 @@ private let appWidgetLog = Logger(subsystem: "com.altman.moviepilot", category: 
       }
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  private func setAlternateAppIcon(iconId: String, result: @escaping FlutterResult) {
+    guard UIApplication.shared.supportsAlternateIcons else {
+      result(false)
+      return
+    }
+    let iconName: String?
+    switch iconId {
+    case "default": iconName = nil
+    case "midnight": iconName = "IconMidnight"
+    case "sunset": iconName = "IconSunset"
+    case "mint": iconName = "IconMint"
+    case "neon": iconName = "IconNeon"
+    case "aurora": iconName = "IconAurora"
+    case "sunset_pop": iconName = "IconSunsetPop"
+    case "mono": iconName = "IconMono"
+    default:
+      result(false)
+      return
+    }
+    UIApplication.shared.setAlternateIconName(iconName) { error in
+      result(error == nil)
+    }
   }
 
   override func application(
