@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/download/controllers/download_controller.dart';
 import 'package:moviepilot_mobile/modules/downloader/models/downloader_stats.dart';
@@ -7,6 +8,7 @@ import 'package:moviepilot_mobile/modules/subtitle/controllers/subtitle_search_c
 import 'package:moviepilot_mobile/modules/subtitle/models/subtitle_search_models.dart';
 import 'package:moviepilot_mobile/utils/size_formatter.dart';
 import 'package:moviepilot_mobile/widgets/bottom_sheet.dart';
+import 'package:moviepilot_mobile/widgets/cached_image.dart';
 
 class SubtitleDownloadSheet extends GetView<DownloadController> {
   const SubtitleDownloadSheet({super.key, required this.item});
@@ -23,7 +25,7 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
     final isDark = theme.brightness == Brightness.dark;
     final background = theme.scaffoldBackgroundColor;
     final backgroundAlt =
-        Color.lerp(background, scheme.primary, isDark ? 0.035 : 0.018) ??
+        Color.lerp(background, scheme.primary, isDark ? 0.04 : 0.02) ??
         background;
 
     return ClipRRect(
@@ -33,9 +35,9 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
         scrollController: controller.scrollController,
         snap: false,
         snapSizes: const [],
-        initialChildSize: 0.62,
-        minChildSize: 0.28,
-        maxChildSize: 0.86,
+        initialChildSize: 0.64,
+        minChildSize: 0.3,
+        maxChildSize: 0.88,
         builder: (context, scrollController) => DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -46,12 +48,12 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
           ),
           child: ListView(
             controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 20),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
             children: [
               _buildSummary(context),
               const SizedBox(height: 12),
-              _buildDownloadSettingsSection(context),
-              const SizedBox(height: 14),
+              _buildSettings(context),
+              const SizedBox(height: 16),
               _buildBottomActions(context),
             ],
           ),
@@ -62,101 +64,186 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
 
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
-        child: Column(
-          children: [
-            Container(
-              width: 38,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant.withValues(
-                  alpha: 0.45,
-                ),
-                borderRadius: BorderRadius.circular(999),
+    final primary = theme.colorScheme.primary;
+    return Stack(
+      children: [
+        Positioned(
+          top: -90,
+          left: -70,
+          child: Container(
+            width: 220,
+            height: 180,
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  primary.withValues(alpha: 0.22),
+                  primary.withValues(alpha: 0),
+                ],
               ),
             ),
-            const SizedBox(height: 10),
-            Row(
+          ),
+        ),
+        Positioned(
+          right: -100,
+          bottom: -100,
+          child: Container(
+            width: 240,
+            height: 200,
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  theme.colorScheme.secondary.withValues(alpha: 0.14),
+                  theme.colorScheme.secondary.withValues(alpha: 0),
+                ],
+              ),
+            ),
+          ),
+        ),
+        SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+            child: Column(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 38,
+                  height: 4,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    CupertinoIcons.text_bubble_fill,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '下载字幕',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: 0.45,
                     ),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  icon: const Icon(Icons.close_rounded),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: primary.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        CupertinoIcons.text_bubble_fill,
+                        color: primary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '下载字幕',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '选择下载器和保存位置',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '关闭',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildSummary(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
+    final scheme = theme.colorScheme;
     final title = (item.title ?? '').trim().isEmpty ? '未命名字幕' : item.title!;
-    final metas = <String>[
-      if ((item.siteName ?? '').trim().isNotEmpty) item.siteName!.trim(),
-      if ((item.language ?? '').trim().isNotEmpty) item.language!.trim(),
-      if (item.size != null && item.size! > 0)
-        SizeFormatter.formatSize(item.size, 1),
-    ];
+    final siteName = (item.siteName ?? '').trim();
+    final language = (item.language ?? '').trim();
+    final icon = (item.languageIcon ?? '').trim();
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(15, 14, 15, 14),
       decoration: _panelDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            maxLines: 3,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
-              height: 1.35,
+              height: 1.3,
             ),
           ),
-          if (metas.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              metas.join(' · '),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(color: muted),
-            ),
-          ],
+          const SizedBox(height: 10),
+          Divider(
+            height: 1,
+            thickness: 0.6,
+            color: scheme.outlineVariant.withValues(alpha: 0.7),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 14,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (siteName.isNotEmpty)
+                _MetaItem(
+                  icon: CupertinoIcons.globe,
+                  text: siteName,
+                ),
+              if (language.isNotEmpty)
+                _MetaItem(
+                  iconWidget: icon.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: CachedImage(
+                            imageUrl: icon,
+                            width: 14,
+                            height: 10,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : null,
+                  icon: CupertinoIcons.flag,
+                  text: language,
+                  tintColor: scheme.primary,
+                ),
+              if (item.size != null && item.size! > 0)
+                _MetaItem(
+                  icon: CupertinoIcons.doc,
+                  text: SizeFormatter.formatSize(item.size, 1),
+                  emphasize: true,
+                ),
+              if ((item.dateElapsed ?? '').trim().isNotEmpty)
+                _MetaItem(
+                  icon: CupertinoIcons.time,
+                  text: item.dateElapsed!.trim(),
+                ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDownloadSettingsSection(BuildContext context) {
+  Widget _buildSettings(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: _panelDecoration(context),
@@ -169,21 +256,19 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
                 width: 30,
                 height: 30,
                 decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.10),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(
                   Icons.tune_rounded,
                   size: 16,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: theme.colorScheme.primary,
                 ),
               ),
               const SizedBox(width: 9),
               Text(
                 '下载设置',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -191,19 +276,17 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
           ),
           const SizedBox(height: 14),
           Obx(
-            () => _buildSubsectionLabel(
-              context,
-              '下载器',
-              controller.selectedDownloader.value?.name ?? '未选择',
+            () => _SubsectionLabel(
+              title: '下载器',
+              value: controller.selectedDownloader.value?.name ?? '未选择',
             ),
           ),
           _buildDownloaderSelector(context),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Obx(
-            () => _buildSubsectionLabel(
-              context,
-              '保存目录',
-              controller.selectedDirectory.value.isEmpty
+            () => _SubsectionLabel(
+              title: '保存目录',
+              value: controller.selectedDirectory.value.isEmpty
                   ? '自动匹配'
                   : controller.selectedDirectory.value,
             ),
@@ -217,12 +300,12 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
   Widget _buildDownloaderSelector(BuildContext context) {
     return Obx(() {
       if (controller.isLoadingDownloaders) {
-        return _buildPlaceholderState(context, label: '正在加载');
+        return const _Placeholder(label: '正在加载');
       }
       final downloaders = controller.downloaders;
       final selected = controller.selectedDownloader.value;
       if (downloaders.isEmpty) {
-        return _buildPlaceholderState(context, label: '暂无可用下载器');
+        return const _Placeholder(label: '暂无可用下载器');
       }
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -235,13 +318,15 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
               child: SizedBox(
                 width: 188,
                 height: 70,
-                child: _buildChoiceTile(
-                  context,
+                child: _ChoiceTile(
                   title: downloader.name,
                   subtitle: _downloaderSubtitle(downloader, stats),
                   isSelected: isSelected,
                   accentColor: Theme.of(context).colorScheme.primary,
-                  onTap: () => controller.setDownloader(downloader),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    controller.setDownloader(downloader);
+                  },
                 ),
               ),
             );
@@ -261,18 +346,19 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
         child: Row(
           children: entries.map((dir) {
             final isAuto = dir.isEmpty;
-            final label = isAuto ? '自动匹配' : dir;
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: SizedBox(
                 width: isAuto ? 116 : 164,
                 height: 46,
-                child: _buildChoiceTile(
-                  context,
-                  title: label,
+                child: _ChoiceTile(
+                  title: isAuto ? '自动匹配' : dir,
                   isSelected: selected == dir,
                   accentColor: Theme.of(context).colorScheme.secondary,
-                  onTap: () => controller.setDirectory(dir),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    controller.setDirectory(dir);
+                  },
                 ),
               ),
             );
@@ -291,6 +377,7 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
         child: FilledButton.icon(
           onPressed: enabled && !busy
               ? () async {
+                  HapticFeedback.mediumImpact();
                   final path = controller.selectedDirectory.value.trim();
                   final ok = await _subtitleController.downloadSubtitle(
                     item,
@@ -318,20 +405,98 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
               : const Icon(Icons.download_rounded, size: 19),
           label: Text(
             busy ? '下载中' : '开始下载',
-            style: Theme.of(
-              context,
-            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       );
     });
   }
 
-  Widget _buildSubsectionLabel(
-    BuildContext context,
-    String title,
-    String selectedValue,
-  ) {
+  String _downloaderSubtitle(dynamic downloader, DownloaderStats? stats) {
+    if (stats != null && stats.freeSpace > 0) {
+      return '剩余 ${SizeFormatter.formatSize(stats.freeSpace, 1)}';
+    }
+    return downloader.type.isNotEmpty ? downloader.type.toUpperCase() : '';
+  }
+
+  BoxDecoration _panelDecoration(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return BoxDecoration(
+      color: theme.cardColor.withValues(alpha: isDark ? 0.92 : 0.98),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: _outlineColor(context)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: isDark ? 0.14 : 0.05),
+          blurRadius: 14,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    );
+  }
+
+  Color _outlineColor(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return theme.colorScheme.outlineVariant.withValues(alpha: isDark ? 0.4 : 0.7);
+  }
+}
+
+class _MetaItem extends StatelessWidget {
+  const _MetaItem({
+    required this.text,
+    this.icon,
+    this.iconWidget,
+    this.emphasize = false,
+    this.tintColor,
+  });
+
+  final String text;
+  final IconData? icon;
+  final Widget? iconWidget;
+  final bool emphasize;
+  final Color? tintColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final color =
+        tintColor ?? (emphasize ? scheme.onSurface : scheme.onSurfaceVariant);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (iconWidget != null)
+          iconWidget!
+        else if (icon != null)
+          Icon(icon, size: 13, color: color),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: color,
+            fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,
+            height: 1.25,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SubsectionLabel extends StatelessWidget {
+  const _SubsectionLabel({required this.title, required this.value});
+
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -347,7 +512,7 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              selectedValue,
+              value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
@@ -361,17 +526,31 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
       ),
     );
   }
+}
 
-  Widget _buildChoiceTile(
-    BuildContext context, {
-    required String title,
-    String? subtitle,
-    required bool isSelected,
-    required Color accentColor,
-    required VoidCallback onTap,
-  }) {
+class _ChoiceTile extends StatelessWidget {
+  const _ChoiceTile({
+    required this.title,
+    required this.isSelected,
+    required this.accentColor,
+    required this.onTap,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final bool isSelected;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final surface = scheme.surfaceContainerHighest.withValues(
+      alpha: isDark ? 0.42 : 0.72,
+    );
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -380,13 +559,11 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
         child: Ink(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           decoration: BoxDecoration(
-            color: isSelected
-                ? accentColor.withValues(alpha: 0.12)
-                : _controlSurface(context),
+            color: isSelected ? accentColor.withValues(alpha: 0.12) : surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isSelected
-                  ? accentColor.withValues(alpha: 0.22)
+                  ? accentColor.withValues(alpha: 0.28)
                   : scheme.outlineVariant.withValues(alpha: 0.55),
             ),
           ),
@@ -426,10 +603,10 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
                         color: isSelected ? accentColor : scheme.onSurface,
                       ),
                     ),
-                    if (subtitle != null && subtitle.isNotEmpty) ...[
+                    if ((subtitle ?? '').isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
-                        subtitle,
+                        subtitle!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -446,15 +623,29 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
       ),
     );
   }
+}
 
-  Widget _buildPlaceholderState(BuildContext context, {required String label}) {
+class _Placeholder extends StatelessWidget {
+  const _Placeholder({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: _controlSurface(context),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: isDark ? 0.42 : 0.72,
+        ),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _outlineColor(context)),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(
+            alpha: isDark ? 0.4 : 0.7,
+          ),
+        ),
       ),
       child: Text(
         label,
@@ -463,43 +654,5 @@ class SubtitleDownloadSheet extends GetView<DownloadController> {
         ),
       ),
     );
-  }
-
-  String _downloaderSubtitle(dynamic downloader, DownloaderStats? stats) {
-    if (stats != null && stats.freeSpace > 0) {
-      return '剩余 ${SizeFormatter.formatSize(stats.freeSpace, 1)}';
-    }
-    return downloader.type.isNotEmpty ? downloader.type.toUpperCase() : '';
-  }
-
-  BoxDecoration _panelDecoration(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return BoxDecoration(
-      color: theme.cardColor.withValues(alpha: isDark ? 0.90 : 0.98),
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: _outlineColor(context)),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: isDark ? 0.14 : 0.055),
-          blurRadius: 16,
-          offset: const Offset(0, 6),
-        ),
-      ],
-    );
-  }
-
-  Color _controlSurface(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return theme.colorScheme.surfaceContainerHighest.withValues(
-      alpha: isDark ? 0.42 : 0.72,
-    );
-  }
-
-  Color _outlineColor(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return theme.colorScheme.outlineVariant.withValues(alpha: isDark ? 0.4 : 0.7);
   }
 }
