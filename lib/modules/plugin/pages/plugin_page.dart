@@ -6,7 +6,6 @@ import 'package:moviepilot_mobile/modules/plugin/models/plugin_models.dart';
 import 'package:moviepilot_mobile/modules/plugin/pages/plugin_info_sheet.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/modules/plugin/widgets/plugin_item_card.dart';
-import 'package:moviepilot_mobile/modules/plugin/widgets/plugin_center_widgets.dart';
 import 'package:moviepilot_mobile/utils/image_util.dart';
 import 'package:moviepilot_mobile/utils/open_url.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
@@ -76,18 +75,12 @@ class PluginPage extends GetView<PluginController> {
       ),
       body: RefreshIndicator(
         onRefresh: controller.load,
-        child: Stack(
-          children: [
-            const Positioned.fill(child: PluginCenterBackdrop()),
-            CustomScrollView(
-              cacheExtent: 200,
-              slivers: [
-                SliverToBoxAdapter(child: _buildOverviewHeader(context)),
-                _buildSliverContent(context),
-                SliverToBoxAdapter(
-                  child: SizedBox(height: _bottomInset(context)),
-                ),
-              ],
+        child: CustomScrollView(
+          cacheExtent: 200,
+          slivers: [
+            _buildSliverContent(context),
+            SliverToBoxAdapter(
+              child: SizedBox(height: _bottomInset(context)),
             ),
           ],
         ),
@@ -121,20 +114,6 @@ class PluginPage extends GetView<PluginController> {
         ),
       ),
     );
-  }
-
-  Widget _buildOverviewHeader(BuildContext context) {
-    return Obx(() {
-      final items = controller.items;
-      final active = items.where((item) => item.state).length;
-      return PluginOverviewHeader(
-        title: '你的插件空间',
-        count: items.length,
-        secondaryCount: active,
-        secondaryLabel: '运行中',
-        icon: Icons.extension_rounded,
-      );
-    });
   }
 
   Future<void> _openRepoInstallSheet(BuildContext context) {

@@ -103,16 +103,11 @@ If needed, you can further use the `web_scraper.py` file to scrape the web page 
 
 ## Done: 下载 startDownload — API detail 为 List 时 ToastUtil.error 类型错误（_downloadApiErrorMessage）
 
-## Current Task: BrushFlow 插件适配
+## Current Task: 插件页 Item 美化
 
-[X] 主页/详情/设置开关/status+settings API
-[X] 任务新增 POST /tasks、编辑 PUT /tasks/{id}
-[X] 分段表单页（基础/调度/筛选/配额/做种/高级）
-[X] 任务卡片移除内嵌编辑/暂停，改 CupertinoContextMenu
-[X] 清理 POST /tasks/{id}/clear + 删除 DELETE /tasks/{id}
-[X] 详情页任务规则改为紧凑 chip + 更多展开
-[X] 种子 item 重做为侧条+元信息+图标统计
-[X] flutter analyze
+[X] PluginItemCard 对齐 DashboardPalette + 取色渐变/侧条
+[X] 已安装/市场共用卡片提亮对比度
+[X] CHANGELOG + analyze
 
 ## Lessons (BrushFlow)
 - 自定义 PluginFormRenderer 需保证 adapter.blocks 非空（sentinel FormBlock），否则 DynamicFormPage 不进入 customRenderer 分支

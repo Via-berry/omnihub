@@ -6,7 +6,6 @@ import 'package:moviepilot_mobile/modules/plugin/defines/plugin_list_filter_defi
 import 'package:moviepilot_mobile/modules/plugin/models/plugin_models.dart';
 import 'package:moviepilot_mobile/modules/plugin/pages/plugin_info_sheet.dart';
 import 'package:moviepilot_mobile/modules/plugin/widgets/plugin_item_card.dart';
-import 'package:moviepilot_mobile/modules/plugin/widgets/plugin_center_widgets.dart';
 import 'package:moviepilot_mobile/modules/plugin/widgets/plugin_list_filter_sheet.dart';
 import 'package:moviepilot_mobile/modules/search_result/widgets/sort_pull_down_widget.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
@@ -91,35 +90,18 @@ class PluginListPage extends GetView<PluginListController> {
       ),
       body: RefreshIndicator(
         onRefresh: controller.load,
-        child: Stack(
-          children: [
-            const Positioned.fill(child: PluginCenterBackdrop()),
-            CustomScrollView(
-              controller: controller.scrollController,
-              cacheExtent: 200,
-              slivers: [
-                SliverToBoxAdapter(child: _buildOverviewHeader(context)),
-                _buildSliverContent(context),
-                SliverToBoxAdapter(
-                  child: SizedBox(height: _bottomInset(context)),
-                ),
-              ],
+        child: CustomScrollView(
+          controller: controller.scrollController,
+          cacheExtent: 200,
+          slivers: [
+            _buildSliverContent(context),
+            SliverToBoxAdapter(
+              child: SizedBox(height: _bottomInset(context)),
             ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildOverviewHeader(BuildContext context) {
-    return Obx(() {
-      final items = controller.items;
-      return PluginOverviewHeader(
-        title: '探索扩展能力',
-        count: items.length,
-        icon: Icons.storefront_rounded,
-      );
-    });
   }
 
   Widget _buildFloatingFilterButton(BuildContext context) {

@@ -1,5 +1,7 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:moviepilot_mobile/modules/dashboard/widgets/dashboard_widget_styles.dart';
 import 'package:moviepilot_mobile/modules/plugin/models/plugin_models.dart';
 import 'package:moviepilot_mobile/modules/plugin/services/plugin_palette_cache.dart';
 import 'package:moviepilot_mobile/widgets/cached_image.dart';
@@ -20,223 +22,275 @@ class PluginItemCard extends StatelessWidget {
   final int installCount;
   final Function(PluginHandleType type)? onHandleTap;
 
-  static const double _radius = 18;
+  static const double _radius = 20;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final accent = _resolveThemeColor();
+    final palette = DashboardPalette.of(context);
     final installedView = onHandleTap != null;
-    final status = _statusPresentation(colorScheme, installedView);
 
-    return Semantics(
-      button: true,
-      label: '${item.pluginName}，${status.label}',
-      child: Card(
-        margin: EdgeInsets.zero,
-        elevation: 0,
-        color: colorScheme.surfaceContainer,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(_radius),
-          side: BorderSide(color: accent.withValues(alpha: 0.18), width: 0.8),
-        ),
-        child: Ink(
+    return Obx(() {
+      final accent = _resolveAccent(palette);
+      final status = _statusPresentation(palette, installedView);
+
+      return Semantics(
+        button: true,
+        label: '${item.pluginName}，${status.label}',
+        child: DecoratedBox(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                accent.withValues(alpha: 0.10),
-                colorScheme.surfaceContainer,
-              ],
-            ),
+            borderRadius: BorderRadius.circular(_radius),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: palette.isDark ? 0.18 : 0.10),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: palette.shadow,
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: Material(
+            color: Colors.transparent,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(_radius),
+              side: BorderSide(
+                color: Color.alphaBlend(
+                  accent.withValues(alpha: palette.isDark ? 0.28 : 0.22),
+                  palette.tileBorder,
+                ),
+              ),
+            ),
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(_radius),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color.alphaBlend(
+                      accent.withValues(alpha: palette.isDark ? 0.22 : 0.14),
+                      palette.surface,
+                    ),
+                    Color.alphaBlend(
+                      accent.withValues(alpha: palette.isDark ? 0.08 : 0.04),
+                      palette.pageBackgroundAlt,
+                    ),
+                    palette.surface,
+                  ],
+                  stops: const [0.0, 0.45, 1.0],
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(_radius),
+                child: Stack(
                   children: [
-                    _buildIcon(context, accent),
-                    const SizedBox(width: 10),
-                    Expanded(
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: ColoredBox(
+                        color: accent,
+                        child: const SizedBox(width: 4),
+                      ),
+                    ),
+                    Positioned(
+                      right: -18,
+                      top: -22,
+                      child: IgnorePointer(
+                        child: Container(
+                          width: 88,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                accent.withValues(
+                                  alpha: palette.isDark ? 0.20 : 0.14,
+                                ),
+                                accent.withValues(alpha: 0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 13, 12, 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            item.pluginName,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: colorScheme.onSurface,
-                              fontWeight: FontWeight.w800,
-                              height: 1.15,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 3),
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Flexible(
-                                child: Text(
-                                  item.pluginAuthor?.trim().isNotEmpty == true
-                                      ? item.pluginAuthor!.trim()
-                                      : '未知作者',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                              _buildIcon(context, accent, palette),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.pluginName,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.25,
+                                        height: 1.2,
+                                        color: palette.titleText,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _metaLine,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        height: 1.25,
+                                        fontWeight: FontWeight.w500,
+                                        color: palette.mutedText,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
                                 ),
                               ),
-                              if ((item.pluginVersion ?? '').isNotEmpty) ...[
-                                Container(
-                                  width: 3,
-                                  height: 3,
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 7,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.onSurfaceVariant,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                Text(
-                                  'v${item.pluginVersion}',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w600,
+                              const SizedBox(width: 8),
+                              _statusBadge(
+                                label: status.label,
+                                color: status.color,
+                                icon: status.icon,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            item.pluginDesc?.trim().isNotEmpty == true
+                                ? item.pluginDesc!.trim()
+                                : '暂无插件说明',
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.35,
+                              color: palette.bodyText.withValues(
+                                alpha: palette.isDark ? 0.78 : 0.82,
+                              ),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 11),
+                          Row(
+                            children: [
+                              _MetaChip(
+                                icon: CupertinoIcons.arrow_down_circle_fill,
+                                label: _formatInstallCount(installCount),
+                                color: accent,
+                                palette: palette,
+                              ),
+                              if (_labelList.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: _MetaChip(
+                                    icon: CupertinoIcons.tag_fill,
+                                    label: _labelList.first,
+                                    color: palette.coolAccent,
+                                    palette: palette,
                                   ),
                                 ),
                               ],
+                              if (item.isLocal) ...[
+                                const SizedBox(width: 6),
+                                _MetaChip(
+                                  icon: CupertinoIcons.device_laptop,
+                                  label: '本地',
+                                  color: palette.warmAccent,
+                                  palette: palette,
+                                ),
+                              ],
+                              const Spacer(),
+                              if (onHandleTap != null)
+                                _buildMenu(context, palette, accent)
+                              else
+                                Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    color: accent.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    CupertinoIcons.chevron_right,
+                                    size: 14,
+                                    color: accent,
+                                  ),
+                                ),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    _statusBadge(
-                      context,
-                      label: status.label,
-                      color: status.color,
-                      icon: status.icon,
-                    ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  item.pluginDesc?.trim().isNotEmpty == true
-                      ? item.pluginDesc!.trim()
-                      : '暂无插件说明',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    height: 1.25,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Divider(
-                  height: 1,
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.65),
-                ),
-                const SizedBox(height: 7),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.download_outlined,
-                      size: 15,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      _formatInstallCount(installCount),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (_labelList.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        constraints: const BoxConstraints(maxWidth: 74),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          _labelList.first,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: accent,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                    if (item.isLocal) ...[
-                      const SizedBox(width: 10),
-                      Icon(
-                        Icons.computer_rounded,
-                        size: 14,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '本地',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    const Spacer(),
-                    if (onHandleTap != null)
-                      _buildMenu(context)
-                    else
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 18,
-                        color: accent,
-                      ),
-                  ],
-                ),
-              ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 
-  Color _resolveThemeColor() {
+  String get _metaLine {
+    final author = item.pluginAuthor?.trim().isNotEmpty == true
+        ? item.pluginAuthor!.trim()
+        : '未知作者';
+    final version = (item.pluginVersion ?? '').trim();
+    if (version.isEmpty) return author;
+    return '$author · v$version';
+  }
+
+  Color _resolveAccent(DashboardPaletteData palette) {
     try {
       final cache = Get.find<PluginPaletteCache>();
-      return cache.getCached(iconUrl) ?? PluginPaletteCache.defaultColor;
+      if (iconUrl.isEmpty) {
+        // keep Obx subscribed even without icon URL
+        cache.getCached('__noop__');
+        return palette.primary;
+      }
+      return cache.watchColor(iconUrl) ??
+          cache.getCached(iconUrl) ??
+          PluginPaletteCache.defaultColor;
     } catch (_) {
-      return PluginPaletteCache.defaultColor;
+      return palette.primary;
     }
   }
 
-  Widget _buildIcon(BuildContext context, Color accent) {
-    final fallback = Container(
-      color: accent.withValues(alpha: 0.18),
-      child: Icon(Icons.extension_rounded, size: 23, color: accent),
+  Widget _buildIcon(
+    BuildContext context,
+    Color accent,
+    DashboardPaletteData palette,
+  ) {
+    final fallback = ColoredBox(
+      color: accent.withValues(alpha: 0.16),
+      child: Icon(Icons.extension_rounded, size: 22, color: accent),
     );
     return Container(
-      width: 44,
-      height: 44,
+      width: 48,
+      height: 48,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: palette.surface,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: accent.withValues(alpha: 0.22)),
+        border: Border.all(color: accent.withValues(alpha: 0.28)),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.22),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: iconUrl.isEmpty
@@ -244,36 +298,38 @@ class PluginItemCard extends StatelessWidget {
           : CachedImage(
               imageUrl: iconUrl,
               fit: BoxFit.cover,
-              memCacheWidth: 88,
-              memCacheHeight: 88,
+              memCacheWidth: 96,
+              memCacheHeight: 96,
               placeholder: fallback,
               errorWidget: fallback,
             ),
     );
   }
 
-  Widget _statusBadge(
-    BuildContext context, {
+  Widget _statusBadge({
     required String label,
     required Color color,
     required IconData icon,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      constraints: const BoxConstraints(minHeight: 26),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.11),
+        color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 10, color: color),
+          Icon(icon, size: 12, color: color),
           const SizedBox(width: 4),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
+            style: TextStyle(
+              fontSize: 11,
               fontWeight: FontWeight.w700,
+              color: color,
             ),
           ),
         ],
@@ -281,18 +337,27 @@ class PluginItemCard extends StatelessWidget {
     );
   }
 
-  Widget _buildMenu(BuildContext context) {
+  Widget _buildMenu(
+    BuildContext context,
+    DashboardPaletteData palette,
+    Color accent,
+  ) {
     return PopupMenuButton<PluginHandleType>(
       tooltip: '插件操作',
       padding: EdgeInsets.zero,
       onSelected: onHandleTap,
-      child: SizedBox(
-        width: 28,
-        height: 28,
+      child: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(11),
+        ),
         child: Icon(
-          Icons.more_horiz_rounded,
-          size: 19,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          CupertinoIcons.ellipsis,
+          size: 18,
+          color: accent,
         ),
       ),
       itemBuilder: (context) => PluginHandleType.values
@@ -304,13 +369,13 @@ class PluginItemCard extends StatelessWidget {
                   Icon(
                     _getHandleTypeIcon(type),
                     size: 18,
-                    color: _getHandleTypeColor(context, type),
+                    color: _getHandleTypeColor(context, type, palette),
                   ),
                   const SizedBox(width: 10),
                   Text(
                     _getHandleTypeLabel(type),
                     style: TextStyle(
-                      color: _getHandleTypeColor(context, type),
+                      color: _getHandleTypeColor(context, type, palette),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -323,37 +388,41 @@ class PluginItemCard extends StatelessWidget {
   }
 
   ({String label, IconData icon, Color color}) _statusPresentation(
-    ColorScheme colorScheme,
+    DashboardPaletteData palette,
     bool installedView,
   ) {
     if (item.hasUpdate) {
       return (
         label: '可更新',
-        icon: Icons.system_update_alt_rounded,
-        color: const Color(0xFFF59E0B),
+        icon: CupertinoIcons.arrow_up_circle_fill,
+        color: palette.warningAccent,
       );
     }
     if (installedView) {
       return item.state
           ? (
               label: '运行中',
-              icon: Icons.check_circle_rounded,
-              color: const Color(0xFF22C55E),
+              icon: CupertinoIcons.checkmark_seal_fill,
+              color: palette.successAccent,
             )
           : (
               label: '已停用',
-              icon: Icons.pause_circle_outline_rounded,
-              color: colorScheme.onSurfaceVariant,
+              icon: CupertinoIcons.pause_circle_fill,
+              color: palette.mutedText,
             );
     }
     if (item.installed) {
       return (
         label: '已安装',
-        icon: Icons.check_rounded,
-        color: const Color(0xFF22C55E),
+        icon: CupertinoIcons.checkmark_circle_fill,
+        color: palette.successAccent,
       );
     }
-    return (label: '可安装', icon: Icons.add_rounded, color: colorScheme.primary);
+    return (
+      label: '可安装',
+      icon: CupertinoIcons.plus_circle_fill,
+      color: palette.primary,
+    );
   }
 
   List<String> get _labelList {
@@ -390,22 +459,71 @@ class PluginItemCard extends StatelessWidget {
   IconData _getHandleTypeIcon(PluginHandleType type) {
     switch (type) {
       case PluginHandleType.settings:
-        return Icons.settings_outlined;
+        return CupertinoIcons.settings;
       case PluginHandleType.log:
-        return Icons.receipt_long_outlined;
+        return CupertinoIcons.doc_text;
       case PluginHandleType.reset:
-        return Icons.restart_alt_rounded;
+        return CupertinoIcons.restart;
       case PluginHandleType.uninstall:
-        return Icons.delete_outline_rounded;
+        return CupertinoIcons.delete;
       case PluginHandleType.web:
-        return Icons.open_in_new_rounded;
+        return CupertinoIcons.compass;
     }
   }
 
-  Color _getHandleTypeColor(BuildContext context, PluginHandleType type) {
+  Color _getHandleTypeColor(
+    BuildContext context,
+    PluginHandleType type,
+    DashboardPaletteData palette,
+  ) {
     if (type == PluginHandleType.uninstall) {
       return Theme.of(context).colorScheme.error;
     }
-    return Theme.of(context).colorScheme.onSurface;
+    return palette.titleText;
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.palette,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final DashboardPaletteData palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 26),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: palette.isDark ? 0.16 : 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
