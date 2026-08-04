@@ -100,6 +100,17 @@ class SubscribePage extends GetView<SubscribeController> {
         ],
         _buildAppBarAction(
           context,
+          icon: CupertinoIcons.clock_fill,
+          tooltip: '历史订阅',
+          iconColor: const Color(0xFF64D2FF),
+          onPressed: () => Get.toNamed(
+            '/subscribe-history',
+            arguments: controller.subscribeType,
+          ),
+        ),
+        const SizedBox(width: 4),
+        _buildAppBarAction(
+          context,
           icon: CupertinoIcons.flame_fill,
           tooltip: '热门订阅',
           iconColor: const Color(0xFFFF9F0A),

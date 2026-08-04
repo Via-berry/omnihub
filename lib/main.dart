@@ -64,11 +64,13 @@ import 'modules/recommend/pages/recommend_category_list_page.dart';
 import 'modules/search_result/controllers/search_result_controller.dart';
 import 'modules/search_result/pages/search_result_page.dart';
 import 'modules/subscribe/controllers/subscribe_controller.dart';
+import 'modules/subscribe/controllers/subscribe_history_controller.dart';
 import 'modules/subscribe/controllers/subscribe_popular_controller.dart';
 import 'modules/subscribe/controllers/subscribe_share_controller.dart';
 import 'modules/subscribe/controllers/subscribe_calendar_controller.dart';
 import 'modules/subscribe/controllers/subscribe_share_statistics_controller.dart';
 import 'modules/subscribe/pages/subscribe_calendar_page.dart';
+import 'modules/subscribe/pages/subscribe_history_page.dart';
 import 'modules/subscribe/pages/subscribe_page.dart';
 import 'modules/subscribe/pages/subscribe_popular_page.dart';
 import 'modules/subscribe/pages/subscribe_share_page.dart';
@@ -433,6 +435,14 @@ class MyApp extends StatelessWidget {
               Get.put(SubscribePopularController(), permanent: false);
             }),
             middlewares: permissionGuards('/subscribe-popular'),
+          ),
+          GetPage(
+            name: '/subscribe-history',
+            page: () => const SubscribeHistoryPage(),
+            binding: BindingsBuilder(() {
+              Get.put(SubscribeHistoryController(), permanent: false);
+            }),
+            middlewares: permissionGuards('/subscribe-history'),
           ),
           GetPage(
             name: '/subscribe-share',
