@@ -105,16 +105,13 @@ If needed, you can further use the `web_scraper.py` file to scrape the web page 
 
 ## Done: 插件页 Item 美化
 
-## Current Task: 历史订阅入口与页面
-
-[X] SubscribeService: history list / delete / resubscribe(raw)
-[X] SubscribeHistoryController + Page + ItemCard(CupertinoContextMenu)
-[X] 订阅页 AppBar 入口 + /subscribe-history 路由
-[X] CHANGELOG + analyze
+## Done: 订阅 Item 文件统计（Sheet + 海报墙）
 
 ## Lessons
 - 历史订阅重新订阅须 POST 原样 raw JSON（保留 completed_episode/episode_priority 等），勿仅用 SubscribeItem.toJson()
 - GET /api/v1/subscribe/history/{mtype}，mtype 为「电视剧」「电影」；DELETE /api/v1/subscribe/history/{id}
+- CupertinoContextMenu 列表卡预览须固定宽高，否则松约束会撑满导致 menuSheet 无布局空间
+- GET /api/v1/subscribe/files/{id} 返回 subscribe + episodes(download/library)；UI 用 DraggableScrollableSheet + 海报墙，勿再走独立路由页
 
 ## Lessons (BrushFlow)
 - 自定义 PluginFormRenderer 需保证 adapter.blocks 非空（sentinel FormBlock），否则 DynamicFormPage 不进入 customRenderer 分支

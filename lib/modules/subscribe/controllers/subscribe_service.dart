@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/applog/app_log.dart';
+import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_files_models.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_submit_resp.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
@@ -260,5 +261,24 @@ class SubscribeService extends GetxService {
       payload['type']?.toString() ?? '',
       payload: payload,
     );
+  }
+
+  /// GET /api/v1/subscribe/files/{subscribe_id}
+  Future<SubscribeFilesResult> fetchSubscribeFiles(int subscribeId) async {
+    if (!_ensureCanSubscribe()) {
+      throw StateError('当前帐号无订阅权限');
+    }
+    final response = await _apiClient.get<dynamic>(
+      '/api/v1/subscribe/files/$subscribeId',
+    );
+    final status = response.statusCode ?? 0;
+    if (status >= 400) {
+      throw StateError('请求失败 (HTTP $status)');
+    }
+    final data = response.data;
+    if (data is! Map) {
+      throw StateError('返回数据格式错误');
+    }
+    return SubscribeFilesResult.fromJson(Map<String, dynamic>.from(data));
   }
 }

@@ -5,6 +5,7 @@ import 'package:moviepilot_mobile/modules/discover/controllers/discover_controll
 import 'package:moviepilot_mobile/modules/recommend/models/recommend_api_item.dart';
 import 'package:moviepilot_mobile/modules/subscribe/controllers/subscribe_controller.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
+import 'package:moviepilot_mobile/modules/subscribe/pages/subscribe_files_page.dart';
 import 'package:moviepilot_mobile/modules/subscribe/widgets/subscribe_filter_sheet.dart';
 import 'package:moviepilot_mobile/modules/subscribe/widgets/subscribe_item_card.dart';
 import 'package:moviepilot_mobile/modules/subscribe/widgets/subscribe_list_floating_bar.dart';
@@ -554,6 +555,9 @@ class SubscribePage extends GetView<SubscribeController> {
           case SubscribeItemCardType.detail:
             _mediaDetail(context, item);
             break;
+          case SubscribeItemCardType.files:
+            _openFiles(context, item);
+            break;
           case SubscribeItemCardType.pause:
             _pauseSubscribe(context, item);
             break;
@@ -575,6 +579,10 @@ class SubscribePage extends GetView<SubscribeController> {
         }
       },
     );
+  }
+
+  void _openFiles(BuildContext context, SubscribeItem item) {
+    showSubscribeFilesSheet(context, item);
   }
 
   Widget _buildRecommendationHeader(BuildContext context) {
