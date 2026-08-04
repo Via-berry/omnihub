@@ -21,6 +21,8 @@ import 'package:moviepilot_mobile/modules/search/pages/person_detail_page.dart';
 import 'package:moviepilot_mobile/modules/search/pages/person_search_result_page.dart';
 import 'package:moviepilot_mobile/modules/search/pages/search_media_result_page.dart';
 import 'package:moviepilot_mobile/modules/search/services/app_update_service.dart';
+import 'package:moviepilot_mobile/modules/subtitle/controllers/subtitle_search_controller.dart';
+import 'package:moviepilot_mobile/modules/subtitle/pages/subtitle_search_result_page.dart';
 import 'package:moviepilot_mobile/middlewares/route_permission_middleware.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:moviepilot_mobile/services/ios_shared_session_service.dart';
@@ -346,6 +348,37 @@ class MyApp extends StatelessWidget {
               });
             }),
             middlewares: permissionGuards('/search-media-result'),
+          ),
+          GetPage(
+            name: '/subtitle-search-result',
+            page: () => const SubtitleSearchResultPage(),
+            binding: BindingsBuilder(() {
+              final args = Get.parameters;
+              if (Get.isRegistered<SubtitleSearchController>()) {
+                Get.delete<SubtitleSearchController>();
+              }
+              Get.put(
+                () {
+                  final c = SubtitleSearchController();
+                  c.mediaSearchKey = args['mediaSearchKey'] ?? '';
+                  c.sites = (args['sites'] ?? '')
+                      .split(',')
+                      .where((s) => s.trim().isNotEmpty)
+                      .map(int.tryParse)
+                      .whereType<int>()
+                      .toList();
+                  c.year = args['year'] ?? '';
+                  c.season = args['season'];
+                  c.mtype = args['mtype'] ?? '电影';
+                  c.title = args['title'] ?? '';
+                  c.prefillTitle = args['title'];
+                  c.prefillBackdrop =
+                      args['backdrop'] ?? args['backdrop_path'];
+                  return c;
+                }(),
+              );
+            }),
+            middlewares: permissionGuards('/subtitle-search-result'),
           ),
           GetPage(
             name: '/media-search-list',

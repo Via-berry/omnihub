@@ -93,7 +93,14 @@ If needed, you can further use the `web_scraper.py` file to scrape the web page 
 - Test file operations should use Path objects for cross-platform compatibility
 - Mock external API calls and file operations to make tests reliable and fast
 
-# Scratchpad
+## Task: 字幕结果页 Item 美化 + 整卡点击下载 Sheet（下载器/保存目录）
+
+[X] ui-ux-pro-max 指导 Item 视觉
+[X] 移除下载按钮，整卡点击
+[X] SubtitleDownloadSheet 复用 DownloadController 选下载器/目录
+[X] downloadSubtitle 带 save_path
+
+## Done: 媒体详情字幕搜索入口 + 按钮改版
 
 ## Done: 已安装插件页（PluginPage）与插件市场同风格 bottom floating bar + visibleItems 缓存 + palette 预加载限制 + await loadFromCache
 
@@ -108,6 +115,8 @@ If needed, you can further use the `web_scraper.py` file to scrape the web page 
 ## Done: 订阅 Item 文件统计（Sheet + 海报墙）
 
 ## Lessons
+- 字幕搜索 SSE：`GET /api/v1/search/subtitle/media/{mediaid}/stream`（mtype/title/year/sites[/season]）；事件 type=append/progress/replace/done；下载 `POST /api/v1/download/subtitle` 须原样回传 subtitle_in（保留 enclosure 签名），save_path 可为 null；接口无 downloader 字段，Sheet 仍选下载器以复用目录偏好与资源下载 UX
+- SSE 长连接 `streamLines` 的 receiveTimeout 须为 null，否则会在搜索中途被 Dio 掐断
 - 历史订阅重新订阅须 POST 原样 raw JSON（保留 completed_episode/episode_priority 等），勿仅用 SubscribeItem.toJson()
 - GET /api/v1/subscribe/history/{mtype}，mtype 为「电视剧」「电影」；DELETE /api/v1/subscribe/history/{id}
 - CupertinoContextMenu 列表卡预览须固定宽高，否则松约束会撑满导致 menuSheet 无布局空间

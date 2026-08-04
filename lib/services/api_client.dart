@@ -596,7 +596,7 @@ class ApiClient extends g.GetxController {
   Future<Stream<String>> streamLines(
     String path, {
     String? token,
-    int? timeout = 30,
+    int? timeout,
   }) async {
     await _ensureReady();
     final authToken = token ?? this.token;
@@ -605,8 +605,8 @@ class ApiClient extends g.GetxController {
       path,
       options: Options(
         responseType: ResponseType.stream,
-        sendTimeout: Duration(seconds: timeout ?? 30),
-        receiveTimeout: Duration(seconds: timeout ?? 30),
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: timeout == null ? null : Duration(seconds: timeout),
         headers: {
           'accept': 'text/event-stream',
           if (authToken != null) 'authorization': 'Bearer $authToken',
