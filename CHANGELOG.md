@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- 演员详情 Header 按沉浸式 Backdrop 规范重建：全屏头像底 + pageBackground 渐变、大字标题/meta/简介与 Metric chip；作品卡改半透明 surface。
+- 演员详情作品列表改为默认横向 List：左海报右信息卡，含类型/年份/评分胶囊与简介；统一 LoadMoreFooter。
+- 演员搜索页视觉升级：沉浸式顶栏、竖版人像卡（底部渐变姓名/部门）、响应式网格、空态与 LoadMoreFooter。
 - 字幕搜索结果 Item 视觉对齐资源卡：侧强调条、语言/站点胶囊、整卡可点；移除独立下载按钮。
 - 字幕下载改为 Bottom Sheet：选择下载器与保存目录后再提交（`save_path` 空则自动匹配）。
 - 字幕下载 Sheet 改为与资源下载一致的干净面板风格：柔光顶栏、实色卡片、图标元信息行，去掉 backdrop/玻璃叠层。
