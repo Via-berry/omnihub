@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:moviepilot_mobile/gen/assets.gen.dart';
 import 'package:moviepilot_mobile/modules/dashboard/widgets/dashboard_widget_styles.dart';
 import 'package:moviepilot_mobile/modules/multifunction/controllers/multifunction_controller.dart';
 import 'package:moviepilot_mobile/modules/multifunction/models/multifunction_models.dart';
@@ -953,14 +954,17 @@ class MultifunctionPage extends GetView<MultifunctionController> {
                   Container(
                     width: 40,
                     height: 40,
+                    padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
-                      color: _primary.withValues(alpha: 0.12),
+                      color: _surface.withValues(alpha: _isDark ? 0.9 : 1),
                       borderRadius: BorderRadius.circular(11),
+                      border: Border.all(color: _outlineSoft),
                     ),
-                    child: Icon(
-                      CupertinoIcons.arrow_down_doc,
-                      size: 18,
-                      color: _primary,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: _downloaderLogo(client.type).image(
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1021,6 +1025,14 @@ class MultifunctionPage extends GetView<MultifunctionController> {
       default:
         return type.trim();
     }
+  }
+
+  AssetGenImage _downloaderLogo(String type) {
+    return switch (type.toLowerCase()) {
+      'qbittorrent' => Assets.images.logos.qbittorrent,
+      'transmission' => Assets.images.logos.transmission,
+      _ => Assets.images.logos.downloader,
+    };
   }
 
   String _formatSpeedText(double value) {

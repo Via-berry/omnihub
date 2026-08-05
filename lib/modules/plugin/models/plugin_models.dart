@@ -41,3 +41,26 @@ int _intFromJson(Object? value) {
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }
+
+Map<String, int> parsePluginInstallCountMap(dynamic data) {
+  if (data is! Map) return {};
+  final result = <String, int>{};
+  for (final entry in data.entries) {
+    final key = entry.key?.toString().trim() ?? '';
+    if (key.isEmpty) continue;
+    result[key] = _intFromJson(entry.value);
+  }
+  return result;
+}
+
+int lookupPluginInstallCount(Map<String, int> counts, Object? id) {
+  final key = id?.toString().trim() ?? '';
+  if (key.isEmpty) return 0;
+  final direct = counts[key];
+  if (direct != null) return direct;
+  final lower = key.toLowerCase();
+  for (final entry in counts.entries) {
+    if (entry.key.toLowerCase() == lower) return entry.value;
+  }
+  return 0;
+}

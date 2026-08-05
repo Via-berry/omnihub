@@ -22,7 +22,10 @@ class PluginItemCard extends StatelessWidget {
   final int installCount;
   final Function(PluginHandleType type)? onHandleTap;
 
-  static const double _radius = 20;
+  static const double _radius = 18;
+  static const double _descHeight = 36;
+  static const double _footerHeight = 32;
+  static const double _actionSize = 32;
 
   @override
   Widget build(BuildContext context) {
@@ -41,14 +44,14 @@ class PluginItemCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(_radius),
             boxShadow: [
               BoxShadow(
-                color: accent.withValues(alpha: palette.isDark ? 0.18 : 0.10),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
+                color: accent.withValues(alpha: palette.isDark ? 0.16 : 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
               BoxShadow(
                 color: palette.shadow,
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -59,7 +62,7 @@ class PluginItemCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(_radius),
               side: BorderSide(
                 color: Color.alphaBlend(
-                  accent.withValues(alpha: palette.isDark ? 0.28 : 0.22),
+                  accent.withValues(alpha: palette.isDark ? 0.26 : 0.18),
                   palette.tileBorder,
                 ),
               ),
@@ -72,16 +75,16 @@ class PluginItemCard extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: [
                     Color.alphaBlend(
-                      accent.withValues(alpha: palette.isDark ? 0.22 : 0.14),
+                      accent.withValues(alpha: palette.isDark ? 0.20 : 0.12),
                       palette.surface,
                     ),
                     Color.alphaBlend(
-                      accent.withValues(alpha: palette.isDark ? 0.08 : 0.04),
+                      accent.withValues(alpha: palette.isDark ? 0.06 : 0.03),
                       palette.pageBackgroundAlt,
                     ),
                     palette.surface,
                   ],
-                  stops: const [0.0, 0.45, 1.0],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
               ),
               child: ClipRRect(
@@ -94,22 +97,22 @@ class PluginItemCard extends StatelessWidget {
                       bottom: 0,
                       child: ColoredBox(
                         color: accent,
-                        child: const SizedBox(width: 4),
+                        child: const SizedBox(width: 3),
                       ),
                     ),
                     Positioned(
-                      right: -18,
-                      top: -22,
+                      right: -20,
+                      top: -24,
                       child: IgnorePointer(
                         child: Container(
-                          width: 88,
-                          height: 88,
+                          width: 84,
+                          height: 84,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: RadialGradient(
                               colors: [
                                 accent.withValues(
-                                  alpha: palette.isDark ? 0.20 : 0.14,
+                                  alpha: palette.isDark ? 0.18 : 0.12,
                                 ),
                                 accent.withValues(alpha: 0),
                               ],
@@ -119,15 +122,15 @@ class PluginItemCard extends StatelessWidget {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 13, 12, 12),
+                      padding: const EdgeInsets.fromLTRB(13, 12, 10, 10),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               _buildIcon(context, accent, palette),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 11),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,21 +138,21 @@ class PluginItemCard extends StatelessWidget {
                                     Text(
                                       item.pluginName,
                                       style: TextStyle(
-                                        fontSize: 16,
+                                        fontSize: 15.5,
                                         fontWeight: FontWeight.w700,
-                                        letterSpacing: -0.25,
+                                        letterSpacing: -0.2,
                                         height: 1.2,
                                         color: palette.titleText,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 3),
                                     Text(
                                       _metaLine,
                                       style: TextStyle(
                                         fontSize: 12,
-                                        height: 1.25,
+                                        height: 1.2,
                                         fontWeight: FontWeight.w500,
                                         color: palette.mutedText,
                                       ),
@@ -167,68 +170,77 @@ class PluginItemCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
-                          Text(
-                            item.pluginDesc?.trim().isNotEmpty == true
-                                ? item.pluginDesc!.trim()
-                                : '暂无插件说明',
-                            style: TextStyle(
-                              fontSize: 13,
-                              height: 1.35,
-                              color: palette.bodyText.withValues(
-                                alpha: palette.isDark ? 0.78 : 0.82,
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: _descHeight,
+                            width: double.infinity,
+                            child: Text(
+                              item.pluginDesc?.trim().isNotEmpty == true
+                                  ? item.pluginDesc!.trim()
+                                  : '暂无插件说明',
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.35,
+                                color: palette.bodyText.withValues(
+                                  alpha: palette.isDark ? 0.78 : 0.82,
+                                ),
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 11),
-                          Row(
-                            children: [
-                              _MetaChip(
-                                icon: CupertinoIcons.arrow_down_circle_fill,
-                                label: _formatInstallCount(installCount),
-                                color: accent,
-                                palette: palette,
-                              ),
-                              if (_labelList.isNotEmpty) ...[
-                                const SizedBox(width: 6),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: _footerHeight,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
                                 Flexible(
-                                  child: _MetaChip(
-                                    icon: CupertinoIcons.tag_fill,
-                                    label: _labelList.first,
-                                    color: palette.coolAccent,
+                                  child: Row(
+                                    children: [
+                                      _MetaChip(
+                                        icon: CupertinoIcons
+                                            .arrow_down_circle_fill,
+                                        label: _formatInstallCount(
+                                          installCount,
+                                        ),
+                                        color: accent,
+                                        palette: palette,
+                                      ),
+                                      if (_labelList.isNotEmpty) ...[
+                                        const SizedBox(width: 6),
+                                        Flexible(
+                                          child: _MetaChip(
+                                            icon: CupertinoIcons.tag_fill,
+                                            label: _labelList.first,
+                                            color: palette.coolAccent,
+                                            palette: palette,
+                                          ),
+                                        ),
+                                      ],
+                                      if (item.isLocal) ...[
+                                        const SizedBox(width: 6),
+                                        _MetaChip(
+                                          icon: CupertinoIcons.device_laptop,
+                                          label: '本地',
+                                          color: palette.warmAccent,
+                                          palette: palette,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                if (onHandleTap != null)
+                                  _buildMenu(context, palette, accent)
+                                else
+                                  _TrailingAction(
+                                    size: _actionSize,
+                                    accent: accent,
                                     palette: palette,
                                   ),
-                                ),
                               ],
-                              if (item.isLocal) ...[
-                                const SizedBox(width: 6),
-                                _MetaChip(
-                                  icon: CupertinoIcons.device_laptop,
-                                  label: '本地',
-                                  color: palette.warmAccent,
-                                  palette: palette,
-                                ),
-                              ],
-                              const Spacer(),
-                              if (onHandleTap != null)
-                                _buildMenu(context, palette, accent)
-                              else
-                                Container(
-                                  width: 30,
-                                  height: 30,
-                                  decoration: BoxDecoration(
-                                    color: accent.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(
-                                    CupertinoIcons.chevron_right,
-                                    size: 14,
-                                    color: accent,
-                                  ),
-                                ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
@@ -256,7 +268,6 @@ class PluginItemCard extends StatelessWidget {
     try {
       final cache = Get.find<PluginPaletteCache>();
       if (iconUrl.isEmpty) {
-        // keep Obx subscribed even without icon URL
         cache.getCached('__noop__');
         return palette.primary;
       }
@@ -278,17 +289,17 @@ class PluginItemCard extends StatelessWidget {
       child: Icon(Icons.extension_rounded, size: 22, color: accent),
     );
     return Container(
-      width: 48,
-      height: 48,
+      width: 44,
+      height: 44,
       decoration: BoxDecoration(
         color: palette.surface,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: accent.withValues(alpha: 0.28)),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: accent.withValues(alpha: 0.26)),
         boxShadow: [
           BoxShadow(
-            color: accent.withValues(alpha: 0.22),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: accent.withValues(alpha: 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -298,8 +309,8 @@ class PluginItemCard extends StatelessWidget {
           : CachedImage(
               imageUrl: iconUrl,
               fit: BoxFit.cover,
-              memCacheWidth: 96,
-              memCacheHeight: 96,
+              memCacheWidth: 88,
+              memCacheHeight: 88,
               placeholder: fallback,
               errorWidget: fallback,
             ),
@@ -347,18 +358,15 @@ class PluginItemCard extends StatelessWidget {
       padding: EdgeInsets.zero,
       onSelected: onHandleTap,
       child: Container(
-        width: 36,
-        height: 36,
+        width: _actionSize,
+        height: _actionSize,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: accent.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: accent.withValues(alpha: 0.16)),
         ),
-        child: Icon(
-          CupertinoIcons.ellipsis,
-          size: 18,
-          color: accent,
-        ),
+        child: Icon(CupertinoIcons.ellipsis, size: 16, color: accent),
       ),
       itemBuilder: (context) => PluginHandleType.values
           .map(
@@ -483,6 +491,37 @@ class PluginItemCard extends StatelessWidget {
   }
 }
 
+class _TrailingAction extends StatelessWidget {
+  const _TrailingAction({
+    required this.size,
+    required this.accent,
+    required this.palette,
+  });
+
+  final double size;
+  final Color accent;
+  final DashboardPaletteData palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: palette.isDark ? 0.16 : 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: accent.withValues(alpha: 0.18)),
+      ),
+      child: Icon(
+        CupertinoIcons.chevron_right,
+        size: 14,
+        color: accent,
+      ),
+    );
+  }
+}
+
 class _MetaChip extends StatelessWidget {
   const _MetaChip({
     required this.icon,
@@ -499,8 +538,9 @@ class _MetaChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 26),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: color.withValues(alpha: palette.isDark ? 0.16 : 0.12),
         borderRadius: BorderRadius.circular(8),
@@ -518,6 +558,7 @@ class _MetaChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
+                height: 1,
                 color: color,
               ),
             ),

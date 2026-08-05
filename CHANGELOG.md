@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+- 新增已安装插件「备份中心」：本地 JSON 备份/导入、备份列表长按删除、多选批量恢复安装；AppBar 直接露出指定安装、备份中心、插件市场，并以主色/冷色/暖色区分。
+- 插件恢复缺 `repo_url` 时自动反推（市场缓存、PLUGIN_MARKET、官方仓、author_url），安装按候选仓依次尝试；进度条内实时显示成功/失败且完成后保留。
+- 备份中心与恢复选插件 Sheet 视觉升级：独立恢复 Sheet、不透明卡片底、圆形勾选、安装按钮 `onPrimary` 配色、删除确认 Dialog。
+- 修复插件市场/已安装列表安装量常为 0：稳健解析 `/plugin/statistic`，避免统计接口异常中断合并。
+- 插件市场 Item 对齐优化：固定双行简介与底栏高度，chevron/菜单与 chip 垂直居中，Grid 高度同步调整。
+- 插件市场与已安装插件页首屏/加载更多改为 AppLoading Lottie 动效。
+- 修复插件市场进入时本地缓存与网络列表顺序不一致：缓存写入 listIndex，读取时按原 API 顺序还原；旧缓存无 index 时仍展示（按安装量近似排序）。
+- 更多页下载器列表 Item 左侧改为对应类型图标（qBittorrent / Transmission，其它回落通用下载器图标）。
 - 演员详情 Header 按沉浸式 Backdrop 规范重建：全屏头像底 + pageBackground 渐变、大字标题/meta/简介与 Metric chip；作品卡改半透明 surface。
 - 演员详情作品列表改为默认横向 List：左海报右信息卡，含类型/年份/评分胶囊与简介；统一 LoadMoreFooter。
 - 演员搜索页视觉升级：沉浸式顶栏、竖版人像卡（底部渐变姓名/部门）、响应式网格、空态与 LoadMoreFooter。
