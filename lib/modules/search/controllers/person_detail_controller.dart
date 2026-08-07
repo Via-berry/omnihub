@@ -17,6 +17,8 @@ class PersonDetailController extends GetxController {
   final RxnString name = RxnString();
   final RxnString avatarUrl = RxnString();
   final RxnString biography = RxnString();
+  final RxnString sourceLabel = RxnString();
+  final RxnInt gender = RxnInt();
   final RxList<String> alsoKnownAs = <String>[].obs;
 
   final RxList<RecommendApiItem> works = <RecommendApiItem>[].obs;
@@ -63,6 +65,8 @@ class PersonDetailController extends GetxController {
       final detail = PersonDetail.fromJson(detailJson);
       name.value = detail.name;
       biography.value = detail.biography;
+      gender.value = detail.gender;
+      sourceLabel.value = detail.source;
 
       final avatar = detail.avatar;
       final profilePath = detail.profilePath;

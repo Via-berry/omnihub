@@ -263,6 +263,18 @@ class DynamicFormPage extends GetView<DynamicFormController> {
     final adapter = controller.pluginAdapter!;
     final items = adapter.actionList ?? [];
     if (items.isEmpty) return const SizedBox.shrink();
+    if (items.length == 1) {
+      final item = items.first;
+      final iconData = item.iconName != null
+          ? VuetifyMappings.iconFromMdi(item.iconName)
+          : Icons.more_horiz;
+      final color = _resolveActionColor(context, item.iconColor);
+      return IconButton(
+        tooltip: item.label,
+        icon: Icon(iconData ?? Icons.more_horiz, color: color),
+        onPressed: () => adapter.onAppBarAction(item.type),
+      );
+    }
     return PopupMenuButton<AppBarActionItem>(
       tooltip: '更多操作',
       padding: EdgeInsets.zero,

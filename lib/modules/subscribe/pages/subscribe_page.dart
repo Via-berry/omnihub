@@ -5,6 +5,7 @@ import 'package:moviepilot_mobile/modules/discover/controllers/discover_controll
 import 'package:moviepilot_mobile/modules/recommend/models/recommend_api_item.dart';
 import 'package:moviepilot_mobile/modules/subscribe/controllers/subscribe_controller.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
+import 'package:moviepilot_mobile/modules/subscribe/pages/subscribe_files_page.dart';
 import 'package:moviepilot_mobile/modules/subscribe/widgets/subscribe_filter_sheet.dart';
 import 'package:moviepilot_mobile/modules/subscribe/widgets/subscribe_item_card.dart';
 import 'package:moviepilot_mobile/modules/subscribe/widgets/subscribe_list_floating_bar.dart';
@@ -98,6 +99,17 @@ class SubscribePage extends GetView<SubscribeController> {
           ),
           const SizedBox(width: 4),
         ],
+        _buildAppBarAction(
+          context,
+          icon: CupertinoIcons.clock_fill,
+          tooltip: '历史订阅',
+          iconColor: const Color(0xFF64D2FF),
+          onPressed: () => Get.toNamed(
+            '/subscribe-history',
+            arguments: controller.subscribeType,
+          ),
+        ),
+        const SizedBox(width: 4),
         _buildAppBarAction(
           context,
           icon: CupertinoIcons.flame_fill,
@@ -534,7 +546,7 @@ class SubscribePage extends GetView<SubscribeController> {
       item: item,
       isTv: controller.isTv,
       layout: layout,
-      onTap: () => _openEditSheet(context, item),
+      onTap: () => _openFiles(context, item),
       onMoreTap: (type) {
         switch (type) {
           case SubscribeItemCardType.edit:
@@ -542,6 +554,9 @@ class SubscribePage extends GetView<SubscribeController> {
             break;
           case SubscribeItemCardType.detail:
             _mediaDetail(context, item);
+            break;
+          case SubscribeItemCardType.files:
+            _openFiles(context, item);
             break;
           case SubscribeItemCardType.pause:
             _pauseSubscribe(context, item);
@@ -564,6 +579,10 @@ class SubscribePage extends GetView<SubscribeController> {
         }
       },
     );
+  }
+
+  void _openFiles(BuildContext context, SubscribeItem item) {
+    showSubscribeFilesSheet(context, item);
   }
 
   Widget _buildRecommendationHeader(BuildContext context) {

@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/applog/app_log.dart';
+import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_files_models.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_submit_resp.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
@@ -207,5 +208,77 @@ class SubscribeService extends GetxService {
     if (!_ensureCanSubscribe()) return false;
     final response = await _apiClient.delete('/api/v1/subscribe/$id');
     return response.statusCode == 200 && response.data['success'] == true;
+  }
+
+  /// GET /api/v1/subscribe/history/{mtype}?page=&count=
+  Future<List<Map<String, dynamic>>> fetchSubscribeHistory({
+    required String mtype,
+    int page = 1,
+    int count = 30,
+  }) async {
+    if (!_ensureCanSubscribe()) {
+      throw StateError('当前帐号无订阅权限');
+    }
+    final encoded = Uri.encodeComponent(mtype);
+    final response = await _apiClient.get<dynamic>(
+      '/api/v1/subscribe/history/$encoded',
+      queryParameters: {'page': page, 'count': count},
+    );
+    final status = response.statusCode ?? 0;
+    if (status >= 400) {
+      throw StateError('请求失败 (HTTP $status)');
+    }
+    final data = response.data;
+    if (data is! List) return const [];
+    return data
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  /// DELETE /api/v1/subscribe/history/{history_id}
+  Future<bool> deleteSubscribeHistory(int historyId) async {
+    if (!_ensureCanSubscribe()) return false;
+    try {
+      final response = await _apiClient.delete(
+        '/api/v1/subscribe/history/$historyId',
+      );
+      if (response.statusCode != 200) return false;
+      final data = response.data;
+      if (data is Map && data['success'] == false) return false;
+      return true;
+    } catch (e) {
+      _log.handle(e, message: '删除订阅历史失败');
+      return false;
+    }
+  }
+
+  /// POST /api/v1/subscribe/ 重新订阅（原样回写历史项）
+  Future<SubscribeSubmitResp> resubscribeFromHistory(
+    Map<String, dynamic> payload,
+  ) {
+    return submitSubscribe(
+      payload['type']?.toString() ?? '',
+      payload: payload,
+    );
+  }
+
+  /// GET /api/v1/subscribe/files/{subscribe_id}
+  Future<SubscribeFilesResult> fetchSubscribeFiles(int subscribeId) async {
+    if (!_ensureCanSubscribe()) {
+      throw StateError('当前帐号无订阅权限');
+    }
+    final response = await _apiClient.get<dynamic>(
+      '/api/v1/subscribe/files/$subscribeId',
+    );
+    final status = response.statusCode ?? 0;
+    if (status >= 400) {
+      throw StateError('请求失败 (HTTP $status)');
+    }
+    final data = response.data;
+    if (data is! Map) {
+      throw StateError('返回数据格式错误');
+    }
+    return SubscribeFilesResult.fromJson(Map<String, dynamic>.from(data));
   }
 }

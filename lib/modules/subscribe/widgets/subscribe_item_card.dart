@@ -11,6 +11,7 @@ enum SubscribeItemCardType {
   edit,
   search,
   detail,
+  files,
   pause,
   resume,
   reset,
@@ -547,6 +548,7 @@ class SubscribeItemCard extends StatelessWidget {
       SubscribeItemCardType.edit,
       SubscribeItemCardType.search,
       SubscribeItemCardType.detail,
+      SubscribeItemCardType.files,
     ];
     if (isPaused) {
       items.add(SubscribeItemCardType.resume);
@@ -607,6 +609,8 @@ class SubscribeItemCard extends StatelessWidget {
         return Icons.edit;
       case SubscribeItemCardType.detail:
         return Icons.info;
+      case SubscribeItemCardType.files:
+        return Icons.folder_open;
       case SubscribeItemCardType.pause:
         return Icons.pause;
       case SubscribeItemCardType.resume:
@@ -628,6 +632,8 @@ class SubscribeItemCard extends StatelessWidget {
         return '编辑';
       case SubscribeItemCardType.detail:
         return '详情';
+      case SubscribeItemCardType.files:
+        return '文件统计';
       case SubscribeItemCardType.pause:
         return '暂停';
       case SubscribeItemCardType.resume:
@@ -649,6 +655,8 @@ class SubscribeItemCard extends StatelessWidget {
         return Colors.blue;
       case SubscribeItemCardType.detail:
         return Colors.green;
+      case SubscribeItemCardType.files:
+        return const Color(0xFF64D2FF);
       case SubscribeItemCardType.pause:
         return Colors.orange;
       case SubscribeItemCardType.resume:

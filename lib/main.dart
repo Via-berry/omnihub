@@ -21,6 +21,8 @@ import 'package:moviepilot_mobile/modules/search/pages/person_detail_page.dart';
 import 'package:moviepilot_mobile/modules/search/pages/person_search_result_page.dart';
 import 'package:moviepilot_mobile/modules/search/pages/search_media_result_page.dart';
 import 'package:moviepilot_mobile/modules/search/services/app_update_service.dart';
+import 'package:moviepilot_mobile/modules/subtitle/controllers/subtitle_search_controller.dart';
+import 'package:moviepilot_mobile/modules/subtitle/pages/subtitle_search_result_page.dart';
 import 'package:moviepilot_mobile/middlewares/route_permission_middleware.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:moviepilot_mobile/services/ios_shared_session_service.dart';
@@ -64,11 +66,13 @@ import 'modules/recommend/pages/recommend_category_list_page.dart';
 import 'modules/search_result/controllers/search_result_controller.dart';
 import 'modules/search_result/pages/search_result_page.dart';
 import 'modules/subscribe/controllers/subscribe_controller.dart';
+import 'modules/subscribe/controllers/subscribe_history_controller.dart';
 import 'modules/subscribe/controllers/subscribe_popular_controller.dart';
 import 'modules/subscribe/controllers/subscribe_share_controller.dart';
 import 'modules/subscribe/controllers/subscribe_calendar_controller.dart';
 import 'modules/subscribe/controllers/subscribe_share_statistics_controller.dart';
 import 'modules/subscribe/pages/subscribe_calendar_page.dart';
+import 'modules/subscribe/pages/subscribe_history_page.dart';
 import 'modules/subscribe/pages/subscribe_page.dart';
 import 'modules/subscribe/pages/subscribe_popular_page.dart';
 import 'modules/subscribe/pages/subscribe_share_page.dart';
@@ -91,11 +95,13 @@ import 'modules/plugin/pages/plugin_page.dart';
 import 'modules/plugin/pages/plugin_list_page.dart';
 import 'modules/plugin/services/plugin_palette_cache.dart';
 import 'modules/dynamic_form/adapters/plugin_form_adapter_registry.dart';
+import 'modules/dynamic_form/adapters/brush_flow_form_controller.dart';
 import 'modules/dynamic_form/adapters/p115_strm_helper_form_controller.dart';
 import 'modules/dynamic_form/adapters/proxmox_ve_backup_form_controller.dart';
 import 'modules/dynamic_form/adapters/subtitle_manual_upload_form_controller.dart';
 import 'modules/dynamic_form/adapters/trash_clean_form_controller.dart';
 import 'modules/dynamic_form/widgets/VueStyle/applitepush/app_lite_push_widgets.dart';
+import 'modules/dynamic_form/widgets/VueStyle/brush_flow/brush_flow_widgets.dart';
 import 'modules/dynamic_form/widgets/VueStyle/proxmox_ve/proxmox_ve_backup_widgets.dart';
 import 'modules/dynamic_form/widgets/VueStyle/subtitle_manual_upload/subtitle_manual_upload_widgets.dart';
 import 'modules/dynamic_form/controllers/dynamic_form_controller.dart';
@@ -181,12 +187,17 @@ Future<void> main() async {
       ({required formMode}) =>
           SubtitleManualUploadFormController(formMode: formMode),
     );
+    PluginFormAdapterRegistry.register(
+      'BrushFlow',
+      ({required formMode}) => BrushFlowFormController(formMode: formMode),
+    );
   } catch (e) {
     debugPrint('Error initializing app: $e');
   }
   registerProxmoxVeBackupRenderer();
   registerAppLitePushRenderer();
   registerSubtitleManualUploadRenderer();
+  registerBrushFlowRenderer();
   runApp(const MyApp());
 }
 
@@ -339,6 +350,37 @@ class MyApp extends StatelessWidget {
             middlewares: permissionGuards('/search-media-result'),
           ),
           GetPage(
+            name: '/subtitle-search-result',
+            page: () => const SubtitleSearchResultPage(),
+            binding: BindingsBuilder(() {
+              final args = Get.parameters;
+              if (Get.isRegistered<SubtitleSearchController>()) {
+                Get.delete<SubtitleSearchController>();
+              }
+              Get.put(
+                () {
+                  final c = SubtitleSearchController();
+                  c.mediaSearchKey = args['mediaSearchKey'] ?? '';
+                  c.sites = (args['sites'] ?? '')
+                      .split(',')
+                      .where((s) => s.trim().isNotEmpty)
+                      .map(int.tryParse)
+                      .whereType<int>()
+                      .toList();
+                  c.year = args['year'] ?? '';
+                  c.season = args['season'];
+                  c.mtype = args['mtype'] ?? '电影';
+                  c.title = args['title'] ?? '';
+                  c.prefillTitle = args['title'];
+                  c.prefillBackdrop =
+                      args['backdrop'] ?? args['backdrop_path'];
+                  return c;
+                }(),
+              );
+            }),
+            middlewares: permissionGuards('/subtitle-search-result'),
+          ),
+          GetPage(
             name: '/media-search-list',
             page: () => const MediaSearchListPage(),
             binding: BindingsBuilder(() {
@@ -426,6 +468,14 @@ class MyApp extends StatelessWidget {
               Get.put(SubscribePopularController(), permanent: false);
             }),
             middlewares: permissionGuards('/subscribe-popular'),
+          ),
+          GetPage(
+            name: '/subscribe-history',
+            page: () => const SubscribeHistoryPage(),
+            binding: BindingsBuilder(() {
+              Get.put(SubscribeHistoryController(), permanent: false);
+            }),
+            middlewares: permissionGuards('/subscribe-history'),
           ),
           GetPage(
             name: '/subscribe-share',

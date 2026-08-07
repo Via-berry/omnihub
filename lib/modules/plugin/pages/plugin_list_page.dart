@@ -6,11 +6,11 @@ import 'package:moviepilot_mobile/modules/plugin/defines/plugin_list_filter_defi
 import 'package:moviepilot_mobile/modules/plugin/models/plugin_models.dart';
 import 'package:moviepilot_mobile/modules/plugin/pages/plugin_info_sheet.dart';
 import 'package:moviepilot_mobile/modules/plugin/widgets/plugin_item_card.dart';
-import 'package:moviepilot_mobile/modules/plugin/widgets/plugin_center_widgets.dart';
 import 'package:moviepilot_mobile/modules/plugin/widgets/plugin_list_filter_sheet.dart';
 import 'package:moviepilot_mobile/modules/search_result/widgets/sort_pull_down_widget.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/utils/image_util.dart';
+import 'package:moviepilot_mobile/widgets/app_loading.dart';
 import 'package:moviepilot_mobile/widgets/glass_search_floating_bar.dart';
 
 class PluginListPage extends GetView<PluginListController> {
@@ -52,28 +52,15 @@ class PluginListPage extends GetView<PluginListController> {
       appBar: AppBar(
         backgroundColor: theme.scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
-        title: Text(
-          '插件市场',
-          style: theme.textTheme.titleLarge?.copyWith(
-            color: theme.colorScheme.onSurface,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+        title: const Text('插件市场'),
         centerTitle: false,
         actions: [
           Obx(() {
             if (!controller.isLoading.value) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(right: 16),
+            return const Padding(
+              padding: EdgeInsets.only(right: 12),
               child: Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
+                child: AppLoadingIndicator(size: 36),
               ),
             );
           }),
@@ -91,35 +78,18 @@ class PluginListPage extends GetView<PluginListController> {
       ),
       body: RefreshIndicator(
         onRefresh: controller.load,
-        child: Stack(
-          children: [
-            const Positioned.fill(child: PluginCenterBackdrop()),
-            CustomScrollView(
-              controller: controller.scrollController,
-              cacheExtent: 200,
-              slivers: [
-                SliverToBoxAdapter(child: _buildOverviewHeader(context)),
-                _buildSliverContent(context),
-                SliverToBoxAdapter(
-                  child: SizedBox(height: _bottomInset(context)),
-                ),
-              ],
+        child: CustomScrollView(
+          controller: controller.scrollController,
+          cacheExtent: 200,
+          slivers: [
+            _buildSliverContent(context),
+            SliverToBoxAdapter(
+              child: SizedBox(height: _bottomInset(context)),
             ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildOverviewHeader(BuildContext context) {
-    return Obx(() {
-      final items = controller.items;
-      return PluginOverviewHeader(
-        title: '探索扩展能力',
-        count: items.length,
-        icon: Icons.storefront_rounded,
-      );
-    });
   }
 
   Widget _buildFloatingFilterButton(BuildContext context) {
@@ -234,13 +204,9 @@ class PluginListPage extends GetView<PluginListController> {
       final items = controller.visibleItems;
 
       if (loading && items.isEmpty && controller.items.isEmpty) {
-        return SliverFillRemaining(
+        return const SliverFillRemaining(
           hasScrollBody: false,
-          child: Center(
-            child: CircularProgressIndicator(
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
+          child: AppLoadingCenter(message: '正在加载插件市场…'),
         );
       }
       if (error != null && controller.items.isEmpty) {
@@ -307,7 +273,7 @@ class PluginListPage extends GetView<PluginListController> {
                           .toInt(),
                   mainAxisSpacing: _gridSpacing,
                   crossAxisSpacing: _gridSpacing,
-                  mainAxisExtent: 148,
+                  mainAxisExtent: 160,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => _buildCard(context, items[index]),
@@ -368,12 +334,10 @@ class PluginListPage extends GetView<PluginListController> {
         padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
         child: Center(
           child: loading
-              ? SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Theme.of(context).colorScheme.primary,
+              ? AppLoading.small(
+                  message: '正在加载更多…',
+                  messageStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 )
               : CupertinoButton(

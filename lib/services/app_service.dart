@@ -583,7 +583,8 @@ class AppService extends GetxService {
     }
 
     if (normalized == '/search-result' ||
-        normalized == '/search-media-result') {
+        normalized == '/search-media-result' ||
+        normalized == '/subtitle-search-result') {
       return canSearch;
     }
 
@@ -643,7 +644,8 @@ class AppService extends GetxService {
       return '当前帐号无应用设置权限';
     }
     if (normalized == '/search-result' ||
-        normalized == '/search-media-result') {
+        normalized == '/search-media-result' ||
+        normalized == '/subtitle-search-result') {
       return '当前帐号无资源搜索权限';
     }
     if (normalized == '/system-message') {

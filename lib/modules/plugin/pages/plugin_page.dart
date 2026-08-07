@@ -1,15 +1,17 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:moviepilot_mobile/modules/dashboard/widgets/dashboard_widget_styles.dart';
 import 'package:moviepilot_mobile/modules/plugin/controllers/plugin_controller.dart';
 import 'package:moviepilot_mobile/modules/plugin/models/plugin_models.dart';
+import 'package:moviepilot_mobile/modules/plugin/pages/plugin_backup_restore_sheet.dart';
 import 'package:moviepilot_mobile/modules/plugin/pages/plugin_info_sheet.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/modules/plugin/widgets/plugin_item_card.dart';
-import 'package:moviepilot_mobile/modules/plugin/widgets/plugin_center_widgets.dart';
 import 'package:moviepilot_mobile/utils/image_util.dart';
 import 'package:moviepilot_mobile/utils/open_url.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
+import 'package:moviepilot_mobile/widgets/app_loading.dart';
 import 'package:moviepilot_mobile/widgets/glass_search_floating_bar.dart';
 
 class PluginPage extends GetView<PluginController> {
@@ -39,29 +41,32 @@ class PluginPage extends GetView<PluginController> {
         ),
       );
     }
-    final theme = Theme.of(context);
+    final palette = DashboardPalette.of(context);
     return Scaffold(
       appBar: AppBar(
         surfaceTintColor: Colors.transparent,
-        title: Text(
-          '已安装插件',
-          style: theme.textTheme.titleLarge?.copyWith(
-            color: theme.colorScheme.onSurface,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+        title: const Text('已安装插件'),
         centerTitle: false,
         actions: [
           _buildAppBarActionButton(
             context,
             icon: Icons.add_rounded,
             tooltip: '指定仓库安装',
+            accent: palette.primary,
             onPressed: () => _openRepoInstallSheet(context),
           ),
           _buildAppBarActionButton(
             context,
+            icon: Icons.settings_backup_restore_rounded,
+            tooltip: '备份中心',
+            accent: palette.coolAccent,
+            onPressed: () => showPluginBackupCenterSheet(context),
+          ),
+          _buildAppBarActionButton(
+            context,
             icon: Icons.storefront_rounded,
-            tooltip: '插件列表',
+            tooltip: '插件市场',
+            accent: palette.warmAccent,
             onPressed: () => Get.toNamed('/plugin-list'),
           ),
         ],
@@ -76,18 +81,12 @@ class PluginPage extends GetView<PluginController> {
       ),
       body: RefreshIndicator(
         onRefresh: controller.load,
-        child: Stack(
-          children: [
-            const Positioned.fill(child: PluginCenterBackdrop()),
-            CustomScrollView(
-              cacheExtent: 200,
-              slivers: [
-                SliverToBoxAdapter(child: _buildOverviewHeader(context)),
-                _buildSliverContent(context),
-                SliverToBoxAdapter(
-                  child: SizedBox(height: _bottomInset(context)),
-                ),
-              ],
+        child: CustomScrollView(
+          cacheExtent: 200,
+          slivers: [
+            _buildSliverContent(context),
+            SliverToBoxAdapter(
+              child: SizedBox(height: _bottomInset(context)),
             ),
           ],
         ),
@@ -99,15 +98,17 @@ class PluginPage extends GetView<PluginController> {
     BuildContext context, {
     required IconData icon,
     required String tooltip,
-    required VoidCallback onPressed,
+    required Color accent,
+    required VoidCallback? onPressed,
   }) {
-    final cs = Theme.of(context).colorScheme;
+    final palette = DashboardPalette.of(context);
+    final enabled = onPressed != null;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Tooltip(
         message: tooltip,
         child: Material(
-          color: cs.surfaceContainerHighest.withValues(alpha: 0.62),
+          color: accent.withValues(alpha: palette.isDark ? 0.18 : 0.12),
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
@@ -115,26 +116,16 @@ class PluginPage extends GetView<PluginController> {
             child: SizedBox(
               width: 38,
               height: 38,
-              child: Icon(icon, size: 20, color: cs.onSurface),
+              child: Icon(
+                icon,
+                size: 20,
+                color: accent.withValues(alpha: enabled ? 1 : 0.38),
+              ),
             ),
           ),
         ),
       ),
     );
-  }
-
-  Widget _buildOverviewHeader(BuildContext context) {
-    return Obx(() {
-      final items = controller.items;
-      final active = items.where((item) => item.state).length;
-      return PluginOverviewHeader(
-        title: '你的插件空间',
-        count: items.length,
-        secondaryCount: active,
-        secondaryLabel: '运行中',
-        icon: Icons.extension_rounded,
-      );
-    });
   }
 
   Future<void> _openRepoInstallSheet(BuildContext context) {
@@ -169,13 +160,9 @@ class PluginPage extends GetView<PluginController> {
       final items = controller.visibleItems;
 
       if (loading && items.isEmpty) {
-        return SliverFillRemaining(
+        return const SliverFillRemaining(
           hasScrollBody: false,
-          child: Center(
-            child: CircularProgressIndicator(
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
+          child: AppLoadingCenter(message: '正在加载已安装插件…'),
         );
       }
       if (error != null && items.isEmpty) {
@@ -237,7 +224,7 @@ class PluginPage extends GetView<PluginController> {
               crossAxisCount: crossAxisCount,
               mainAxisSpacing: _gridSpacing,
               crossAxisSpacing: _gridSpacing,
-              mainAxisExtent: 148,
+              mainAxisExtent: 160,
             ),
             delegate: SliverChildBuilderDelegate(
               (context, index) => _buildCard(context, items[index]),

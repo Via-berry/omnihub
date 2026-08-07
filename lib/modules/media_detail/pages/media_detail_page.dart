@@ -1251,153 +1251,156 @@ class MediaDetailPage extends GetWidget<MediaDetailController> {
       final canSubscribe = appService.canSubscribe;
       final canSearch = appService.canSearch;
       final movieSubscribed = controller.movieSubscribeItem.value != null;
-      final seasons = detail.season_info;
-      if (isTv && seasons?.isNotEmpty == true) {
-        final actions = <Widget>[];
-        if (canSubscribe) {
-          actions.add(
-            _buildSubscribeButton(
-              context,
-              detail,
-              isLoading,
-              controller.seasonSubscribeMap.isNotEmpty,
-            ),
-          );
-        }
-        if (canSearch) {
-          actions.add(
-            _buildPrimaryAction(
-              label: '搜索资源',
-              icon: CupertinoIcons.search,
-              onPressed: isLoading ? null : () => _openSearch(context),
-              accentColor: Theme.of(context).colorScheme.secondary,
-            ),
-          );
-        }
-        if (actions.isEmpty) return const SizedBox.shrink();
-        return _buildHeaderActionGroup(children: actions);
-      }
-      final actions = <Widget>[];
-      if (canSubscribe) {
-        actions.add(
-          _buildSubscribeButton(context, detail, isLoading, movieSubscribed),
-        );
-      }
-      if (canSearch) {
-        actions.add(
-          _buildPrimaryAction(
-            label: '搜索资源',
-            icon: CupertinoIcons.search,
-            onPressed: isLoading ? null : () => _openSearch(context),
-            accentColor: Theme.of(context).colorScheme.secondary,
-          ),
-        );
-      }
-      if (actions.isEmpty) {
+      final isSubscribed = isTv
+          ? controller.seasonSubscribeMap.isNotEmpty
+          : movieSubscribed;
+      if (!canSubscribe && !canSearch) {
         return const SizedBox.shrink();
       }
-      return _buildHeaderActionGroup(children: actions);
+
+      return Row(
+        children: [
+          if (canSearch)
+            Expanded(
+              child: _buildSearchPillButton(
+                context,
+                enabled: !isLoading,
+                onPressed: () => _openSearch(context),
+              ),
+            )
+          else
+            const Spacer(),
+          if (canSubscribe) ...[
+            if (canSearch) const SizedBox(width: 10),
+            _buildCircleActionButton(
+              context,
+              icon: controller.subscribeLoadingState.value
+                  ? CupertinoIcons.arrow_2_circlepath
+                  : (isSubscribed
+                        ? CupertinoIcons.bell_fill
+                        : CupertinoIcons.bell),
+              accentColor: isSubscribed
+                  ? const Color(0xFFFF6B6B)
+                  : Colors.white,
+              onPressed: isLoading || controller.subscribeLoadingState.value
+                  ? null
+                  : () => _onSubscribePressed(context, detail, isSubscribed),
+            ),
+          ],
+          if (canSearch) ...[
+            const SizedBox(width: 8),
+            _buildCircleActionButton(
+              context,
+              icon: CupertinoIcons.text_bubble,
+              onPressed: isLoading ? null : () => _openSubtitleSearch(context),
+            ),
+          ],
+        ],
+      );
     });
   }
 
-  Widget _buildHeaderActionGroup({required List<Widget> children}) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
-          ),
-          child: Row(
-            children: [
-              for (var i = 0; i < children.length; i++) ...[
-                Expanded(child: children[i]),
-                if (i != children.length - 1)
-                  Container(
-                    width: 0.5,
-                    height: 34,
-                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                    color: Colors.white.withValues(alpha: 0.18),
+  Widget _buildSearchPillButton(
+    BuildContext context, {
+    required bool enabled,
+    required VoidCallback onPressed,
+  }) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return Opacity(
+      opacity: enabled ? 1 : 0.52,
+      child: Material(
+        color: accent,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: enabled ? onPressed : null,
+          borderRadius: BorderRadius.circular(999),
+          child: const SizedBox(
+            height: 48,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(CupertinoIcons.search, size: 18, color: Colors.white),
+                SizedBox(width: 8),
+                Text(
+                  '搜索资源',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                   ),
+                ),
               ],
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSubscribeButton(
+  Widget _buildCircleActionButton(
+    BuildContext context, {
+    required IconData icon,
+    Color accentColor = Colors.white,
+    VoidCallback? onPressed,
+  }) {
+    return Opacity(
+      opacity: onPressed == null ? 0.52 : 1,
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.14),
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: onPressed,
+          customBorder: const CircleBorder(),
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Icon(icon, size: 20, color: accentColor),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onSubscribePressed(
     BuildContext context,
     MediaDetail detail,
-    bool isLoading,
     bool isSubscribed,
-  ) {
-    return Obx(() {
-      if (controller.subscribeLoadingState.value) {
-        return _buildPrimaryAction(
-          label: 'loading...',
-          icon: CupertinoIcons.arrow_2_circlepath,
-          onPressed: null,
-          accentColor: Colors.grey,
-        );
+  ) async {
+    try {
+      if (_isTv(detail)) {
+        await _openTvSubscribeSheet(context, detail);
+        return;
       }
-      return _buildPrimaryAction(
-        label: _isTv(detail)
-            ? (controller.seasonSubscribeMap.isNotEmpty ? '已订阅' : '订阅')
-            : (isSubscribed ? '已订阅' : '订阅'),
-        icon: isSubscribed
-            ? CupertinoIcons.heart_slash_fill
-            : CupertinoIcons.heart_fill,
-        onPressed: () async {
-          try {
-            if (_isTv(detail)) {
-              await _openTvSubscribeSheet(context, detail);
-              return;
-            }
-            final (success, isTv, subscribeId) = await controller
-                .handleSubscribe();
-            if (!success) {
-              ToastUtil.error('${isSubscribed ? '取消' : ''}订阅失败');
-              return;
-            }
+      final (success, isTv, subscribeId) = await controller.handleSubscribe();
+      if (!success) {
+        ToastUtil.error('${isSubscribed ? '取消' : ''}订阅失败');
+        return;
+      }
 
-            if (!isSubscribed && isTv && subscribeId != null) {
-              ToastUtil.success(
-                '${detail.title ?? ''} 订阅成功',
-                title: '订阅成功',
-                duration: const Duration(seconds: 3),
-                mainButtonText: '编辑',
-                onMainButtonPressed: () {
-                  Get.toNamed(
-                    '/subscribe-edit',
-                    arguments: SubscribeItem(id: subscribeId),
-                  );
-                },
-              );
-              return;
-            }
+      if (!isSubscribed && isTv && subscribeId != null) {
+        ToastUtil.success(
+          '${detail.title ?? ''} 订阅成功',
+          title: '订阅成功',
+          duration: const Duration(seconds: 3),
+          mainButtonText: '编辑',
+          onMainButtonPressed: () {
+            Get.toNamed(
+              '/subscribe-edit',
+              arguments: SubscribeItem(id: subscribeId),
+            );
+          },
+        );
+        return;
+      }
 
-            if (isSubscribed) {
-              ToastUtil.success('${isSubscribed ? '取消' : ''}订阅成功');
-            } else {
-              ToastUtil.info('${isSubscribed ? '取消' : ''}订阅成功');
-            }
-          } catch (e) {
-            ToastUtil.error('请求失败 $e');
-          }
-        },
-        accentColor: isLoading
-            ? Colors.grey
-            : isSubscribed
-            ? Colors.red
-            : Theme.of(context).colorScheme.primary,
-      );
-    });
+      if (isSubscribed) {
+        ToastUtil.success('${isSubscribed ? '取消' : ''}订阅成功');
+      } else {
+        ToastUtil.info('${isSubscribed ? '取消' : ''}订阅成功');
+      }
+    } catch (e) {
+      ToastUtil.error('请求失败 $e');
+    }
   }
 
   Future<void> _openTvSubscribeSheet(
@@ -1773,43 +1776,6 @@ class MediaDetailPage extends GetWidget<MediaDetailController> {
     return HttpPathBuilderUtil.buildMediaPath(item);
   }
 
-  Widget _buildPrimaryAction({
-    required String label,
-    required IconData icon,
-    VoidCallback? onPressed,
-    Color? accentColor,
-  }) {
-    final accent = accentColor ?? const Color(0xFF60A5FA);
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
-      onPressed: onPressed,
-      child: Opacity(
-        opacity: onPressed == null ? 0.52 : 1,
-        child: SizedBox(
-          height: 58,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 21, color: accent),
-              const SizedBox(height: 5),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildLinkAction({
     required String label,
     String? iconPath,
@@ -1877,6 +1843,43 @@ class MediaDetailPage extends GetWidget<MediaDetailController> {
       params['season'] = selectedSeason.toString();
     }
     Get.toNamed('/search-media-result', parameters: params);
+  }
+
+  void _openSubtitleSearch(BuildContext context) async {
+    if (!Get.find<AppService>().canSearch) {
+      ToastUtil.info('当前帐号无资源搜索权限');
+      return;
+    }
+    final searchKey = controller.args.path;
+    final detail = controller.mediaDetail.value;
+    final result = await Get.bottomSheet<({String area, List<int> sites})>(
+      SiteSelectSheet(
+        hasSegment: false,
+        seasons: detail == null ? null : _availableSeasons(detail),
+        mediaSearchKey: searchKey,
+      ),
+      isScrollControlled: true,
+    );
+    if (result == null) return;
+    final sites = result.sites;
+    if (sites.isEmpty) {
+      ToastUtil.info('请至少选择一个站点');
+      return;
+    }
+    final selectedSeason = await _loadLastSelectedSeason(searchKey);
+    final params = <String, String>{
+      'mediaSearchKey': searchKey,
+      'sites': sites.join(','),
+      'year': detail?.year ?? '',
+      'mtype': detail?.type ?? '电影',
+      'title': detail?.title ?? '',
+      if ((detail?.backdrop_path ?? '').isNotEmpty)
+        'backdrop': detail!.backdrop_path!,
+    };
+    if (detail != null && _isTv(detail) && selectedSeason > 0) {
+      params['season'] = selectedSeason.toString();
+    }
+    Get.toNamed('/subtitle-search-result', parameters: params);
   }
 
   Future<int> _loadLastSelectedSeason(String mediaSearchKey) async {
