@@ -5,6 +5,7 @@ import 'package:moviepilot_mobile/modules/profile/models/user_info.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 
 /// 用户订阅统计
 class UserSubscribeStats {
@@ -186,7 +187,7 @@ class UserManagementController extends GetxController {
       int tvCount = 0;
       for (final item in list) {
         if (item is! Map<String, dynamic>) continue;
-        final sub = SubscribeItem.fromJson(item);
+        final sub = SubscribeItem.fromJson(normalizeSubscribeJson(item));
         final t = sub.type?.trim().toLowerCase() ?? '';
         if (t.contains('电影') || t.contains('movie') || t == 'movie') {
           movieCount++;

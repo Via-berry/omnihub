@@ -13,6 +13,7 @@ import 'package:moviepilot_mobile/modules/search/services/search_keyword_hints_s
 import 'package:moviepilot_mobile/modules/subscribe/controllers/subscribe_service.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 import 'package:path_provider/path_provider.dart';
 
 const List<String> _movieSubCategories = <String>[
@@ -584,7 +585,7 @@ class RecommendController extends GetxController {
       if (raw is! Map) continue;
       final map = _toStringKeyMap(raw);
       try {
-        final apiItem = RecommendApiItem.fromJson(map);
+        final apiItem = RecommendApiItem.fromJson(normalizeMediaJson(map));
         items.add(apiItem);
       } catch (e, st) {
         _log.handle(e, stackTrace: st, message: '解析推荐条目失败');

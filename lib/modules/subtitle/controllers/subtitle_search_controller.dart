@@ -6,12 +6,16 @@ import 'package:moviepilot_mobile/applog/app_log.dart';
 import 'package:moviepilot_mobile/modules/subtitle/models/subtitle_search_models.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
+import 'package:moviepilot_mobile/services/server_api_version_service.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
 
 class SubtitleSearchController extends GetxController {
   final _apiClient = Get.find<ApiClient>();
   final _appService = Get.find<AppService>();
   final _log = Get.find<AppLog>();
+  ServerApiVersionService get _serverApiVersionService =>
+      Get.find<ServerApiVersionService>();
 
   var mediaSearchKey = '';
   var mtype = '电影';
@@ -91,9 +95,14 @@ class SubtitleSearchController extends GetxController {
           seasonValue != '0') {
         query['season'] = seasonValue;
       }
+      final identity = MediaIdentity.parse(mediaSearchKey);
+      final useV3 =
+          identity != null && await _serverApiVersionService.isV3();
+      if (useV3) query['media_source'] = identity.source;
+      final requestMediaId = useV3 ? identity.id : mediaSearchKey;
 
       final path =
-          '/api/v1/search/subtitle/media/$mediaSearchKey/stream'
+          '/api/v1/search/subtitle/media/$requestMediaId/stream'
           '?${Uri(queryParameters: query).query}';
 
       final stream = await _apiClient.streamLines(path, token: token);

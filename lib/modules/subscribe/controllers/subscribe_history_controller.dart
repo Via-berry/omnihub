@@ -4,6 +4,7 @@ import 'package:moviepilot_mobile/modules/multifunction/controllers/multifunctio
 import 'package:moviepilot_mobile/modules/subscribe/controllers/subscribe_controller.dart';
 import 'package:moviepilot_mobile/modules/subscribe/controllers/subscribe_service.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
 
 class SubscribeHistoryEntry {
@@ -151,7 +152,7 @@ class SubscribeHistoryController extends GetxController {
       try {
         result.add(
           SubscribeHistoryEntry(
-            item: SubscribeItem.fromJson(raw),
+            item: SubscribeItem.fromJson(normalizeSubscribeJson(raw)),
             raw: raw,
           ),
         );

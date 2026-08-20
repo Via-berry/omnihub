@@ -12,6 +12,7 @@ import 'package:moviepilot_mobile/modules/site/controllers/site_controller.dart'
 import 'package:moviepilot_mobile/modules/system_message/controllers/system_message_controller.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/services/ios_shared_session_service.dart';
+import 'package:moviepilot_mobile/services/server_api_version_service.dart';
 import '../../../services/api_client.dart';
 import '../../../services/hive_service.dart';
 import '../models/login_profile.dart';
@@ -22,6 +23,8 @@ class AuthRepository extends GetxService {
   final _api = Get.find<ApiClient>();
   final _appService = Get.find<AppService>();
   final _iosSharedSessionService = Get.find<IosSharedSessionService>();
+  ServerApiVersionService get _serverApiVersionService =>
+      Get.find<ServerApiVersionService>();
 
   Box<LoginProfile> get _loginBox => Get.find<HiveService>().loginProfileBox;
 
@@ -53,6 +56,7 @@ class AuthRepository extends GetxService {
     );
     final login = LoginResponse.fromJson(response.data!);
     _talker.info('登录成功: $username');
+    _serverApiVersionService.reset();
     // 登录成功后，后续请求统一携带 Token
     _api.setToken(login.accessToken);
 
@@ -138,6 +142,7 @@ class AuthRepository extends GetxService {
       final userLookupKey = normalizedUserName.isNotEmpty
           ? normalizedUserName
           : normalizedLoginName;
+      _serverApiVersionService.reset();
       _appService.restoreSessionFromProfile(profile);
       _api.setBaseUrl(normalizedServer);
       _api.setToken(profile.accessToken);
@@ -188,6 +193,7 @@ class AuthRepository extends GetxService {
 
   void restoreLocalSession({required LoginProfile profile}) {
     final normalizedServer = _normalizeServer(profile.server);
+    _serverApiVersionService.reset();
     _appService.restoreSessionFromProfile(profile);
     _api.setBaseUrl(normalizedServer);
     _api.setToken(profile.accessToken);
@@ -211,6 +217,7 @@ class AuthRepository extends GetxService {
     await _api.clearSessionCookies();
     _api.setToken('');
     _appService.clearCookie();
+    _serverApiVersionService.reset();
     _appService.restoreSessionFromProfile(profile);
     _api.setBaseUrl(normalizedServer);
     _api.setToken(profile.accessToken);

@@ -9,7 +9,9 @@ import 'package:moviepilot_mobile/modules/search_result/controllers/search_resul
 import 'package:moviepilot_mobile/modules/search_result/models/search_result_models.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
+import 'package:moviepilot_mobile/services/server_api_version_service.dart';
 import 'package:moviepilot_mobile/services/sse_client.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum SearchType { media, title }
@@ -21,6 +23,8 @@ class SearchMediaController extends GetxController {
   final _apiClient = Get.find<ApiClient>();
   final _appService = Get.find<AppService>();
   final _log = Get.find<AppLog>();
+  ServerApiVersionService get _serverApiVersionService =>
+      Get.find<ServerApiVersionService>();
 
   final searchText = ''.obs;
   String? prefillTitle;
@@ -216,8 +220,18 @@ class SearchMediaController extends GetxController {
       if (season != null && season!.isNotEmpty && season != '0') {
         queryParameters['season'] = season!;
       }
+      final identity = MediaIdentity.parse(mediaSearchKey);
+      final useV3 =
+          searchType == SearchType.media &&
+          identity != null &&
+          await _serverApiVersionService.isV3();
+      if (useV3) {
+        queryParameters['media_source'] = identity.source;
+      }
       final endpoint = switch (searchType) {
-        SearchType.media => '/api/v1/search/media/$mediaSearchKey',
+        SearchType.media => useV3
+            ? '/api/v1/search/media/${identity.id}'
+            : '/api/v1/search/media/$mediaSearchKey',
         SearchType.title => '/api/v1/search/title',
       };
       final response = await _apiClient.get<dynamic>(

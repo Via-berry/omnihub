@@ -8,6 +8,7 @@ import 'package:moviepilot_mobile/modules/search_result/controllers/search_resul
 import 'package:moviepilot_mobile/modules/subscribe/controllers/subscribe_service.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MediaSearchListController extends GetxController {
@@ -152,7 +153,9 @@ class MediaSearchListController extends GetxController {
       final raw = response.data;
       final parsed = _extractList(raw)
           .whereType<Map<String, dynamic>>()
-          .map(RecommendApiItem.fromJson)
+          .map(
+            (item) => RecommendApiItem.fromJson(normalizeMediaJson(item)),
+          )
           .toList();
       if (append) {
         items.addAll(parsed);
