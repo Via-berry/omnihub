@@ -8,6 +8,7 @@ import 'package:moviepilot_mobile/applog/app_log.dart';
 import 'package:talker/talker.dart';
 import 'package:talker_dio_logger/talker_dio_logger.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
+import 'package:moviepilot_mobile/services/server_api_version_service.dart';
 import 'package:moviepilot_mobile/utils/dio_adapter_config_stub.dart'
     if (dart.library.io) 'package:moviepilot_mobile/utils/dio_adapter_config_io.dart'
     if (dart.library.js_interop) 'package:moviepilot_mobile/utils/dio_adapter_config_web.dart';
@@ -41,6 +42,8 @@ class ApiHttpException implements Exception {
 }
 
 class ApiClient extends g.GetxController {
+  static const _skipV3EnvelopeUnwrapKey = 'skipV3EnvelopeUnwrap';
+
   final _appService = g.Get.find<AppService>();
   final _iosSharedSessionService = g.Get.find<IosSharedSessionService>();
   final _hiveService = g.Get.find<HiveService>();
@@ -191,6 +194,59 @@ class ApiClient extends g.GetxController {
         ),
       );
     }
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onResponse: (response, handler) async {
+          if (response.requestOptions.extra[_skipV3EnvelopeUnwrapKey] == true ||
+              response.requestOptions.responseType != ResponseType.json) {
+            handler.next(response);
+            return;
+          }
+
+          final envelope = response.data;
+          if (envelope is! Map ||
+              envelope['success'] is! bool ||
+              !envelope.containsKey('data')) {
+            handler.next(response);
+            return;
+          }
+
+          if (!g.Get.isRegistered<ServerApiVersionService>()) {
+            handler.next(response);
+            return;
+          }
+
+          try {
+            final isV3 = await g.Get.find<ServerApiVersionService>().isV3();
+            if (!isV3) {
+              handler.next(response);
+              return;
+            }
+          } catch (_) {
+            handler.next(response);
+            return;
+          }
+
+          final data = envelope['data'];
+          if (data == null) {
+            handler.next(response);
+            return;
+          }
+          if (data is Map) {
+            // 业务字段优先：仅在原始数据没有同名键时才补 envelope 的字段，
+            // 避免把接口本身返回的 success / message / data 覆盖掉。
+            final merged = Map<String, dynamic>.from(data);
+            merged.putIfAbsent('success', () => envelope['success']);
+            merged.putIfAbsent('message', () => envelope['message']);
+            merged.putIfAbsent('data', () => data);
+            response.data = merged;
+          } else {
+            response.data = data;
+          }
+          handler.next(response);
+        },
+      ),
+    );
   }
 
   Future<void> _ensureReady() => _ready;
@@ -531,6 +587,7 @@ class ApiClient extends g.GetxController {
     int? timeout,
     Map<String, dynamic>? headers,
     bool skipUnauthorizedHandling = false,
+    bool skipV3EnvelopeUnwrap = false,
   }) async {
     await _ensureReady();
     final authToken = token ?? this.token;
@@ -546,7 +603,10 @@ class ApiClient extends g.GetxController {
         // 允许所有状态码，让调用者自己处理错误
         return true;
       },
-      extra: {if (skipUnauthorizedHandling) 'skipUnauthorizedHandling': true},
+      extra: {
+        if (skipUnauthorizedHandling) 'skipUnauthorizedHandling': true,
+        if (skipV3EnvelopeUnwrap) _skipV3EnvelopeUnwrapKey: true,
+      },
     );
     final response = await _dio.get<T>(
       path,

@@ -23,8 +23,15 @@ class ServerApiVersionService extends GetxService {
 
   Future<bool> _detect(String baseUrl, int generation) async {
     try {
-      final response = await _apiClient.get<dynamic>('/api/v1/media/source');
-      final result = response.statusCode == 200 && response.data is List;
+      final response = await _apiClient.get<dynamic>(
+        '/api/v1/media/source',
+        skipV3EnvelopeUnwrap: true,
+      );
+      final data = response.data;
+      final hasSourceList =
+          data is List ||
+          (data is Map && data.containsKey('data') && data['data'] is List);
+      final result = response.statusCode == 200 && hasSourceList;
       if (generation == _generation) {
         _cache[baseUrl] = result;
       }

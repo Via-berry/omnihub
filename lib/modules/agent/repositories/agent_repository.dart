@@ -29,13 +29,20 @@ class AgentRepository implements AgentRepositoryContract {
     int page = 1,
     int count = 30,
   }) async {
-    final response = await _apiClient.get<Map<String, dynamic>>(
+    final response = await _apiClient.get<dynamic>(
       '/api/v1/message/agent/sessions',
       queryParameters: {'page': page, 'count': count},
     );
     final data = response.data;
-    if (data == null || data['success'] != true) {
-      throw StateError(data?['message']?.toString() ?? '会话列表加载失败');
+    if (data is List) {
+      return data
+          .whereType<Map>()
+          .map((item) => AgentSession.fromJson(Map<String, dynamic>.from(item)))
+          .toList(growable: false);
+    }
+    if (data is! Map || data['success'] != true) {
+      final message = data is Map ? data['message']?.toString() : null;
+      throw StateError(message ?? '会话列表加载失败');
     }
     final list = data['data'];
     if (list is! List) return const [];

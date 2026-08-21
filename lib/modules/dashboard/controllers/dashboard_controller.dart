@@ -422,14 +422,19 @@ class DashboardController extends GetxController {
   Future<void> loadMemoryData() async {
     try {
       talker.info('开始加载内存数据');
-      final response = await apiClient.get<List<dynamic>>(
-        '/api/v1/dashboard/memory',
-      );
+      final response = await apiClient.get<dynamic>('/api/v1/dashboard/memory');
       if (response.statusCode == 200) {
         final data = response.data!;
-        if (data.length >= 2) {
-          final memoryUsed = data[0] as int;
-          final memoryUsage = data[1] as int;
+        int? memoryUsed;
+        int? memoryUsage;
+        if (data is Map) {
+          memoryUsed = (data['used'] as num?)?.toInt();
+          memoryUsage = (data['usage'] as num?)?.round();
+        } else if (data is List && data.length >= 2) {
+          memoryUsed = (data[0] as num?)?.toInt();
+          memoryUsage = (data[1] as num?)?.round();
+        }
+        if (memoryUsed != null && memoryUsage != null) {
           memoryData.value = [memoryUsed, memoryUsage];
           _appendMemoryChartData(memoryUsage.toDouble());
           talker.info('内存数据加载成功: 使用 $memoryUsed 字节, 使用率 $memoryUsage%');
