@@ -1,4 +1,5 @@
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 
 class SubscribeFilesResult {
   const SubscribeFilesResult({
@@ -13,7 +14,9 @@ class SubscribeFilesResult {
     final subscribeRaw = json['subscribe'];
     SubscribeItem? subscribe;
     if (subscribeRaw is Map) {
-      subscribe = SubscribeItem.fromJson(Map<String, dynamic>.from(subscribeRaw));
+      subscribe = SubscribeItem.fromJson(
+        normalizeSubscribeJson(Map<String, dynamic>.from(subscribeRaw)),
+      );
     }
 
     final episodesRaw = json['episodes'];

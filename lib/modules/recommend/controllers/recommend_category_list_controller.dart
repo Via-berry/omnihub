@@ -9,6 +9,7 @@ import 'package:moviepilot_mobile/modules/recommend/models/recommend_api_item.da
 import 'package:moviepilot_mobile/modules/search_result/controllers/search_result_controller.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 推荐分类列表控制器，支持分页加载
@@ -147,7 +148,11 @@ class RecommendCategoryListController extends GetxController {
       final list = _extractList(payload);
       final parsed = list
           .whereType<Map>()
-          .map((e) => RecommendApiItem.fromJson(Map<String, dynamic>.from(e)))
+          .map(
+            (e) => RecommendApiItem.fromJson(
+              normalizeMediaJson(Map<String, dynamic>.from(e)),
+            ),
+          )
           .toList();
 
       if (append) {

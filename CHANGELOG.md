@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- 兼容 MoviePilot v3 的媒体身份契约，同时保留 MoviePilot v2 请求行为。
+- 修复 MoviePilot v3 服务端下媒体详情页因身份参数不匹配返回 422 的问题。
 - 新增已安装插件「备份中心」：本地 JSON 备份/导入、备份列表长按删除、多选批量恢复安装；AppBar 直接露出指定安装、备份中心、插件市场，并以主色/冷色/暖色区分。
 - 插件恢复缺 `repo_url` 时自动反推（市场缓存、PLUGIN_MARKET、官方仓、author_url），安装按候选仓依次尝试；进度条内实时显示成功/失败且完成后保留。
 - 备份中心与恢复选插件 Sheet 视觉升级：独立恢复 Sheet、不透明卡片底、圆形勾选、安装按钮 `onPrimary` 配色、删除确认 Dialog。

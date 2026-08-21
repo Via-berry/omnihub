@@ -7,12 +7,16 @@ import 'package:moviepilot_mobile/modules/subscribe/controllers/subscribe_servic
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
+import 'package:moviepilot_mobile/services/server_api_version_service.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 
 class MediaDetailService extends GetxService {
   final _apiClient = Get.find<ApiClient>();
   final _appService = Get.find<AppService>();
   final _log = Get.find<AppLog>();
   final _subscribeService = Get.put(SubscribeService());
+  ServerApiVersionService get _serverApiVersionService =>
+      Get.find<ServerApiVersionService>();
 
   String? _getToken() =>
       _appService.loginResponse?.accessToken ??
@@ -71,19 +75,28 @@ class MediaDetailService extends GetxService {
   }
 
   /// GET /api/v1/media/seasons 获取媒体可订阅的季度列表。
-  /// mediaid 使用详情页原始媒体标识（如 tmdb:2734、douban:xxxx），
-  /// 不在客户端拆分或重组，避免不同来源的参数规则被混用。
+  /// v2 使用原始 mediaid；v3 拆分为 media_source 与 media_id。
   Future<List<SeasonInfo>> getMediaSeasons({
     required String mediaId,
     required String title,
     required String year,
   }) async {
     try {
-      final query = <String, dynamic>{
-        'mediaid': mediaId,
-        if (title.trim().isNotEmpty) 'title': title.trim(),
-        if (year.trim().isNotEmpty) 'year': year.trim(),
-      };
+      final identity = MediaIdentity.parse(mediaId);
+      final useV3 =
+          identity != null && await _serverApiVersionService.isV3();
+      final query = useV3
+          ? <String, dynamic>{
+              'media_source': identity.source,
+              'media_id': identity.id,
+              if (title.trim().isNotEmpty) 'title': title.trim(),
+              if (year.trim().isNotEmpty) 'year': year.trim(),
+            }
+          : <String, dynamic>{
+              'mediaid': mediaId,
+              if (title.trim().isNotEmpty) 'title': title.trim(),
+              if (year.trim().isNotEmpty) 'year': year.trim(),
+            };
       final response = await _apiClient.get<dynamic>(
         '/api/v1/media/seasons',
         queryParameters: query,

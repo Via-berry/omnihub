@@ -10,6 +10,7 @@ import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_submit_resp
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/services/hive_service.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -193,7 +194,10 @@ class SubscribeController extends GetxController {
       final currentUsernames = await _currentUsernames();
       final parsed = list
           .whereType<Map<String, dynamic>>()
-          .map(SubscribeItem.fromJson)
+          .map(
+            (item) =>
+                SubscribeItem.fromJson(normalizeSubscribeJson(item)),
+          )
           .where(
             (e) => _matchesType(e) && _matchesCurrentUser(e, currentUsernames),
           )

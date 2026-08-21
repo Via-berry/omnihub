@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:moviepilot_mobile/modules/recommend/models/recommend_api_item.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 part 'search_result_models.freezed.dart';
 part 'search_result_models.g.dart';
 
@@ -11,8 +12,16 @@ class SearchResultItem with _$SearchResultItem {
     @JsonKey(name: 'torrent_info') SearchTorrentInfo? torrent_info,
   }) = _SearchResultItem;
 
-  factory SearchResultItem.fromJson(Map<String, dynamic> json) =>
-      _$SearchResultItemFromJson(json);
+  factory SearchResultItem.fromJson(Map<String, dynamic> json) {
+    final normalized = Map<String, dynamic>.from(json);
+    final mediaInfo = normalized['media_info'];
+    if (mediaInfo is Map) {
+      normalized['media_info'] = normalizeMediaJson(
+        Map<String, dynamic>.from(mediaInfo),
+      );
+    }
+    return _$SearchResultItemFromJson(normalized);
+  }
 }
 
 @freezed

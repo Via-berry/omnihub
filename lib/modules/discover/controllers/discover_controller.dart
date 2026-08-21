@@ -12,6 +12,7 @@ import 'package:moviepilot_mobile/modules/recommend/models/recommend_api_item.da
 import 'package:moviepilot_mobile/modules/search/services/search_keyword_hints_service.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
+import 'package:moviepilot_mobile/utils/media_identity_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum DiscoverSource {
@@ -838,7 +839,7 @@ class DiscoverController extends GetxController {
       if (raw is! Map) continue;
       final map = _toStringKeyMap(raw);
       try {
-        final apiItem = RecommendApiItem.fromJson(map);
+        final apiItem = RecommendApiItem.fromJson(normalizeMediaJson(map));
         final patched = (apiItem.type == null || apiItem.type!.isEmpty)
             ? apiItem.copyWith(type: fallbackMediaType)
             : apiItem;
