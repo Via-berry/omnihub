@@ -135,17 +135,28 @@ class SiteDetailController extends GetxController {
         return;
       }
       final raw = response.data;
-      if (raw is! Map<String, dynamic>) {
+      final List<SiteUserDataHistoryItem> list;
+      if (raw is List) {
+        list = raw
+            .whereType<Map>()
+            .map(
+              (item) => SiteUserDataHistoryItem.fromJson(
+                Map<String, dynamic>.from(item),
+              ),
+            )
+            .toList();
+      } else if (raw is Map<String, dynamic>) {
+        final res = SiteUserDataHistoryResponse.fromJson(raw);
+        if (!res.success) {
+          errorText.value = res.message ?? '请求失败';
+          historyItems.clear();
+          return;
+        }
+        list = res.data.toList();
+      } else {
         historyItems.clear();
         return;
       }
-      final res = SiteUserDataHistoryResponse.fromJson(raw);
-      if (!res.success) {
-        errorText.value = res.message ?? '请求失败';
-        historyItems.clear();
-        return;
-      }
-      final list = res.data.toList();
       list.sort((a, b) {
         final da = a.updatedDay;
         final db = b.updatedDay;
