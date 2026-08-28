@@ -13,7 +13,15 @@ class SearchResultItem with _$SearchResultItem {
   }) = _SearchResultItem;
 
   factory SearchResultItem.fromJson(Map<String, dynamic> json) {
-    final normalized = Map<String, dynamic>.from(json);
+    var normalized = Map<String, dynamic>.from(json);
+    // v3 的实时搜索接口（/search/media/{media_id}、/search/title）直接返回种子信息，
+    // 不再包一层 Context；这里补回 App 内部使用的 meta_info / media_info / torrent_info 结构。
+    // v2 以及 v3 的 /search/last 仍返回 Context，带这三个键，不会走到这个分支。
+    if (!normalized.containsKey('torrent_info') &&
+        !normalized.containsKey('meta_info') &&
+        !normalized.containsKey('media_info')) {
+      normalized = <String, dynamic>{'torrent_info': normalized};
+    }
     final mediaInfo = normalized['media_info'];
     if (mediaInfo is Map) {
       normalized['media_info'] = normalizeMediaJson(
