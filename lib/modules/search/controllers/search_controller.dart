@@ -250,7 +250,15 @@ class SearchMediaController extends GetxController {
       }
 
       final raw = response.data;
-      final list = _extractList(raw);
+      var list = _extractList(raw).toList();
+      // v3 的 /search/media 与 /search/title 声明了 list[TorrentInfo] 的 response_model，
+      // 而链路实际返回 Context，字段对不上会被序列化成一批空壳；
+      // 这种情况下回退到 /search/last 取同一次搜索缓存下来的完整结果。
+      if (_looksStrippedResult(list) &&
+          await _serverApiVersionService.isV3()) {
+        final fallback = await _fetchLastSearchResults(token);
+        if (fallback.isNotEmpty) list = fallback;
+      }
       items
         ..clear()
         ..addAll(
@@ -472,6 +480,35 @@ class SearchMediaController extends GetxController {
       if (matchedDirection.isNotEmpty) {
         sortDirection.value = matchedDirection.first;
       }
+    }
+  }
+
+  /// 判断搜索结果是否被服务端序列化成了空壳：既没有 Context 的三层结构，
+  /// 也没有种子标题，说明这批数据没有可用信息。
+  bool _looksStrippedResult(List<dynamic> list) {
+    if (list.isEmpty) return false;
+    for (final item in list) {
+      if (item is! Map) return false;
+      if (item['torrent_info'] != null) return false;
+      if (item['meta_info'] != null) return false;
+      final title = item['title'];
+      if (title is String && title.trim().isNotEmpty) return false;
+    }
+    return true;
+  }
+
+  /// 回退获取上次搜索结果（/search/last 返回完整的 Context 列表）。
+  Future<List<dynamic>> _fetchLastSearchResults(String? token) async {
+    try {
+      final response = await _apiClient.get<dynamic>(
+        '/api/v1/search/last',
+        token: token,
+      );
+      if ((response.statusCode ?? 0) != 200) return const [];
+      return _extractList(response.data).toList();
+    } catch (e, st) {
+      _log.handle(e, stackTrace: st, message: '回退获取上次搜索结果失败');
+      return const [];
     }
   }
 
