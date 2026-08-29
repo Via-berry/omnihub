@@ -140,7 +140,7 @@ class SubscribeService extends GetxService {
     }
     try {
       final path = '/api/v1/subscribe/';
-      final requestPayload = await _prepareSubscribePayload(payload);
+      final requestPayload = await prepareSubscribePayload(payload);
       final response = await _apiClient.post(path, data: requestPayload);
       if (response.statusCode == 200) {
         return SubscribeSubmitResp.fromJson(response.data);
@@ -204,7 +204,7 @@ class SubscribeService extends GetxService {
     String? tmdbid,
     String? year = '',
     int bestVersion = 0,
-    int bestVersionFull = 1,
+    int? bestVersionFull = 1,
   }) async {
     final payload = {
       'doubanid': doubanid,
@@ -215,7 +215,7 @@ class SubscribeService extends GetxService {
       'tmdbid': tmdbid,
       'year': year,
       'best_version': bestVersion,
-      'best_version_full': bestVersionFull,
+      if (bestVersionFull != null) 'best_version_full': bestVersionFull,
       'type': '电视剧',
     };
     final isV3 = await _serverApiVersionService.isV3();
@@ -363,7 +363,7 @@ class SubscribeService extends GetxService {
     payload.remove('mediaid');
   }
 
-  Future<Map<String, dynamic>> _prepareSubscribePayload(
+  Future<Map<String, dynamic>> prepareSubscribePayload(
     Map<String, dynamic> payload,
   ) async {
     if (!await _serverApiVersionService.isV3()) {
