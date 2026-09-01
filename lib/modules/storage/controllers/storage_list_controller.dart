@@ -2,8 +2,9 @@ import 'package:get/get.dart';
 import 'package:moviepilot_mobile/applog/app_log.dart';
 import 'package:moviepilot_mobile/modules/media_organize/models/media_organize_models.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
+import 'package:moviepilot_mobile/services/server_api_version_service.dart';
 
-/// 存储使用情况（API: /api/v1/storage/usage/{type}）
+/// 存储使用情况
 class StorageUsage {
   const StorageUsage({
     required this.total,
@@ -26,10 +27,12 @@ class StorageUsage {
 
 /// 存储列表页 Controller
 /// 使用 /api/v1/system/setting/Storages 获取 StorageSetting 列表
-/// 使用 /api/v1/storage/usage/{type} 获取各存储的使用信息
+/// 获取各存储的使用信息
 class StorageListController extends GetxController {
   final _apiClient = Get.find<ApiClient>();
   final _log = Get.find<AppLog>();
+  ServerApiVersionService get _serverApiVersionService =>
+      Get.find<ServerApiVersionService>();
 
   final storages = <StorageSetting>[].obs;
   final storageNameMap = <String, String>{}.obs;
@@ -108,9 +111,17 @@ class StorageListController extends GetxController {
 
   Future<StorageUsage?> _loadUsage(String type) async {
     try {
-      final response = await _apiClient.get<dynamic>(
-        '/api/v1/storage/usage/$type',
-      );
+      final isV3 = await _serverApiVersionService.isV3();
+      final response = isV3
+          ? await _apiClient.postJson<dynamic>(
+              '/api/v1/storage/manage',
+              {
+                'target': _storageUsageTarget(type),
+                'action': 'usage',
+                'params': <String, dynamic>{},
+              },
+            )
+          : await _apiClient.get<dynamic>('/api/v1/storage/usage/$type');
       final status = response.statusCode ?? 0;
       if (status >= 400) return null;
 
@@ -127,6 +138,8 @@ class StorageListController extends GetxController {
       return null;
     }
   }
+
+  String _storageUsageTarget(String type) => type;
 
   /// 根据 storage type 获取显示名称
   String getStorageName(String? type) {

@@ -17,6 +17,7 @@ import 'package:moviepilot_mobile/modules/search_result/models/search_result_mod
 import 'package:moviepilot_mobile/modules/setting/controllers/setting_controller.dart';
 import 'package:moviepilot_mobile/modules/setting/models/setting_models.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
+import 'package:moviepilot_mobile/services/server_api_version_service.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
 import 'package:moviepilot_mobile/utils/prefs_keys.dart';
 import 'package:path_provider/path_provider.dart';
@@ -27,6 +28,8 @@ class DownloadController extends GetxController {
 
   final _apiClient = Get.find<ApiClient>();
   final _log = Get.find<AppLog>();
+  ServerApiVersionService get _serverApiVersionService =>
+      Get.find<ServerApiVersionService>();
   final scrollController = DraggableScrollableController();
   // 下载器列表（使用 DownloadClient）
   final downloaders = <DownloadClient>[].obs;
@@ -419,13 +422,13 @@ class DownloadController extends GetxController {
     return normalized;
   }
 
-  ({String path, Map<String, dynamic> body}) _buildDownloadRequest({
+  Future<({String path, Map<String, dynamic> body})> _buildDownloadRequest({
     required Map<String, dynamic> torrentIn,
     required Map<String, dynamic>? mediaIn,
     required String downloader,
     required String? savePath,
     String? customTmdbId,
-  }) {
+  }) async {
     final body = <String, dynamic>{
       'torrent_in': torrentIn,
       'downloader': downloader,
@@ -439,9 +442,16 @@ class DownloadController extends GetxController {
       _printDownload('_buildDownloadRequest: use POST / (has media_in)');
       return (path: '/api/v1/download/', body: body);
     }
-    if (parsedTmdb != null) body['tmdbid'] = parsedTmdb;
+    if (parsedTmdb != null) {
+      if (await _serverApiVersionService.isV3()) {
+        body['media_source'] = 'themoviedb';
+        body['media_id'] = parsedTmdb.toString();
+      } else {
+        body['tmdbid'] = parsedTmdb;
+      }
+    }
     _printDownload(
-      '_buildDownloadRequest: use POST /add (no media_in, tmdbid=$parsedTmdb)',
+      '_buildDownloadRequest: use POST /add (no media_in, mediaId=$parsedTmdb)',
     );
     return (path: '/api/v1/download/add', body: body);
   }
@@ -616,7 +626,7 @@ class DownloadController extends GetxController {
     isDownloading.value = true;
     try {
       final mediaIn = _buildDownloadMediaIn(item, customTmdbId: customTmdbId);
-      final request = _buildDownloadRequest(
+      final request = await _buildDownloadRequest(
         torrentIn: torrentIn,
         mediaIn: mediaIn,
         downloader: selectedDownloader.value!.name,

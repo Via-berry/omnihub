@@ -580,7 +580,13 @@ class SubscribeController extends GetxController {
     if (fullPayload['doubanid'] is int) {
       fullPayload['doubanid'] = fullPayload['doubanid'].toString();
     }
-    final response = await _apiClient.put('/api/v1/subscribe/', fullPayload);
+    final requestPayload = await subscribeService.prepareSubscribePayload(
+      fullPayload,
+    );
+    final response = await _apiClient.put(
+      '/api/v1/subscribe/',
+      requestPayload,
+    );
     if (response.statusCode == null || response.statusCode! >= 400) {
       return false;
     }
@@ -710,20 +716,16 @@ class SubscribeController extends GetxController {
     String? tmdbid,
     String? year = '',
   }) async {
-    final payload = {
-      'bangumiid': bangumiid,
-      'best_version': bestVersion,
-      'doubanid': doubanid,
-      'episode_group': episodeGroup,
-      'mediaid': mediaid,
-      'name': name,
-      'season': season,
-      'tmdbid': tmdbid,
-      'year': year,
-    };
-    final resp = await subscribeService.submitSubscribe(
-      'movie',
-      payload: payload,
+    final resp = await subscribeService.submitMovieSubscribe(
+      bangumiid: bangumiid,
+      bestVersion: bestVersion,
+      doubanid: doubanid,
+      episodeGroup: episodeGroup,
+      mediaid: mediaid,
+      name: name,
+      season: season,
+      tmdbid: tmdbid,
+      year: year,
     );
     if (resp.success == true) {
       await _notifyMultifunctionSubscribeChanged();
@@ -740,18 +742,16 @@ class SubscribeController extends GetxController {
     String? tmdbid,
     String? year = '',
   }) async {
-    final payload = {
-      'doubanid': doubanid,
-      'episode_group': episode_group,
-      'mediaid': mediaid,
-      'name': name,
-      'season': season,
-      'tmdbid': tmdbid,
-      'year': year,
-      'best_version': 0,
-      'type': '电视剧',
-    };
-    final resp = await subscribeService.submitSubscribe('tv', payload: payload);
+    final resp = await subscribeService.submitTvSubscribe(
+      doubanid: doubanid,
+      episode_group: episode_group,
+      mediaid: mediaid,
+      name: name,
+      season: season,
+      tmdbid: tmdbid,
+      year: year,
+      bestVersionFull: null,
+    );
     if (resp.success == true) {
       await _notifyMultifunctionSubscribeChanged();
     }
