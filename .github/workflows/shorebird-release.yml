@@ -28,6 +28,8 @@ jobs:
 
       - name: Ensure Android Gradle wrapper
         run: |
+          FLUTTER_PATH=$(which flutter | sed 's|/bin/flutter||')
+          echo "flutter.sdk=$FLUTTER_PATH" > android/local.properties
           if [ ! -f "android/gradlew" ]; then
             cd android && gradle wrapper || true
             cd ..
