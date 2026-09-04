@@ -26,20 +26,13 @@ jobs:
             exit 1
           fi
 
-      - name: Ensure Android Gradle wrapper
-        run: |
-          FLUTTER_PATH=$(which flutter | sed 's|/bin/flutter||')
-          echo "flutter.sdk=$FLUTTER_PATH" > android/local.properties
-          if [ ! -f "android/gradlew" ]; then
-            cd android && gradle wrapper || true
-            cd ..
-          fi
-
-      - name: Ensure Shorebird app initialized
+      - name: Ensure Shorebird app initialized (iOS)
         run: |
           if [ ! -f "shorebird.yaml" ] || grep -q "YOUR_APP_ID" shorebird.yaml; then
-            echo "Initializing Shorebird app..."
+            echo "Initializing Shorebird app for iOS..."
+            [ -d "android" ] && mv android android_backup
             shorebird init --force --display-name=MoviePilotLite
+            [ -d "android_backup" ] && mv android_backup android
           fi
 
       - name: Install dependencies
