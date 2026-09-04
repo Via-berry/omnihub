@@ -326,7 +326,7 @@ class JavMainPage extends GetView<JavController> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: const LinearGradient(
-                            colors: [Colors.roseAccent, Colors.purpleAccent],
+                            colors: [Colors.pinkAccent, Colors.purpleAccent],
                           ),
                           boxShadow: [
                             BoxShadow(

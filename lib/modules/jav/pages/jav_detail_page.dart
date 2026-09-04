@@ -344,7 +344,7 @@ class JavDetailPage extends GetView<JavDetailController> {
                   ),
                   child: Text(
                     g,
-                    style: const TextStyle(color: Colors.white90, fontSize: 11),
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                 );
               }).toList(),
@@ -433,7 +433,7 @@ class JavDetailPage extends GetView<JavDetailController> {
                   height: 38,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(colors: [Colors.roseAccent, Colors.purpleAccent]),
+                    gradient: LinearGradient(colors: [Colors.pinkAccent, Colors.purpleAccent]),
                   ),
                   child: Center(
                     child: Text(
@@ -491,7 +491,7 @@ class JavDetailPage extends GetView<JavDetailController> {
 
   Widget _buildInfoRow(String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.between,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
         Text(value, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),

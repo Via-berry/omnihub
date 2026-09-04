@@ -136,7 +136,7 @@ class JavStillsGallery extends StatelessWidget {
                 left: 16,
                 right: 16,
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.between,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Obx(() => Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
