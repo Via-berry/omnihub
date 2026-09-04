@@ -37,8 +37,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          flutter pub upgrade altman_downloader_control || true
-          flutter pub get
+          shorebird flutter pub upgrade altman_downloader_control || true
+          shorebird flutter pub get
 
       - name: Install CocoaPods
         run: |
