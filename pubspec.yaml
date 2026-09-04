@@ -50,6 +50,7 @@ dependencies:
   flutter_floating_bottom_bar: ^2.0.2
   native_glass_navbar:
     path: third_party/native_glass_navbar
+  shorebird_code_push: ^2.0.7
 dev_dependencies:
   flutter_test:
     sdk: flutter

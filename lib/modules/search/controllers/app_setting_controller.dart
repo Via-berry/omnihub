@@ -14,6 +14,7 @@ import 'package:moviepilot_mobile/utils/open_url.dart';
 import 'package:moviepilot_mobile/utils/size_formatter.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shorebird_code_push/shorebird_code_push.dart';
 
 class AppSettingController extends GetxController {
   final themeMode = ThemeMode.system.obs;
@@ -204,11 +205,13 @@ class AppSettingController extends GetxController {
           .toStringAsFixed(0);
       return '$percent%';
     }
+    final patch = _updateService.currentPatchNumber.value;
+    final patchLabel = patch != null ? ' (补丁 #$patch)' : '';
     final info = updateInfo.value;
     if (info != null && info.isNewer) {
-      return '发现 ${info.latestLabel}';
+      return '发现 ${info.latestLabel}$patchLabel';
     }
-    return version.value;
+    return '${version.value}$patchLabel';
   }
 
   Future<void> handleVersionTap(BuildContext context) async {
@@ -237,6 +240,27 @@ class AppSettingController extends GetxController {
     if (isCheckingUpdate.value) return;
     isCheckingUpdate.value = true;
     try {
+      if (Platform.isIOS && _updateService.isShorebirdAvailable) {
+        final status = await _updateService.checkShorebirdUpdate();
+        if (status == UpdateStatus.outdated) {
+          ToastUtil.info('发现新版本热补丁，正在自动拉取...');
+          await _updateService.downloadShorebirdUpdate();
+          await _updateService.loadPatchNumber();
+          ToastUtil.success('热补丁下载完成，下次重启应用生效！');
+          return;
+        } else if (status == UpdateStatus.restartRequired) {
+          ToastUtil.info('新版本热补丁已就绪，重启应用生效');
+          return;
+        } else if (status == UpdateStatus.upToDate) {
+          if (showUpToDate) {
+            final patch = await _updateService.loadPatchNumber();
+            final patchText = patch != null ? ' (当前补丁 #$patch)' : ' (底包)';
+            ToastUtil.success('当前已是最新版本$patchText');
+          }
+          return;
+        }
+      }
+
       final info = await _updateService.fetchLatestRelease();
       updateInfo.value = info;
       if (!info.isNewer) {

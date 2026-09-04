@@ -1,0 +1,49 @@
+﻿name: Shorebird Patch (iOS 业务热更新)
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Shorebird
+        uses: shorebirdtech/actions/setup-shorebird@v1
+
+      - name: Verify SHOREBIRD_TOKEN
+        run: |
+          if [ -z "${SHOREBIRD_TOKEN}" ]; then
+            echo "::error::缺少 SHOREBIRD_TOKEN Secret，请在 GitHub 仓库设置中添加！"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: |
+          flutter pub upgrade altman_downloader_control || true
+          flutter pub get
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
+      - name: Publish Shorebird iOS Patch
+        run: |
+          shorebird patch ios --no-codesign -- --dart-define=FLUTTER_APP_ENV=release

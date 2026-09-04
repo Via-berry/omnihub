@@ -165,6 +165,7 @@ Future<void> main() async {
     Get.put(AppService());
     Get.put(ApiClient());
     final updateService = Get.put(AppUpdateService(), permanent: true);
+    await updateService.initShorebird();
     await updateService.cleanupExpiredApkCache(maxAge: Duration.zero);
     Get.put(MediaDetailService());
     Get.put(ImageUtil());

@@ -8,9 +8,60 @@ import 'package:moviepilot_mobile/modules/settings/models/system_env_model.dart'
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shorebird_code_push/shorebird_code_push.dart';
 
 class AppUpdateService extends GetxService {
   AppUpdateService() : _dio = Dio(_baseOptions);
+
+  final ShorebirdUpdater _shorebirdUpdater = ShorebirdUpdater();
+  final Rx<int?> currentPatchNumber = Rx<int?>(null);
+
+  bool get isShorebirdAvailable => _shorebirdUpdater.isAvailable;
+
+  Future<void> initShorebird() async {
+    if (!_shorebirdUpdater.isAvailable) return;
+    try {
+      final patch = await _shorebirdUpdater.readCurrentPatch();
+      currentPatchNumber.value = patch?.number;
+      _log.info('Shorebird 当前补丁: ${patch?.number ?? 'Base底包'}');
+
+      _shorebirdUpdater.checkForUpdate().then((status) {
+        if (status == UpdateStatus.outdated) {
+          _log.info('发现新版 Shorebird 热补丁，正在后台自动拉取...');
+          _shorebirdUpdater.update().then((_) {
+            _log.info('Shorebird 热补丁下载完成，下次启动应用即可生效');
+          }).catchError((e) {
+            _log.warning('Shorebird 补丁下载失败: $e');
+          });
+        }
+      }).catchError((e) {
+        _log.warning('Shorebird 检查补丁失败: $e');
+      });
+    } catch (e) {
+      _log.warning('初始化 Shorebird 失败: $e');
+    }
+  }
+
+  Future<int?> loadPatchNumber() async {
+    if (!_shorebirdUpdater.isAvailable) return null;
+    try {
+      final patch = await _shorebirdUpdater.readCurrentPatch();
+      currentPatchNumber.value = patch?.number;
+      return patch?.number;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<UpdateStatus> checkShorebirdUpdate() async {
+    if (!_shorebirdUpdater.isAvailable) return UpdateStatus.unavailable;
+    return await _shorebirdUpdater.checkForUpdate();
+  }
+
+  Future<void> downloadShorebirdUpdate() async {
+    if (!_shorebirdUpdater.isAvailable) return;
+    await _shorebirdUpdater.update();
+  }
 
   static const String releasesApi =
       'https://api.github.com/repos/singleton-altman/MoviePilotLite/releases';

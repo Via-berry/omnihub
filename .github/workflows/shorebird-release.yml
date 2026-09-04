@@ -1,0 +1,99 @@
+name: Shorebird Release (iOS Base 底包构建)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-base-ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Shorebird
+        uses: shorebirdtech/actions/setup-shorebird@v1
+
+      - name: Verify SHOREBIRD_TOKEN
+        run: |
+          if [ -z "${SHOREBIRD_TOKEN}" ]; then
+            echo "::error::缺少 SHOREBIRD_TOKEN Secret，请在 GitHub 仓库设置中添加！"
+            exit 1
+          fi
+
+      - name: Ensure Shorebird app initialized
+        run: |
+          if [ ! -f "shorebird.yaml" ] || grep -q "YOUR_APP_ID" shorebird.yaml; then
+            echo "Initializing Shorebird app..."
+            shorebird init --force
+          fi
+
+      - name: Install dependencies
+        run: |
+          flutter pub upgrade altman_downloader_control || true
+          flutter pub get
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
+      - name: Shorebird Release iOS
+        run: |
+          shorebird release ios --no-codesign -- --dart-define=FLUTTER_APP_ENV=release
+
+      - name: Package Base IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | sed 's/+.*//' | tr -d ' ')
+          IPA_NAME="MoviePilotLite-Base-v${VERSION}.ipa"
+          
+          if [ -d "build/ios/iphoneos/Runner.app" ]; then
+            APP_PATH="build/ios/iphoneos/Runner.app"
+          elif [ -d "build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app" ]; then
+            APP_PATH="build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app"
+          else
+            APP_PATH=$(find build -name "Runner.app" -type d | head -n 1)
+          fi
+          
+          echo "Found app at: $APP_PATH"
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r -y "$IPA_NAME" Payload
+          shasum -a 256 "$IPA_NAME" > "${IPA_NAME}.sha256"
+          
+          mkdir -p dist
+          mv "$IPA_NAME" dist/
+          mv "${IPA_NAME}.sha256" dist/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-ios-ipa
+          path: dist/
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "base-ios-latest"
+          name: "MoviePilotLite Shorebird Base 底包"
+          body: |
+            ### 🎬 MoviePilotLite Shorebird Base 底包 (仅需首次自签安装一次)
+            
+            本安装包内置了 Shorebird 代码热推送引擎。
+            
+            **使用说明**：
+            1. 下载下方的 .ipa 文件；
+            2. 使用 **全能签**（或爱思助手、AltStore、牛蛙助手等）导入并自签名安装到 iPhone；
+            3. **安装此底包后，后续所有的业务代码更新、功能新增或修复，都将通过 Shorebird 自动静默在线热更新，无需再重新签名或重装！**
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
