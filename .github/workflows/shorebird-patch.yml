@@ -53,4 +53,4 @@ jobs:
 
       - name: Publish Shorebird iOS Patch
         run: |
-          shorebird patch ios --no-codesign --force -- --dart-define=FLUTTER_APP_ENV=release
+          shorebird patch ios --no-codesign --release-version=latest --allow-native-diffs --allow-asset-diffs -- --dart-define=FLUTTER_APP_ENV=release

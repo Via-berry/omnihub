@@ -314,7 +314,7 @@ class AppSettingPage extends GetView<AppSettingController> {
                       child: _buildInfoColumn(
                         context,
                         label: '项目属性',
-                        value: '开源移动客户端',
+                        value: '开源移动客户端 · Shorebird 热更新生效',
                       ),
                     ),
                   ],

@@ -137,7 +137,7 @@ class DashboardPage extends GetView<DashboardController> {
         ),
       ),
       title: const Text(
-        'Dashboard',
+        'Dashboard · 热更新生效 ✨',
         style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
       ),
       centerTitle: false,
