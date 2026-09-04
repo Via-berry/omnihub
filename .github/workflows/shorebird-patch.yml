@@ -1,4 +1,4 @@
-﻿name: Shorebird Patch (iOS 业务热更新)
+name: Shorebird Patch (iOS 业务热更新)
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 45
     env:
-      SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+      SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN || secrets.SHOREBIRD_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
