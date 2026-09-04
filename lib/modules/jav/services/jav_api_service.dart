@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -17,8 +18,8 @@ class JavApiService {
     _dio = Dio(
       BaseOptions(
         baseUrl: defaultBaseUrl,
-        connectTimeout: const Duration(seconds: 4),
-        receiveTimeout: const Duration(seconds: 8),
+        connectTimeout: const Duration(seconds: 6),
+        receiveTimeout: const Duration(seconds: 25),
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'OmniHub-Mobile/1.2.3',
@@ -97,7 +98,12 @@ class JavApiService {
 
       final res = await _dio.get('/api/jav/explore', queryParameters: queryParams);
       if (res.statusCode == 200 && res.data != null) {
-        final data = res.data;
+        var data = res.data;
+        if (data is String) {
+          try {
+            data = jsonDecode(data);
+          } catch (_) {}
+        }
         List rawList = [];
         if (data is Map) {
           if (data['results'] is List) {
@@ -110,8 +116,8 @@ class JavApiService {
         }
 
         return rawList
-            .whereType<Map<String, dynamic>>()
-            .map((e) => JavItem.fromJson(e))
+            .whereType<Map>()
+            .map((e) => JavItem.fromJson(Map<String, dynamic>.from(e)))
             .toList();
       }
       return [];
@@ -126,8 +132,14 @@ class JavApiService {
     try {
       final cleanCode = code.trim().toUpperCase();
       final res = await _dio.get('/api/jav/detail/$cleanCode');
-      if (res.statusCode == 200 && res.data != null && res.data is Map<String, dynamic>) {
-        return JavDetail.fromJson(res.data as Map<String, dynamic>);
+      var data = res.data;
+      if (data is String) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {}
+      }
+      if (res.statusCode == 200 && data != null && data is Map) {
+        return JavDetail.fromJson(Map<String, dynamic>.from(data));
       }
       return null;
     } catch (e) {
@@ -140,8 +152,13 @@ class JavApiService {
   Future<List<JavActress>> fetchActresses() async {
     try {
       final res = await _dio.get('/api/jav/actresses');
-      if (res.statusCode == 200 && res.data != null) {
-        final data = res.data;
+      var data = res.data;
+      if (data is String) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {}
+      }
+      if (res.statusCode == 200 && data != null) {
         List rawList = [];
         if (data is Map && data['actresses'] is List) {
           rawList = data['actresses'] as List;
@@ -150,8 +167,8 @@ class JavApiService {
         }
 
         return rawList
-            .whereType<Map<String, dynamic>>()
-            .map((e) => JavActress.fromJson(e))
+            .whereType<Map>()
+            .map((e) => JavActress.fromJson(Map<String, dynamic>.from(e)))
             .toList();
       }
       return [];
@@ -168,8 +185,13 @@ class JavApiService {
         '/api/jav/search',
         queryParameters: {'q': keyword.trim(), 'page': page},
       );
-      if (res.statusCode == 200 && res.data != null) {
-        final data = res.data;
+      var data = res.data;
+      if (data is String) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {}
+      }
+      if (res.statusCode == 200 && data != null) {
         List rawList = [];
         if (data is Map && data['results'] is List) {
           rawList = data['results'] as List;
@@ -177,14 +199,14 @@ class JavApiService {
           rawList = data;
         }
         return rawList
-            .whereType<Map<String, dynamic>>()
-            .map((e) => JavItem.fromJson(e))
+            .whereType<Map>()
+            .map((e) => JavItem.fromJson(Map<String, dynamic>.from(e)))
             .toList();
       }
       return [];
     } catch (e) {
       debugPrint('JavApiService.search error: $e');
-      return [];
+      rethrow;
     }
   }
 
