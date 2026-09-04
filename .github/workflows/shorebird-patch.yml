@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Shorebird
-        uses: shorebirdtech/actions/setup-shorebird@v1
+        uses: shorebirdtech/setup-shorebird@v1
 
       - name: Verify SHOREBIRD_TOKEN
         run: |
