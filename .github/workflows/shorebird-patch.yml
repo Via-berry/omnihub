@@ -24,6 +24,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.2"
+          channel: "stable"
+          cache: true
+
       - name: Setup Shorebird
         uses: shorebirdtech/setup-shorebird@v1
 
@@ -36,8 +43,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          shorebird flutter pub upgrade altman_downloader_control || true
-          shorebird flutter pub get
+          flutter pub upgrade altman_downloader_control || true
+          flutter pub get
 
       - name: Install CocoaPods
         run: |
