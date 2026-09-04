@@ -777,19 +777,9 @@ class JavMainPage extends GetView<JavController> {
                               ? CachedImage(
                                   imageUrl: proxyAvatar,
                                   fit: BoxFit.cover,
-                                  errorWidget: Container(
-                                    color: Colors.black45,
-                                    child: const Center(
-                                      child: Icon(Icons.person, color: Colors.white54, size: 24),
-                                    ),
-                                  ),
+                                  errorWidget: _buildActressAvatarPlaceholder(a.name),
                                 )
-                              : Container(
-                                  color: Colors.black54,
-                                  child: const Center(
-                                    child: Icon(Icons.person, color: Colors.white54, size: 24),
-                                  ),
-                                ),
+                              : _buildActressAvatarPlaceholder(a.name),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -810,6 +800,32 @@ class JavMainPage extends GetView<JavController> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActressAvatarPlaceholder(String name) {
+    final char = name.isNotEmpty ? name.substring(0, 1) : '优';
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.purple.withValues(alpha: 0.8),
+            Colors.pinkAccent.withValues(alpha: 0.6),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          char,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }

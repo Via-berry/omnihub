@@ -17,6 +17,8 @@ class _JavPlayerPageState extends State<JavPlayerPage> {
   String _title = '在线播放';
   String _initialUrl = '';
   String _allowedHost = '';
+  bool _canGoBack = false;
+  bool _canGoForward = false;
 
   static const String _adBlockScript = '''
 (function() {
@@ -69,8 +71,16 @@ class _JavPlayerPageState extends State<JavPlayerPage> {
             if (mounted) setState(() => _isLoading = true);
             _controller.runJavaScript(_adBlockScript);
           },
-          onPageFinished: (String url) {
-            if (mounted) setState(() => _isLoading = false);
+          onPageFinished: (String url) async {
+            if (mounted) {
+              final canBack = await _controller.canGoBack();
+              final canForward = await _controller.canGoForward();
+              setState(() {
+                _isLoading = false;
+                _canGoBack = canBack;
+                _canGoForward = canForward;
+              });
+            }
             _controller.runJavaScript(_adBlockScript);
           },
           onNavigationRequest: (NavigationRequest request) {
@@ -122,12 +132,11 @@ class _JavPlayerPageState extends State<JavPlayerPage> {
     }
   }
 
-  Future<void> _handleBack() async {
-    if (await _controller.canGoBack()) {
-      await _controller.goBack();
-    } else {
-      Get.back();
-    }
+  @override
+  void dispose() {
+    // 销毁时停止音视频播放与执行，释放资源
+    _controller.loadRequest(Uri.parse('about:blank'));
+    super.dispose();
   }
 
   Future<void> _openInSafari() async {
@@ -142,80 +151,122 @@ class _JavPlayerPageState extends State<JavPlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        await _handleBack();
-      },
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
         backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          elevation: 0,
-          leading: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: _handleBack,
-            child: const Icon(CupertinoIcons.chevron_left, color: Colors.white),
-          ),
-          title: Text(
-            _title,
-            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          actions: [
-            // 在外部 Safari 中打开
-            CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              onPressed: _openInSafari,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(CupertinoIcons.compass, color: Colors.cyanAccent, size: 14),
-                    SizedBox(width: 4),
-                    Text(
-                      'Safari 打开',
-                      style: TextStyle(color: Colors.cyanAccent, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // 一键速退
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                color: Colors.redAccent.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(20),
-                onPressed: () => Get.offAllNamed('/main', arguments: {'initialIndex': 0}),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.shield_outlined, color: Colors.redAccent, size: 14),
-                    SizedBox(width: 4),
-                    Text('一键速退', style: TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            ),
-          ],
+        elevation: 0,
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => Get.back(),
+          child: const Icon(CupertinoIcons.chevron_left, color: Colors.white, size: 22),
         ),
-        body: Stack(
-          children: [
-            WebViewWidget(controller: _controller),
-            if (_isLoading)
-              const Center(
-                child: CupertinoActivityIndicator(color: Colors.cyanAccent, radius: 16),
+        title: Text(
+          _title,
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          // 一键速退
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              color: Colors.redAccent.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(20),
+              onPressed: () => Get.offAllNamed('/main', arguments: {'initialIndex': 0}),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.shield_outlined, color: Colors.redAccent, size: 14),
+                  SizedBox(width: 4),
+                  Text('一键速退', style: TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
               ),
+            ),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_isLoading)
+            const Center(
+              child: CupertinoActivityIndicator(color: Colors.cyanAccent, radius: 16),
+            ),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        color: const Color(0xFF101010),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + 4,
+          top: 6,
+          left: 12,
+          right: 12,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CupertinoButton(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  onPressed: _canGoBack
+                      ? () async {
+                          await _controller.goBack();
+                          final canBack = await _controller.canGoBack();
+                          final canForward = await _controller.canGoForward();
+                          if (mounted) setState(() { _canGoBack = canBack; _canGoForward = canForward; });
+                        }
+                      : null,
+                  child: Icon(
+                    CupertinoIcons.chevron_back,
+                    color: _canGoBack ? Colors.white : Colors.white24,
+                    size: 20,
+                  ),
+                ),
+                CupertinoButton(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  onPressed: _canGoForward
+                      ? () async {
+                          await _controller.goForward();
+                          final canBack = await _controller.canGoBack();
+                          final canForward = await _controller.canGoForward();
+                          if (mounted) setState(() { _canGoBack = canBack; _canGoForward = canForward; });
+                        }
+                      : null,
+                  child: Icon(
+                    CupertinoIcons.chevron_forward,
+                    color: _canGoForward ? Colors.white : Colors.white24,
+                    size: 20,
+                  ),
+                ),
+                CupertinoButton(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  onPressed: () => _controller.reload(),
+                  child: const Icon(CupertinoIcons.arrow_clockwise, color: Colors.white70, size: 18),
+                ),
+              ],
+            ),
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+              onPressed: _openInSafari,
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(CupertinoIcons.compass, color: Colors.cyanAccent, size: 14),
+                  SizedBox(width: 4),
+                  Text(
+                    'Safari 打开',
+                    style: TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

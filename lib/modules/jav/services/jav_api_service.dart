@@ -86,6 +86,7 @@ class JavApiService {
     int page = 1,
     String? type,
     String? magnetType,
+    CancelToken? cancelToken,
   }) async {
     try {
       final queryParams = <String, dynamic>{'page': page};
@@ -96,7 +97,11 @@ class JavApiService {
         queryParams['magnet'] = magnetType;
       }
 
-      final res = await _dio.get('/api/jav/explore', queryParameters: queryParams);
+      final res = await _dio.get(
+        '/api/jav/explore',
+        queryParameters: queryParams,
+        cancelToken: cancelToken,
+      );
       if (res.statusCode == 200 && res.data != null) {
         var data = res.data;
         if (data is String) {
@@ -122,16 +127,22 @@ class JavApiService {
       }
       return [];
     } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        return [];
+      }
       debugPrint('JavApiService.fetchExplore error: $e');
       rethrow;
     }
   }
 
   /// 获取番号完整详情 (包含 12 张样张、磁链等)
-  Future<JavDetail?> fetchDetail(String code) async {
+  Future<JavDetail?> fetchDetail(String code, {CancelToken? cancelToken}) async {
     try {
       final cleanCode = code.trim().toUpperCase();
-      final res = await _dio.get('/api/jav/detail/$cleanCode');
+      final res = await _dio.get(
+        '/api/jav/detail/$cleanCode',
+        cancelToken: cancelToken,
+      );
       var data = res.data;
       if (data is String) {
         try {
@@ -143,15 +154,18 @@ class JavApiService {
       }
       return null;
     } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        return null;
+      }
       debugPrint('JavApiService.fetchDetail error for $code: $e');
       rethrow;
     }
   }
 
   /// 获取热门女优列表
-  Future<List<JavActress>> fetchActresses() async {
+  Future<List<JavActress>> fetchActresses({CancelToken? cancelToken}) async {
     try {
-      final res = await _dio.get('/api/jav/actresses');
+      final res = await _dio.get('/api/jav/actresses', cancelToken: cancelToken);
       var data = res.data;
       if (data is String) {
         try {
@@ -173,15 +187,18 @@ class JavApiService {
       }
       return [];
     } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        return [];
+      }
       debugPrint('JavApiService.fetchActresses error: $e');
       return [];
     }
   }
 
   /// 获取 AI 推荐题材/找片标签
-  Future<List<JavTagPrompt>> fetchTags() async {
+  Future<List<JavTagPrompt>> fetchTags({CancelToken? cancelToken}) async {
     try {
-      final res = await _dio.get('/api/jav/tags');
+      final res = await _dio.get('/api/jav/tags', cancelToken: cancelToken);
       var data = res.data;
       if (data is String) {
         try {
@@ -202,17 +219,25 @@ class JavApiService {
       }
       return [];
     } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        return [];
+      }
       debugPrint('JavApiService.fetchTags error: $e');
       return [];
     }
   }
 
   /// 搜索番号、演员或 AI 描述找片
-  Future<JavSearchResult> search(String keyword, {int page = 1}) async {
+  Future<JavSearchResult> search(
+    String keyword, {
+    int page = 1,
+    CancelToken? cancelToken,
+  }) async {
     try {
       final res = await _dio.get(
         '/api/jav/search',
         queryParameters: {'query': keyword.trim(), 'page': page},
+        cancelToken: cancelToken,
       );
       var data = res.data;
       if (data is String) {
@@ -249,6 +274,9 @@ class JavApiService {
       }
       return JavSearchResult(prompt: keyword, results: []);
     } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        return JavSearchResult(prompt: keyword, results: []);
+      }
       debugPrint('JavApiService.search error: $e');
       rethrow;
     }
