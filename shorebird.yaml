@@ -1,6 +1,6 @@
-﻿# Shorebird Configuration
+# Shorebird Configuration
 # This file identifies your app on Shorebird.
 # When running with a valid SHOREBIRD_TOKEN in CI, if app_id is unset or YOUR_APP_ID,
 # CI will automatically run `shorebird init --force` to link/create the app.
-app_id: YOUR_APP_ID
+app_id: 4612c7b1-7f15-4f9e-ad42-88095a33e023
 auto_update: true
