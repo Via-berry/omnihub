@@ -1,140 +1,71 @@
-# MoviePilot Mobile
+# OmniHub
 
-基于 [MoviePilot](https://github.com/jxxghp/MoviePilot) 的 Flutter 跨端客户端，对接 MoviePilot v2 API，在手机上完成订阅、搜索、下载、整理与系统运维等常用操作。
+OmniHub 是一款基于 [MoviePilot](https://github.com/jxxghp/MoviePilot) 生态演进的现代化多媒体移动端管理终端。在全面继承 MoviePilot 原版核心业务体验（智能发现、精准搜索、站点管理、下载监控、订阅管理等）的基础上，深度集成了 **Shorebird 代码热推送（Code Push）** 引擎，彻底解决了 iOS 自签用户频繁重新签名与重装应用的痛点。
 
-**当前版本**：1.1.8 · **API 文档**：[api.movie-pilot.org](https://api.movie-pilot.org)
+---
+
+## 核心特性
+
+- **永久免签免装（Code Push）**：
+  - iOS 客户端只需在初次使用时通过 **全能签**（或爱思助手、AltStore 等）完成一次 Base 底包的自签名安装；
+  - 后续所有的 Dart 业务功能新增、UI 界面优化与 Bug 修复，均由云端差分补丁自动静默下发，打开 App 即可直接热更生效，无需再次签名与覆盖安装。
+- **100% 还原原版生态**：
+  - 完整保留原生精致的毛玻璃设计质感与操作手感；
+  - 完美对接 MoviePilot v2 REST API，支持各类媒体服务器（Emby / Jellyfin / Plex）与下载器状态实时监控。
+- **全自动化 CI/CD 云端流水线**：
+  - 依托 GitHub Actions 云端构建，自动生成 Base 独立底包并在 Releases 发布；
+  - 主分支代码提交自动触发 Shorebird Patch 补丁编译与全球 CDN 分发，实现极速迭代。
+
+---
+
+## 快速上手（iOS 用户）
+
+### 首次安装（仅需一次）
+1. 前往本仓库的 [Releases 页面](../../releases/tag/base-ios-latest)；
+2. 下载最新的底包文件 `MoviePilotLite-Base-v1.2.3.ipa`；
+3. 将该文件导入手机上的 **全能签**（或其他自签工具），使用你的自签证书签名并安装到 iPhone。
+
+### 日常使用与热更新
+- 首次安装并登录连接你的 MoviePilot 服务端即可正常使用；
+- 当有新功能或代码变动发布时，无需执行任何下载安装动作，App 会在启动时自动拉取并应用最新补丁。
 
 ---
 
 ## 平台支持
 
-| 平台 | 说明 |
-|------|------|
-| Android | 正式支持；设置页可检查 Release 并热更新 APK |
-| iOS | 正式支持；TestFlight / 自签；订阅日历 Widget |
-| macOS | 桌面端构建 |
-| Web | 功能预览（非主维护目标）→ [在线体验](https://web-brown-kappa-21.vercel.app) |
-| HarmonyOS | 独立分支 `ohos`，HAP 需自签证书安装 |
+| 平台 | 状态 | 说明 |
+|:---|:---:|:---|
+| **iOS** | 主力支持 | 集成 Shorebird 热推送；全能签自签一次底包后永久热更新 |
+| **Android** | 支持 | 支持原生编译与 APK 构建 |
+| **macOS** | 支持 | 桌面端调试与构建 |
 
 ---
 
-## 快速开始（开发）
+## 开发与云端构建
 
-### 环境
-
-- Flutter 3.38+ / Dart 3.8+
-- Android SDK / Xcode（按目标平台准备）
-- 可连接的 MoviePilot 服务端
+### 本地环境
+- Flutter 3.38+ / Dart 3.10+
+- iOS 调试工具链 / Android SDK
+- 准备可连接的 MoviePilot 服务端（API 文档：[api.movie-pilot.org](https://api.movie-pilot.org)）
 
 ### 常用命令
-
 ```bash
+# 获取依赖
 flutter pub get
+
+# 静态分析与测试
 flutter analyze
 flutter test
-flutter run
-
-# 代码生成（Freezed / JSON / Hive 等）
-dart run build_runner build --delete-conflicting-outputs
-
-# 构建
-flutter build apk --release --dart-define=FLUTTER_APP_ENV=release
-flutter build ios
-flutter build macos
 ```
 
-### 依赖说明
-
-- `altman_downloader_control` 为 Git 依赖，CI 会在 `flutter pub get` 前执行 `flutter pub upgrade altman_downloader_control`，避免 lockfile 中的旧 commit。
-- 本地若需同步该库最新代码，可手动执行上述 upgrade 后再 `flutter pub get`。
-- 已提交的 `form_block_models.freezed.dart` 存在已知生成问题，**勿随意全量 regenerate**，除非已修复源模型。
+### GitHub Actions 流水线
+- **Shorebird Release (iOS Base 底包构建)**：手动触发构建最新的 iOS Base ipa 并自动发布 Release。
+- **Shorebird Patch (iOS 业务热更新)**：推送到 `main` / `master` 分支自动构建补丁并推送至 Shorebird 分发网络。
 
 ---
 
-## App 推送
+## 致谢与开源说明
 
-推送依赖 [MoviePilot-Plugins](https://github.com/singleton-altman/MoviePilot-Plugins) 中的 **APPLitePush** 插件，由作者提供转发服务，**无需自建推送平台**。
-
-### 使用前准备
-
-1. 前往 [http://106.14.89.6/apply](http://106.14.89.6/apply) 申请 **App Push Token**
-2. 加入 [Telegram 群](https://t.me/+MLbOpDDD1mdlOTM1)，申请完成后 **@ 管理员** 确认
-3. 在 MoviePilot 中安装 **APPLitePush** 插件
-4. 在系统 / App 设置中 **开启推送通知权限**
-
-### iOS（TestFlight / 自签）
-
-- 安装包 **Bundle ID 必须为 `com.altman.moviepilot`**，否则无法完成推送绑定
-- TestFlight 与自签用户使用同一套配置流程，均走作者转发服务，无需自行部署 JPush / APNs 转发
-
-**插件绑定步骤：**
-
-1. 在插件配置中填写 **Push Key**（Telegram 群获取）与 **App Push Token**（步骤 1 申请）
-2. 点击 **保存**
-3. 点击 **应用**（App 内完成 alias 绑定）
-4. 点击 **发送测试消息** — 正常情况下应收到一条推送
-
-> 建议使用 **Release** 包安装；Debug 包可能无法正常收到推送。
-
-### Android
-
-流程与 iOS 相同：申请 Token → Telegram @ 管理员 → 安装插件 → 按上述步骤填写 Push Key / App Push Token → 保存 → 应用 → 发送测试。当前未配置厂商通道，到达率不保证。
-
-### 限制与说明
-
-- 推送走作者阿里云转发服务器，**单 IP 每分钟最多 10 条**
-- 服务可能因成本原因调整；TestFlight 名额有限
-- 收不到推送时请先确认：通知权限已开、Bundle ID 正确、已点击「应用」且测试消息已发送
-
----
-
-## 社区与贡献
-
-- **Telegram**：[小白裙](https://t.me/+MLbOpDDD1mdlOTM1)
-- **Issue**：[AltmanTech/MoviePilotLite](https://github.com/AltmanTech/MoviePilotLite/issues)
-- **Release**：[singleton-altman/MoviePilotLite](https://github.com/singleton-altman/MoviePilotLite/releases)
-- **更新日志**：[CHANGELOG.md](CHANGELOG.md)
-- 欢迎 Pull Request
-
----
-
-## 技术栈
-
-| 类别 | 选型 |
-|------|------|
-| 框架 | Flutter |
-| 状态 / 路由 | GetX |
-| 网络 | Dio + Cookie 管理 |
-| 本地存储 | Hive CE；SharedPreferences |
-| 模型 | Freezed + json_serializable |
-| UI | Material 3 + Cupertino 组件混用 |
-| 日志 | Talker / Talker Dio |
-| 图表 | Syncfusion Charts |
-| 推送 | JPush（iOS/Android） |
-
----
-
-## 许可证
-
-本项目采用 **Business Source License 1.1 (BSL-1.1)**。
-
-- 允许查看与修改源代码
-- 生产环境使用在特定条件下可能受限
-- **2029-01-21** 起自动转为 **GPL-3.0**
-
-详见 [LICENSE](LICENSE)。
-
----
-
-## 免责声明
-
-- 本软件仅供学习交流，不得用于商业用途或违法犯罪活动
-- 软件对用户行为不知情，一切责任由使用者自行承担
-
----
-
-## 赞赏
-
-若本项目对你有帮助，欢迎赞赏以支持持续维护。
-
-![赞赏码](donate.JPG)
+- 感谢 [MoviePilot](https://github.com/jxxghp/MoviePilot) 提供的优秀开源媒体自动化服务；
+- 感谢 [MoviePilotLite](https://github.com/singleton-altman/MoviePilotLite) 提供的移动端跨端客户端基础；
+- 感谢 [Shorebird](https://shorebird.dev) 提供的 Flutter 动态代码热推送基础设施。
