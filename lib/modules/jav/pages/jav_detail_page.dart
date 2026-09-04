@@ -595,13 +595,34 @@ class JavDetailPage extends GetView<JavDetailController> {
               ),
               const SizedBox(height: 14),
               ...detail.onlineWatchUrls.entries.map((entry) {
+                String title = entry.key;
+                String subtitle = '在线免下载流媒体播放';
+                IconData icon = Icons.play_circle_fill;
+                Color iconColor = Colors.cyanAccent;
+
+                final keyLower = entry.key.toLowerCase();
+                if (keyLower.contains('jable')) {
+                  title = 'Jable 极速内嵌源 (推荐·广告少)';
+                  subtitle = '内嵌播放体验极佳，中文字幕完整';
+                  iconColor = Colors.greenAccent;
+                } else if (keyLower.contains('missav')) {
+                  title = 'MissAV 全网片源';
+                  subtitle = '全网收录最全，防劫持保护已开启';
+                  iconColor = Colors.pinkAccent;
+                } else if (keyLower.contains('dmm')) {
+                  title = 'DMM 官方高清预告片';
+                  subtitle = '官方 1080P 原画精彩剪辑，无任何广告';
+                  iconColor = Colors.amberAccent;
+                }
+
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   child: ListTile(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     tileColor: Colors.white.withValues(alpha: 0.08),
-                    leading: const Icon(Icons.play_circle_fill, color: Colors.cyanAccent),
-                    title: Text(entry.key, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    leading: Icon(icon, color: iconColor),
+                    title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 11)),
                     trailing: const Icon(CupertinoIcons.chevron_right, color: Colors.white54, size: 14),
                     onTap: () {
                       Navigator.pop(context);
