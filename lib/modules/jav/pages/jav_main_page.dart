@@ -29,24 +29,51 @@ class JavMainPage extends GetView<JavController> {
         if (controller.errorMsg.value.isNotEmpty && controller.bannerItems.isEmpty) {
           return Center(
             child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(CupertinoIcons.wifi_exclamationmark, color: Colors.white54, size: 48),
-                  const SizedBox(height: 12),
-                  Text(
-                    controller.errorMsg.value,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                  const SizedBox(height: 16),
-                  CupertinoButton.filled(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    onPressed: controller.refreshData,
-                    child: const Text('重新连接', style: TextStyle(fontSize: 13)),
-                  ),
-                ],
+              padding: const EdgeInsets.all(28),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(CupertinoIcons.wifi_exclamationmark, color: Colors.amberAccent, size: 48),
+                    const SizedBox(height: 14),
+                    const Text(
+                      '无法连接到后端服务',
+                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      controller.errorMsg.value,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 13, height: 1.4),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CupertinoButton(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          color: Colors.white.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          onPressed: () => _showServerConfigDialog(context),
+                          child: const Text('设置地址', style: TextStyle(fontSize: 13, color: Colors.white)),
+                        ),
+                        const SizedBox(width: 12),
+                        CupertinoButton.filled(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          borderRadius: BorderRadius.circular(12),
+                          onPressed: controller.refreshData,
+                          child: const Text('重试连接', style: TextStyle(fontSize: 13)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -92,14 +119,18 @@ class JavMainPage extends GetView<JavController> {
       ),
       leading: Padding(
         padding: const EdgeInsets.all(8.0),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.cyan.withValues(alpha: 0.2),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.cyan.withValues(alpha: 0.3)),
-          ),
-          child: const Center(
-            child: Icon(Icons.stream_rounded, color: Colors.cyanAccent, size: 18),
+        child: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => _showServerConfigDialog(context),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.cyan.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.cyan.withValues(alpha: 0.3)),
+            ),
+            child: const Center(
+              child: Icon(CupertinoIcons.gear_alt, color: Colors.cyanAccent, size: 18),
+            ),
           ),
         ),
       ),
@@ -371,6 +402,51 @@ class JavMainPage extends GetView<JavController> {
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showServerConfigDialog(BuildContext context) {
+    final textController = TextEditingController(text: controller.api.baseUrl);
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('后端服务器配置'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '手机在 5G 移动网络下无法直接访问 192.168.50.x 局域网地址。请切换为家庭 Wi-Fi 或输入穿透/DDNS 域名。',
+                style: TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
+              ),
+              const SizedBox(height: 12),
+              CupertinoTextField(
+                controller: textController,
+                placeholder: 'http://192.168.50.81:8923',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('取消'),
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: const Text('保存并重试'),
+            onPressed: () {
+              final newUrl = textController.text.trim();
+              if (newUrl.isNotEmpty) {
+                controller.updateServerUrl(newUrl);
+              }
+              Navigator.of(ctx).pop();
+            },
           ),
         ],
       ),

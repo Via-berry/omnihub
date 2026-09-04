@@ -1,28 +1,68 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/jav/models/jav_models.dart';
+import 'package:moviepilot_mobile/services/app_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class JavApiService {
   static final JavApiService _instance = JavApiService._internal();
   factory JavApiService() => _instance;
 
+  static const String defaultBaseUrl = 'http://192.168.50.81:8923';
+  late final Dio _dio;
+  String _baseUrl = defaultBaseUrl;
+
   JavApiService._internal() {
     _dio = Dio(
       BaseOptions(
         baseUrl: defaultBaseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 15),
+        connectTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 8),
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'OmniHub-Mobile/1.2.3',
         },
       ),
     );
+    _initBaseUrlSync();
   }
 
-  static const String defaultBaseUrl = 'http://192.168.50.81:8923';
-  late final Dio _dio;
-  String _baseUrl = defaultBaseUrl;
+  void _initBaseUrlSync() {
+    try {
+      if (Get.isRegistered<AppService>()) {
+        final appService = Get.find<AppService>();
+        final server = appService.baseUrl;
+        if (server != null && server.isNotEmpty) {
+          final uri = Uri.tryParse(server);
+          if (uri != null && uri.host.isNotEmpty) {
+            final scheme = uri.scheme.isNotEmpty ? uri.scheme : 'http';
+            updateBaseUrl('$scheme://${uri.host}:8923');
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> initBaseUrl() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('jav_server_url');
+      if (saved != null && saved.trim().isNotEmpty) {
+        updateBaseUrl(saved.trim());
+        return;
+      }
+    } catch (_) {}
+    _initBaseUrlSync();
+  }
+
+  Future<void> saveBaseUrl(String newUrl) async {
+    updateBaseUrl(newUrl);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('jav_server_url', _baseUrl);
+    } catch (_) {}
+  }
 
   String get baseUrl => _baseUrl;
 
@@ -31,8 +71,13 @@ class JavApiService {
     if (url.endsWith('/')) {
       url = url.substring(0, url.length - 1);
     }
-    _baseUrl = url;
-    _dio.options.baseUrl = _baseUrl;
+    if (url.isNotEmpty) {
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'http://$url';
+      }
+      _baseUrl = url;
+      _dio.options.baseUrl = _baseUrl;
+    }
   }
 
   /// 获取探索流作品 (带分页与分类)
@@ -72,7 +117,7 @@ class JavApiService {
       return [];
     } catch (e) {
       debugPrint('JavApiService.fetchExplore error: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -87,7 +132,7 @@ class JavApiService {
       return null;
     } catch (e) {
       debugPrint('JavApiService.fetchDetail error for $code: $e');
-      return null;
+      rethrow;
     }
   }
 

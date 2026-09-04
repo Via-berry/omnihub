@@ -30,7 +30,12 @@ class JavController extends GetxController {
   void onInit() {
     super.onInit();
     bannerPageController = PageController();
-    fetchInitialData();
+    _initAndFetch();
+  }
+
+  Future<void> _initAndFetch() async {
+    await api.initBaseUrl();
+    await fetchInitialData();
   }
 
   @override
@@ -74,13 +79,26 @@ class JavController extends GetxController {
       if (actressList.isNotEmpty) {
         actresses.value = actressList;
       }
+
+      if (bannerItems.isEmpty && hotItems.isEmpty) {
+        errorMsg.value = '未能获取到任何数据，请检查后端服务是否正常运行。';
+      }
     } catch (e) {
-      errorMsg.value = '连接 NAS 局域网服务异常，请确认已连接家庭 Wi-Fi';
+      errorMsg.value = '无法连接到局域网服务 (${api.baseUrl})\n\n'
+          '排查建议：\n'
+          '1. 手机当前若使用 5G 移动网络，请连接家庭 Wi-Fi\n'
+          '2. 若开启了代理/VPN，请确认局域网网段未被代理劫持\n'
+          '3. 可点击左上角齿轮修改为内网穿透或公网地址';
       debugPrint('JavController.fetchInitialData error: $e');
     } finally {
       isLoading.value = false;
       isRefreshing.value = false;
     }
+  }
+
+  Future<void> updateServerUrl(String newUrl) async {
+    await api.saveBaseUrl(newUrl);
+    await refreshData();
   }
 
   Future<void> refreshData() async {
