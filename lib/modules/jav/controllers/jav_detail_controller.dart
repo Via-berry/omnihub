@@ -80,6 +80,6 @@ class JavDetailController extends GetxController {
   }
 
   void exitJav() {
-    Get.offAllNamed('/dashboard');
+    Get.offAllNamed('/main', arguments: {'initialIndex': 0});
   }
 }

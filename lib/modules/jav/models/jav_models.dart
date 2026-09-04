@@ -7,6 +7,8 @@ class JavItem {
   final bool hasSubtitles;
   final bool isHd;
   final String? url;
+  final String? actress;
+  final String? size;
 
   JavItem({
     required this.code,
@@ -17,6 +19,8 @@ class JavItem {
     this.hasSubtitles = false,
     this.isHd = false,
     this.url,
+    this.actress,
+    this.size,
   });
 
   factory JavItem.fromJson(Map<String, dynamic> json) {
@@ -29,14 +33,43 @@ class JavItem {
       hasSubtitles: json['has_subtitles'] == true,
       isHd: json['is_hd'] == true,
       url: json['url']?.toString(),
+      actress: json['actress']?.toString(),
+      size: json['size']?.toString(),
     );
   }
 
   String getProxyCover(String baseUrl) {
     if (cover.isEmpty) return '';
+    if (cover.startsWith(baseUrl)) return cover;
     final encoded = Uri.encodeComponent(cover);
     return '$baseUrl/api/img/proxy?url=$encoded&code=$code';
   }
+}
+
+class JavTagPrompt {
+  final String name;
+  final String prompt;
+
+  JavTagPrompt({required this.name, required this.prompt});
+
+  factory JavTagPrompt.fromJson(Map<String, dynamic> json) {
+    return JavTagPrompt(
+      name: json['name']?.toString() ?? '',
+      prompt: json['prompt']?.toString() ?? '',
+    );
+  }
+}
+
+class JavSearchResult {
+  final String prompt;
+  final String? aiComment;
+  final List<JavItem> results;
+
+  JavSearchResult({
+    required this.prompt,
+    this.aiComment,
+    required this.results,
+  });
 }
 
 class JavActressRef {

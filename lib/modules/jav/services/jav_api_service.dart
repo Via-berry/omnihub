@@ -178,12 +178,41 @@ class JavApiService {
     }
   }
 
-  /// 搜索番号或演员
-  Future<List<JavItem>> search(String keyword, {int page = 1}) async {
+  /// 获取 AI 推荐题材/找片标签
+  Future<List<JavTagPrompt>> fetchTags() async {
+    try {
+      final res = await _dio.get('/api/jav/tags');
+      var data = res.data;
+      if (data is String) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {}
+      }
+      if (res.statusCode == 200 && data != null) {
+        List rawList = [];
+        if (data is Map && data['tags'] is List) {
+          rawList = data['tags'] as List;
+        } else if (data is List) {
+          rawList = data;
+        }
+        return rawList
+            .whereType<Map>()
+            .map((e) => JavTagPrompt.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('JavApiService.fetchTags error: $e');
+      return [];
+    }
+  }
+
+  /// 搜索番号、演员或 AI 描述找片
+  Future<JavSearchResult> search(String keyword, {int page = 1}) async {
     try {
       final res = await _dio.get(
         '/api/jav/search',
-        queryParameters: {'q': keyword.trim(), 'page': page},
+        queryParameters: {'query': keyword.trim(), 'page': page},
       );
       var data = res.data;
       if (data is String) {
@@ -193,17 +222,32 @@ class JavApiService {
       }
       if (res.statusCode == 200 && data != null) {
         List rawList = [];
-        if (data is Map && data['results'] is List) {
-          rawList = data['results'] as List;
+        String? aiComment;
+        String prompt = keyword;
+        if (data is Map) {
+          if (data['results'] is List) {
+            rawList = data['results'] as List;
+          }
+          if (data['ai_comment'] is String) {
+            aiComment = data['ai_comment'] as String;
+          }
+          if (data['prompt'] is String) {
+            prompt = data['prompt'] as String;
+          }
         } else if (data is List) {
           rawList = data;
         }
-        return rawList
+        final items = rawList
             .whereType<Map>()
             .map((e) => JavItem.fromJson(Map<String, dynamic>.from(e)))
             .toList();
+        return JavSearchResult(
+          prompt: prompt,
+          aiComment: aiComment,
+          results: items,
+        );
       }
-      return [];
+      return JavSearchResult(prompt: keyword, results: []);
     } catch (e) {
       debugPrint('JavApiService.search error: $e');
       rethrow;

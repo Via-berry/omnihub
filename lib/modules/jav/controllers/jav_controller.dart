@@ -21,6 +21,17 @@ class JavController extends GetxController {
   final RxList<JavItem> subtitledItems = <JavItem>[].obs;
   final RxList<JavActress> actresses = <JavActress>[].obs;
 
+  // 推荐题材/找片标签
+  final RxList<JavTagPrompt> recommendationTags = <JavTagPrompt>[].obs;
+
+  // 搜索状态
+  final TextEditingController searchInputController = TextEditingController();
+  final RxString searchQuery = ''.obs;
+  final RxBool isSearching = false.obs;
+  final RxBool isSearchLoading = false.obs;
+  final RxString searchAiComment = ''.obs;
+  final RxList<JavItem> searchResults = <JavItem>[].obs;
+
   // 分页控制
   final RxInt currentPage = 1.obs;
   final RxBool hasMore = true.obs;
@@ -41,6 +52,7 @@ class JavController extends GetxController {
   @override
   void onClose() {
     bannerPageController.dispose();
+    searchInputController.dispose();
     super.onClose();
   }
 
@@ -48,39 +60,46 @@ class JavController extends GetxController {
     isLoading.value = true;
     errorMsg.value = '';
     try {
-      // 并行拉取首屏数据
+      // 并行拉取真实首屏数据：今日新片、真实高分神作推荐、精翻中字、热门女优、智能标签
       final results = await Future.wait([
         api.fetchExplore(page: 1),
-        api.fetchExplore(page: 2),
-        api.fetchExplore(page: 1, magnetType: 'zh'),
+        api.search('高分中字高清佳作'),
+        api.search('精翻中文字幕'),
         api.fetchActresses(),
+        api.fetchTags(),
       ]);
 
       final p1Items = results[0] as List<JavItem>;
-      final p2Items = results[1] as List<JavItem>;
-      final zhItems = results[2] as List<JavItem>;
+      final hotSearchResult = results[1] as JavSearchResult;
+      final zhSearchResult = results[2] as JavSearchResult;
       final actressList = results[3] as List<JavActress>;
+      final tagsList = results[4] as List<JavTagPrompt>;
 
       if (p1Items.isNotEmpty) {
-        // 取前 5 个做 Banner 轮播
-        bannerItems.value = p1Items.take(5).toList();
-        // 其余及第 1 页全部做今日发行
         nowPlayingItems.value = p1Items;
       }
 
-      if (p2Items.isNotEmpty) {
-        hotItems.value = p2Items;
+      if (hotSearchResult.results.isNotEmpty) {
+        hotItems.value = hotSearchResult.results;
+        // 选用真实高分作品作为轮播大画幅海报
+        bannerItems.value = hotSearchResult.results.take(5).toList();
+      } else if (p1Items.isNotEmpty) {
+        bannerItems.value = p1Items.take(5).toList();
       }
 
-      if (zhItems.isNotEmpty) {
-        subtitledItems.value = zhItems;
+      if (zhSearchResult.results.isNotEmpty) {
+        subtitledItems.value = zhSearchResult.results;
       }
 
       if (actressList.isNotEmpty) {
         actresses.value = actressList;
       }
 
-      if (bannerItems.isEmpty && hotItems.isEmpty) {
+      if (tagsList.isNotEmpty) {
+        recommendationTags.value = tagsList;
+      }
+
+      if (bannerItems.isEmpty && hotItems.isEmpty && nowPlayingItems.isEmpty) {
         errorMsg.value = '未能获取到任何数据，请检查后端服务是否正常运行。';
       }
     } catch (e) {
@@ -88,12 +107,47 @@ class JavController extends GetxController {
           '排查建议：\n'
           '1. 手机当前若使用 5G 移动网络，请连接家庭 Wi-Fi\n'
           '2. 若开启了代理/VPN，请确认局域网网段未被代理劫持\n'
-          '3. 可点击左上角齿轮修改为内网穿透或公网地址';
+          '3. 可点击右上角齿轮修改为内网穿透或公网地址';
       debugPrint('JavController.fetchInitialData error: $e');
     } finally {
       isLoading.value = false;
       isRefreshing.value = false;
     }
+  }
+
+  Future<void> executeSearch(String keyword) async {
+    final query = keyword.trim();
+    if (query.isEmpty) {
+      clearSearch();
+      return;
+    }
+    searchQuery.value = query;
+    if (searchInputController.text != query) {
+      searchInputController.text = query;
+    }
+    isSearching.value = true;
+    isSearchLoading.value = true;
+    searchAiComment.value = '';
+    searchResults.clear();
+
+    try {
+      final res = await api.search(query);
+      searchResults.value = res.results;
+      searchAiComment.value = res.aiComment ?? '';
+    } catch (e) {
+      debugPrint('executeSearch error: $e');
+    } finally {
+      isSearchLoading.value = false;
+    }
+  }
+
+  void clearSearch() {
+    searchInputController.clear();
+    searchQuery.value = '';
+    isSearching.value = false;
+    isSearchLoading.value = false;
+    searchResults.clear();
+    searchAiComment.value = '';
   }
 
   Future<void> updateServerUrl(String newUrl) async {
@@ -104,7 +158,12 @@ class JavController extends GetxController {
   Future<void> refreshData() async {
     isRefreshing.value = true;
     currentPage.value = 1;
-    await fetchInitialData();
+    if (isSearching.value && searchQuery.value.isNotEmpty) {
+      await executeSearch(searchQuery.value);
+      isRefreshing.value = false;
+    } else {
+      await fetchInitialData();
+    }
   }
 
   void openDetail(String code) {
@@ -113,6 +172,6 @@ class JavController extends GetxController {
   }
 
   void exitJav() {
-    Get.offAllNamed('/dashboard');
+    Get.offAllNamed('/main', arguments: {'initialIndex': 0});
   }
 }

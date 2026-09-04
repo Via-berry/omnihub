@@ -66,7 +66,7 @@ class _JavPlayerPageState extends State<JavPlayerPage> {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               color: Colors.redAccent.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(20),
-              onPressed: () => Get.offAllNamed('/dashboard'),
+              onPressed: () => Get.offAllNamed('/main', arguments: {'initialIndex': 0}),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
