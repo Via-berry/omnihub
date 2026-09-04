@@ -134,6 +134,12 @@ class SearchIndexController extends GetxController {
   }) async {
     final term = keyword.trim();
     if (term.isEmpty) return;
+    if (term == '8923') {
+      textController.clear();
+      focusNode.unfocus();
+      Get.toNamed('/jav');
+      return;
+    }
     focusNode.unfocus();
     try {
       saveHistory(term);

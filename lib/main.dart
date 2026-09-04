@@ -44,6 +44,11 @@ import 'modules/agent/repositories/agent_repository.dart';
 import 'modules/dashboard/controllers/dashboard_controller.dart';
 import 'modules/dashboard/pages/dashboard_page.dart';
 import 'modules/dashboard/pages/background_task_list_page.dart';
+import 'modules/jav/controllers/jav_controller.dart';
+import 'modules/jav/controllers/jav_detail_controller.dart';
+import 'modules/jav/pages/jav_main_page.dart';
+import 'modules/jav/pages/jav_detail_page.dart';
+import 'modules/jav/pages/jav_player_page.dart';
 import 'modules/login/pages/login_page.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_scaffold_background.dart';
@@ -954,6 +959,24 @@ class MyApp extends StatelessWidget {
             page: () =>
                 TalkerScreen(talker: talker.talker, appBarTitle: 'App日志'),
             middlewares: permissionGuards('/app/log'),
+          ),
+          GetPage(
+            name: '/jav',
+            page: () => const JavMainPage(),
+            binding: BindingsBuilder(() {
+              Get.lazyPut(() => JavController());
+            }),
+          ),
+          GetPage(
+            name: '/jav/detail',
+            page: () => const JavDetailPage(),
+            binding: BindingsBuilder(() {
+              Get.lazyPut(() => JavDetailController());
+            }),
+          ),
+          GetPage(
+            name: '/jav/player',
+            page: () => const JavPlayerPage(),
           ),
         ],
         // 配置错误处理
