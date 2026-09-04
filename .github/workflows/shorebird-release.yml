@@ -26,11 +26,18 @@ jobs:
             exit 1
           fi
 
+      - name: Ensure Android Gradle wrapper
+        run: |
+          if [ ! -f "android/gradlew" ]; then
+            cd android && gradle wrapper || true
+            cd ..
+          fi
+
       - name: Ensure Shorebird app initialized
         run: |
           if [ ! -f "shorebird.yaml" ] || grep -q "YOUR_APP_ID" shorebird.yaml; then
             echo "Initializing Shorebird app..."
-            shorebird init --force
+            shorebird init --force --display-name=MoviePilotLite
           fi
 
       - name: Install dependencies
