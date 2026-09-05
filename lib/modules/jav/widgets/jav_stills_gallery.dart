@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/jav/services/jav_api_service.dart';
 import 'package:moviepilot_mobile/modules/jav/widgets/jav_safe_cover.dart';
+import 'package:moviepilot_mobile/widgets/cached_image.dart';
 
 class JavStillsGallery extends StatelessWidget {
   const JavStillsGallery({
