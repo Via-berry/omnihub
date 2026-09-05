@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:moviepilot_mobile/modules/jav/models/jav_models.dart';
 import 'package:moviepilot_mobile/modules/jav/services/jav_api_service.dart';
-import 'package:moviepilot_mobile/widgets/cached_image.dart';
+import 'package:moviepilot_mobile/modules/jav/widgets/jav_safe_cover.dart';
 import 'package:soft_edge_blur/soft_edge_blur.dart';
 
 class JavBannerCard extends StatelessWidget {
@@ -58,11 +58,14 @@ class JavBannerCard extends StatelessWidget {
         ),
       ],
       child: url.isNotEmpty
-          ? CachedImage(
+          ? JavSafeCover(
               imageUrl: url,
+              code: item.code,
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
+              showBadge: false,
+              enablePeeking: false,
               errorWidget: Container(
                 color: const Color(0xFF10211F),
                 child: const Center(

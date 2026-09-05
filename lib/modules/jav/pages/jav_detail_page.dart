@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/jav/controllers/jav_detail_controller.dart';
 import 'package:moviepilot_mobile/modules/jav/models/jav_models.dart';
 import 'package:moviepilot_mobile/modules/jav/services/jav_api_service.dart';
+import 'package:moviepilot_mobile/modules/jav/services/jav_safe_service.dart';
+import 'package:moviepilot_mobile/modules/jav/widgets/jav_safe_cover.dart';
 import 'package:moviepilot_mobile/modules/jav/widgets/jav_stills_gallery.dart';
 import 'package:moviepilot_mobile/widgets/cached_image.dart';
 
@@ -90,6 +92,48 @@ class JavDetailPage extends GetView<JavDetailController> {
         ),
       ),
       actions: [
+        // 避人脱敏模式切换
+        Obx(() {
+          final isSafe = JavSafeService.to.isSafeMode.value;
+          return CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            onPressed: JavSafeService.to.toggleSafeMode,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSafe
+                    ? Colors.cyanAccent.withValues(alpha: 0.20)
+                    : Colors.white.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSafe
+                      ? Colors.cyanAccent.withValues(alpha: 0.60)
+                      : Colors.white.withValues(alpha: 0.20),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isSafe ? CupertinoIcons.eye_slash_fill : CupertinoIcons.eye_fill,
+                    color: isSafe ? Colors.cyanAccent : Colors.white70,
+                    size: 13,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    isSafe ? '脱敏中' : '明文',
+                    style: TextStyle(
+                      color: isSafe ? Colors.cyanAccent : Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+        // 一键速退
         Padding(
           padding: const EdgeInsets.only(right: 12),
           child: CupertinoButton(
@@ -129,8 +173,9 @@ class JavDetailPage extends GetView<JavDetailController> {
         children: [
           // 巨幕全屏大图剧照
           proxyCover.isNotEmpty
-              ? CachedImage(
+              ? JavSafeCover(
                   imageUrl: proxyCover,
+                  code: detail.code,
                   fit: BoxFit.cover,
                   errorWidget: Container(color: const Color(0xFF152220)),
                 )
@@ -161,21 +206,27 @@ class JavDetailPage extends GetView<JavDetailController> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  detail.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.2,
-                    shadows: [
-                      Shadow(color: Colors.black87, blurRadius: 8, offset: Offset(0, 1)),
-                    ],
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
+                Obx(() {
+                  final isSafe = JavSafeService.to.isSafeMode.value;
+                  final displayTitle = isSafe
+                      ? '${detail.code} ${detail.actresses.isNotEmpty ? '· ${detail.actresses.join(' ')}' : ''}'
+                      : detail.title;
+                  return Text(
+                    displayTitle,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
+                      shadows: [
+                        Shadow(color: Colors.black87, blurRadius: 8, offset: Offset(0, 1)),
+                      ],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  );
+                }),
                 const SizedBox(height: 4),
                 Text(
                   '${detail.code} · ${detail.maker ?? detail.publisher ?? '独占企画'}',

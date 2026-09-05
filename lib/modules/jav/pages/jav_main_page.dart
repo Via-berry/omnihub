@@ -4,8 +4,10 @@ import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/jav/controllers/jav_controller.dart';
 import 'package:moviepilot_mobile/modules/jav/models/jav_models.dart';
 import 'package:moviepilot_mobile/modules/jav/services/jav_api_service.dart';
+import 'package:moviepilot_mobile/modules/jav/services/jav_safe_service.dart';
 import 'package:moviepilot_mobile/modules/jav/widgets/jav_banner_card.dart';
 import 'package:moviepilot_mobile/modules/jav/widgets/jav_now_playing_card.dart';
+import 'package:moviepilot_mobile/modules/jav/widgets/jav_safe_cover.dart';
 import 'package:moviepilot_mobile/widgets/cached_image.dart';
 
 class JavMainPage extends GetView<JavController> {
@@ -158,6 +160,47 @@ class JavMainPage extends GetView<JavController> {
         ),
       )),
       actions: [
+        // 避人脱敏模式切换
+        Obx(() {
+          final isSafe = JavSafeService.to.isSafeMode.value;
+          return CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            onPressed: JavSafeService.to.toggleSafeMode,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSafe
+                    ? Colors.cyanAccent.withValues(alpha: 0.20)
+                    : Colors.white.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSafe
+                      ? Colors.cyanAccent.withValues(alpha: 0.60)
+                      : Colors.white.withValues(alpha: 0.20),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isSafe ? CupertinoIcons.eye_slash_fill : CupertinoIcons.eye_fill,
+                    color: isSafe ? Colors.cyanAccent : Colors.white70,
+                    size: 13,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    isSafe ? '脱敏中' : '明文',
+                    style: TextStyle(
+                      color: isSafe ? Colors.cyanAccent : Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
         CupertinoButton(
           padding: const EdgeInsets.symmetric(horizontal: 6),
           onPressed: () => _showServerConfigDialog(context),
@@ -456,8 +499,9 @@ class JavMainPage extends GetView<JavController> {
                 fit: StackFit.expand,
                 children: [
                   if (proxyCover.isNotEmpty)
-                    CachedImage(
+                    JavSafeCover(
                       imageUrl: proxyCover,
+                      code: item.code,
                       fit: BoxFit.cover,
                       errorWidget: Container(
                         color: Colors.black38,
@@ -537,12 +581,18 @@ class JavMainPage extends GetView<JavController> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500, height: 1.2),
-                  ),
+                  Obx(() {
+                    final isSafe = JavSafeService.to.isSafeMode.value;
+                    final displayTitle = isSafe
+                        ? '${item.code} ${item.actress != null && item.actress!.isNotEmpty ? '· ${item.actress}' : ''}'
+                        : item.title;
+                    return Text(
+                      displayTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500, height: 1.2),
+                    );
+                  }),
                   const SizedBox(height: 4),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -773,13 +823,17 @@ class JavMainPage extends GetView<JavController> {
                           ],
                         ),
                         child: ClipOval(
-                          child: proxyAvatar.isNotEmpty
-                              ? CachedImage(
-                                  imageUrl: proxyAvatar,
-                                  fit: BoxFit.cover,
-                                  errorWidget: _buildActressAvatarPlaceholder(a.name),
-                                )
-                              : _buildActressAvatarPlaceholder(a.name),
+                          child: Obx(() {
+                            final isSafe = JavSafeService.to.isSafeMode.value;
+                            if (isSafe || proxyAvatar.isEmpty) {
+                              return _buildActressAvatarPlaceholder(a.name);
+                            }
+                            return CachedImage(
+                              imageUrl: proxyAvatar,
+                              fit: BoxFit.cover,
+                              errorWidget: _buildActressAvatarPlaceholder(a.name),
+                            );
+                          }),
                         ),
                       ),
                       const SizedBox(height: 6),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:moviepilot_mobile/modules/jav/models/jav_models.dart';
 import 'package:moviepilot_mobile/modules/jav/services/jav_api_service.dart';
-import 'package:moviepilot_mobile/widgets/cached_image.dart';
+import 'package:moviepilot_mobile/modules/jav/widgets/jav_safe_cover.dart';
 
 class JavNowPlayingCard extends StatelessWidget {
   const JavNowPlayingCard({
@@ -47,8 +47,9 @@ class JavNowPlayingCard extends StatelessWidget {
                   ColoredBox(
                     color: const Color(0xFF0B1716),
                     child: proxyUrl.isNotEmpty
-                        ? CachedImage(
+                        ? JavSafeCover(
                             imageUrl: proxyUrl,
+                            code: item.code,
                             fit: BoxFit.cover,
                             errorWidget: Container(
                               color: const Color(0xFF10211F),
