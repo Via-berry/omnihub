@@ -1,0 +1,629 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:moviepilot_mobile/modules/dian115/controllers/dian115_share_controller.dart';
+import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart';
+import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_share_card.dart';
+import 'package:moviepilot_mobile/utils/toast_util.dart';
+
+class Dian115ShareSheet extends StatefulWidget {
+  const Dian115ShareSheet({
+    super.key,
+    this.tmdbId,
+    this.mediaType = 'movie',
+    this.season,
+    this.mediaTitle = '',
+  });
+
+  final int? tmdbId;
+  final String mediaType;
+  final int? season;
+  final String mediaTitle;
+
+  static Future<void> show(
+    BuildContext context, {
+    int? tmdbId,
+    String mediaType = 'movie',
+    int? season,
+    String mediaTitle = '',
+  }) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Dian115ShareSheet(
+        tmdbId: tmdbId,
+        mediaType: mediaType,
+        season: season,
+        mediaTitle: mediaTitle,
+      ),
+    );
+  }
+
+  @override
+  State<Dian115ShareSheet> createState() => _Dian115ShareSheetState();
+}
+
+class _Dian115ShareSheetState extends State<Dian115ShareSheet> {
+  late final Dian115ShareController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(
+      Dian115ShareController(
+        tmdbId: widget.tmdbId,
+        mediaType: widget.mediaType,
+        initialSeason: widget.season,
+        mediaTitle: widget.mediaTitle,
+      ),
+      tag: '${widget.tmdbId}_${widget.season}_${widget.mediaTitle}',
+    );
+  }
+
+  @override
+  void dispose() {
+    Get.delete<Dian115ShareController>(
+      tag: '${widget.tmdbId}_${widget.season}_${widget.mediaTitle}',
+    );
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.88,
+      decoration: const BoxDecoration(
+        color: Color(0xFF11151F),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        children: [
+          _buildHeader(context),
+          _buildFilterBar(),
+          Expanded(child: _buildBody()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161C26),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+      ),
+      child: Column(
+        children: [
+          // 拖拽指示条
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.20),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.35),
+                  ),
+                ),
+                child: const Icon(
+                  CupertinoIcons.cloud_download,
+                  color: Color(0xFF34D399),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          '癫影 115 资源',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Obx(() => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '共 ${controller.allShares.length} 个',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 10,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            )),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (widget.tmdbId != null && widget.tmdbId! > 0)
+                          Text(
+                            'TMDB ${widget.tmdbId}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 10,
+                            ),
+                          )
+                        else
+                          Text(
+                            widget.mediaTitle.isNotEmpty ? widget.mediaTitle : '片源直连',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 10,
+                            ),
+                          ),
+                        const SizedBox(width: 6),
+                        Obx(() {
+                          final online = controller.isOnline.value;
+                          return Row(
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: online
+                                      ? const Color(0xFF10B981)
+                                      : Colors.amber,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                online ? '网关在线' : '离线探测中',
+                                style: TextStyle(
+                                  color: online
+                                      ? const Color(0xFF34D399)
+                                      : Colors.amber,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // 积分与签到
+              Obx(() => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('💰', style: TextStyle(fontSize: 10)),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${controller.userPoints.value}',
+                          style: const TextStyle(
+                            color: Color(0xFFFBBF24),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const SizedBox(width: 1),
+                        const Text(
+                          '分',
+                          style: TextStyle(color: Color(0xFFFBBF24), fontSize: 9),
+                        ),
+                      ],
+                    ),
+                  )),
+              const SizedBox(width: 6),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minSize: 24,
+                color: const Color(0xFF10B981).withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(999),
+                onPressed: controller.signin,
+                child: const Text(
+                  '签到+5',
+                  style: TextStyle(
+                    color: Color(0xFF34D399),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              // 网关地址设置按钮
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                minSize: 28,
+                onPressed: () => _showHostConfigDialog(context),
+                child: Icon(
+                  CupertinoIcons.gear_alt,
+                  size: 16,
+                  color: Colors.white.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(width: 2),
+              // 关闭按钮
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                minSize: 28,
+                onPressed: () => Navigator.of(context).pop(),
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(CupertinoIcons.clear, size: 12, color: Colors.white70),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterBar() {
+    return Obx(() {
+      final seasons = controller.sharesResponse.value?.availableSeasons ?? const [];
+      final hasSeasons = seasons.length > 1;
+
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              // 季度选择胶囊 (剧集)
+              if (hasSeasons) ...[
+                _buildFilterChip(
+                  label: '全部季度',
+                  isSelected: controller.filterSeason.value == -1,
+                  onTap: () {
+                    controller.filterSeason.value = -1;
+                    controller.fetchShares();
+                  },
+                ),
+                for (final s in seasons) ...[
+                  const SizedBox(width: 6),
+                  _buildFilterChip(
+                    label: s.season == 0 ? '特别篇' : '第 ${s.season} 季',
+                    count: s.shareCount,
+                    isSelected: controller.filterSeason.value == s.season,
+                    onTap: () {
+                      controller.filterSeason.value = s.season;
+                      controller.fetchShares();
+                    },
+                  ),
+                ],
+                const SizedBox(width: 10),
+                Container(width: 1, height: 16, color: Colors.white12),
+                const SizedBox(width: 10),
+              ],
+
+              // 分辨率胶囊
+              _buildFilterChip(
+                label: '全部清晰度',
+                isSelected: controller.filterResolution.value == 'all',
+                onTap: () => controller.filterResolution.value = 'all',
+              ),
+              const SizedBox(width: 6),
+              _buildFilterChip(
+                label: '4K UHD',
+                isSelected: controller.filterResolution.value == '4K',
+                onTap: () => controller.filterResolution.value =
+                    controller.filterResolution.value == '4K' ? 'all' : '4K',
+              ),
+              const SizedBox(width: 6),
+              _buildFilterChip(
+                label: '1080P',
+                isSelected: controller.filterResolution.value == '1080P',
+                onTap: () => controller.filterResolution.value =
+                    controller.filterResolution.value == '1080P' ? 'all' : '1080P',
+              ),
+              const SizedBox(width: 10),
+              Container(width: 1, height: 16, color: Colors.white12),
+              const SizedBox(width: 10),
+
+              // 中文字幕
+              _buildFilterChip(
+                label: '仅含中字',
+                icon: CupertinoIcons.captions_bubble_fill,
+                isSelected: controller.filterOnlyChineseSub.value,
+                activeColor: const Color(0xFFF59E0B),
+                onTap: () => controller.filterOnlyChineseSub.toggle(),
+              ),
+              const SizedBox(width: 6),
+
+              // 渠道类型
+              _buildFilterChip(
+                label: '仅115网盘',
+                isSelected: controller.filterKind.value == '115',
+                onTap: () => controller.filterKind.value =
+                    controller.filterKind.value == '115' ? 'all' : '115',
+              ),
+              const SizedBox(width: 6),
+              _buildFilterChip(
+                label: '仅离线磁力',
+                isSelected: controller.filterKind.value == 'offline',
+                onTap: () => controller.filterKind.value =
+                    controller.filterKind.value == 'offline' ? 'all' : 'offline',
+              ),
+              const SizedBox(width: 10),
+              Container(width: 1, height: 16, color: Colors.white12),
+              const SizedBox(width: 10),
+
+              // 排序模式切换
+              _buildFilterChip(
+                label: controller.sortBy.value == 'size_desc'
+                    ? '体积从大到小 ↓'
+                    : (controller.sortBy.value == 'use_desc'
+                        ? '热度最高'
+                        : '最新发布'),
+                icon: CupertinoIcons.sort_down,
+                isSelected: true,
+                activeColor: const Color(0xFF3B82F6),
+                onTap: () {
+                  if (controller.sortBy.value == 'size_desc') {
+                    controller.sortBy.value = 'use_desc';
+                  } else if (controller.sortBy.value == 'use_desc') {
+                    controller.sortBy.value = 'date_desc';
+                  } else {
+                    controller.sortBy.value = 'size_desc';
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    int? count,
+    IconData? icon,
+    required bool isSelected,
+    Color? activeColor,
+    required VoidCallback onTap,
+  }) {
+    final effectiveColor = activeColor ?? Theme.of(context).colorScheme.primary;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? effectiveColor.withValues(alpha: 0.20)
+              : Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: isSelected
+                ? effectiveColor.withValues(alpha: 0.50)
+                : Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 11,
+                color: isSelected ? effectiveColor : Colors.white60,
+              ),
+              const SizedBox(width: 3),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? effectiveColor : Colors.white70,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+            if (count != null) ...[
+              const SizedBox(width: 3),
+              Text(
+                '($count)',
+                style: TextStyle(
+                  color: isSelected ? effectiveColor.withValues(alpha: 0.8) : Colors.white38,
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    return Obx(() {
+      if (controller.isLoading.value) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CupertinoActivityIndicator(color: Colors.white, radius: 14),
+              const SizedBox(height: 12),
+              Text(
+                '正在检索癫影 115 资源...',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (controller.errorMsg.value.isNotEmpty) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  CupertinoIcons.exclamationmark_circle,
+                  color: Colors.amber,
+                  size: 42,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  controller.errorMsg.value,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                CupertinoButton.filled(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  onPressed: controller.fetchShares,
+                  child: const Text('重新加载', style: TextStyle(fontSize: 13)),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      final list = controller.filteredShares;
+      if (list.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                CupertinoIcons.tray,
+                color: Colors.white24,
+                size: 48,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '暂无符合当前筛选条件的网盘资源',
+                style: TextStyle(color: Colors.white60, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                color: Colors.white12,
+                borderRadius: BorderRadius.circular(999),
+                onPressed: () {
+                  controller.filterResolution.value = 'all';
+                  controller.filterKind.value = 'all';
+                  controller.filterOnlyChineseSub.value = false;
+                  controller.filterSeason.value = -1;
+                },
+                child: const Text('重置筛选', style: TextStyle(fontSize: 12, color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+        physics: const BouncingScrollPhysics(),
+        itemCount: list.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final item = list[index];
+          return Dian115ShareCard(item: item, controller: controller);
+        },
+      );
+    });
+  }
+
+  void _showHostConfigDialog(BuildContext context) {
+    final hostController = TextEditingController(text: Dian115Service.to.host.value);
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) {
+        return CupertinoAlertDialog(
+          title: const Text('配置癫影中转网关地址'),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '默认为极空间局域网服务，若在外网可通过内网穿透或反向代理访问。',
+                  style: TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 10),
+                CupertinoTextField(
+                  controller: hostController,
+                  placeholder: '如 http://192.168.50.81:8924',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('取消'),
+            ),
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              onPressed: () async {
+                final newHost = hostController.text.trim();
+                if (newHost.isNotEmpty) {
+                  await Dian115Service.to.updateHost(newHost);
+                  Navigator.of(ctx).pop();
+                  controller.fetchShares();
+                  ToastUtil.success('已更新网关服务地址');
+                }
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}

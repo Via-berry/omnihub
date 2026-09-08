@@ -7,6 +7,8 @@ import 'package:moviepilot_mobile/modules/media_detail/models/media_detail_model
 import 'package:moviepilot_mobile/modules/media_detail/models/media_notexists.dart';
 import 'package:moviepilot_mobile/modules/media_detail/models/season_episode_detail.dart';
 import 'package:moviepilot_mobile/modules/search/pages/search_mid_sheet.dart';
+import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_share_sheet.dart';
+import 'package:moviepilot_mobile/modules/media_detail/widgets/search_source_select_sheet.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/utils/image_util.dart';
@@ -179,6 +181,22 @@ class _MediaSeasonDetailPageState extends State<MediaSeasonDetailPage> {
       return;
     }
     final detail = _mediaDetailController.mediaDetail.value;
+    final sourceType = await SearchSourceSelectSheet.show(context);
+    if (sourceType == null) return;
+
+    if (sourceType == SearchSourceType.dian115) {
+      if (context.mounted) {
+        Dian115ShareSheet.show(
+          context,
+          tmdbId: detail?.tmdb_id ?? int.tryParse(widget.tmdbId),
+          mediaType: 'tv',
+          season: _seasonNumber ?? 0,
+          mediaTitle: widget.title,
+        );
+      }
+      return;
+    }
+
     final source = detail?.source;
     final searchKey = widget.subscribeMediaKey;
     final result = await Get.bottomSheet<({String area, List<int> sites})>(

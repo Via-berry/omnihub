@@ -10,6 +10,8 @@ import 'package:moviepilot_mobile/modules/media_detail/models/media_notexists.da
 import 'package:moviepilot_mobile/modules/media_detail/pages/media_season_detail_page.dart';
 import 'package:moviepilot_mobile/modules/media_detail/widgets/media_detail_season_card.dart';
 import 'package:moviepilot_mobile/modules/search/pages/search_mid_sheet.dart';
+import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_share_sheet.dart';
+import 'package:moviepilot_mobile/modules/media_detail/widgets/search_source_select_sheet.dart';
 import 'package:moviepilot_mobile/modules/recommend/models/recommend_api_item.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
 import 'package:moviepilot_mobile/modules/subscribe/widgets/subscribe_tv_season_sheet.dart';
@@ -1812,8 +1814,23 @@ class MediaDetailPage extends GetWidget<MediaDetailController> {
       ToastUtil.info('当前帐号无资源搜索权限');
       return;
     }
-    final searchKey = controller.args.path;
     final detail = controller.mediaDetail.value;
+    final sourceType = await SearchSourceSelectSheet.show(context);
+    if (sourceType == null) return;
+
+    if (sourceType == SearchSourceType.dian115) {
+      if (context.mounted) {
+        Dian115ShareSheet.show(
+          context,
+          tmdbId: detail?.tmdb_id,
+          mediaType: detail?.type ?? 'movie',
+          mediaTitle: detail?.title ?? '',
+        );
+      }
+      return;
+    }
+
+    final searchKey = controller.args.path;
     final result = await Get.bottomSheet<({String area, List<int> sites})>(
       SiteSelectSheet(
         hasSegment: true,
