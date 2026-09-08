@@ -206,15 +206,24 @@ class Dian115UnlockResult {
     this.unlockedAtTimestamp,
   });
 
-  bool get isSuccess => code == 'ok' || shareUrl.isNotEmpty || magnetUrl.isNotEmpty;
+  bool get isSuccess =>
+      (code == 'ok' || code == 'success' || code.isEmpty) &&
+      (shareUrl.isNotEmpty || magnetUrl.isNotEmpty);
+
+  bool get isTurnstileRequired =>
+      code == 'turnstile_failed' || code == 'turnstile_required';
 
   factory Dian115UnlockResult.fromJson(Map<String, dynamic> json) {
     return Dian115UnlockResult(
       code: json['code']?.toString() ?? 'ok',
-      shareUrl: json['share_url']?.toString() ?? '',
-      receiveCode: json['receive_code']?.toString() ?? '',
-      magnetUrl: json['magnet_url']?.toString() ?? '',
-      pointsCost: json['points_cost'] as int? ?? 0,
+      shareUrl: json['share_url']?.toString() ?? json['url']?.toString() ?? '',
+      receiveCode: json['receive_code']?.toString() ??
+          json['code_pwd']?.toString() ??
+          json['password']?.toString() ??
+          '',
+      magnetUrl:
+          json['magnet_url']?.toString() ?? json['magnet']?.toString() ?? '',
+      pointsCost: json['points_cost'] as int? ?? json['cost'] as int? ?? 0,
       unlockedAtTimestamp: json['unlocked_at'] as int?,
     );
   }
@@ -236,6 +245,8 @@ class Dian115StatusResult {
   final bool isVip;
   final String nickname;
   final String proxy;
+  final String lastSigninDate;
+  final int consecutiveSignin;
 
   const Dian115StatusResult({
     this.service = 'online',
@@ -244,7 +255,16 @@ class Dian115StatusResult {
     this.isVip = false,
     this.nickname = '',
     this.proxy = '',
+    this.lastSigninDate = '',
+    this.consecutiveSignin = 0,
   });
+
+  bool get isTodaySigned {
+    if (lastSigninDate.isEmpty) return false;
+    final now = DateTime.now();
+    final today = "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    return lastSigninDate.startsWith(today);
+  }
 
   factory Dian115StatusResult.fromJson(Map<String, dynamic> json) {
     final account = json['account'] as Map<String, dynamic>? ?? const {};
@@ -255,6 +275,8 @@ class Dian115StatusResult {
       isVip: json['is_vip'] as bool? ?? account['vip'] as bool? ?? false,
       nickname: account['nickname']?.toString() ?? '',
       proxy: json['proxy']?.toString() ?? '',
+      lastSigninDate: account['last_signin_date']?.toString() ?? '',
+      consecutiveSignin: account['consecutive_signin'] as int? ?? 0,
     );
   }
 }

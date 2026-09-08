@@ -5,8 +5,10 @@ import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/dian115/controllers/dian115_share_controller.dart';
 import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
 import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart';
+import 'package:moviepilot_mobile/modules/dian115/services/pan115_service.dart';
 import 'package:moviepilot_mobile/utils/open_url.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
+import 'package:moviepilot_mobile/utils/web_view_screen.dart';
 
 class Dian115ShareCard extends StatefulWidget {
   const Dian115ShareCard({
@@ -316,51 +318,58 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                 ],
               ),
 
-              // 解锁/获取链接按钮区域
+              // 解锁/获取链接与转存按钮区域
               Obx(() {
                 final isUnlocked = service.isUnlocked(item.id);
                 final cachedResult = service.getUnlockedInfo(item.id);
 
-                if (isUnlocked && cachedResult != null) {
+                if (isUnlocked && cachedResult != null && cachedResult.isSuccess) {
                   return Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.35),
-                          ),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(CupertinoIcons.checkmark_alt, size: 11, color: Color(0xFF34D399)),
-                            SizedBox(width: 3),
-                            Text(
-                              '已解锁',
-                              style: TextStyle(
-                                color: Color(0xFF34D399),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
+                      // 查看/复制链接次级按钮
                       CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        color: const Color(0xFF10B981),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                        minSize: 30,
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(999),
                         onPressed: () => _showLinkModal(context, cachedResult),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(CupertinoIcons.link, size: 13, color: Colors.black),
+                            Icon(CupertinoIcons.link, size: 12, color: Colors.white70),
+                            SizedBox(width: 3),
+                            Text(
+                              '链接',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // 主转存按钮
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        minSize: 32,
+                        color: const Color(0xFF10B981),
+                        borderRadius: BorderRadius.circular(999),
+                        onPressed: () {
+                          widget.controller.transferToPan115(
+                            shareUrl: cachedResult.shareUrl,
+                            receiveCode: cachedResult.receiveCode,
+                            magnetUrl: cachedResult.magnetUrl,
+                          );
+                        },
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(CupertinoIcons.cloud_download_fill, size: 13, color: Colors.black),
                             SizedBox(width: 4),
                             Text(
-                              '获取链接',
+                              '转存',
                               style: TextStyle(
                                 color: Colors.black,
                                 fontSize: 12,
@@ -374,13 +383,14 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                   );
                 }
 
-                // 未解锁状态
+                // 未解锁状态或免费资源状态
+                final isFree = item.unlockCost == 0;
                 return Row(
                   children: [
                     Text(
-                      item.unlockCost > 0 ? '消耗 ${item.unlockCost} 积分' : '免费资源',
+                      !isFree ? '消耗 ${item.unlockCost} 积分' : '免费资源',
                       style: TextStyle(
-                        color: item.unlockCost > 0
+                        color: !isFree
                             ? const Color(0xFFFBBF24)
                             : const Color(0xFF34D399),
                         fontSize: 11,
@@ -389,19 +399,28 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                     ),
                     const SizedBox(width: 8),
                     CupertinoButton(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      color: Theme.of(context).colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      minSize: 32,
+                      color: isFree
+                          ? const Color(0xFF10B981)
+                          : Theme.of(context).colorScheme.primary,
                       borderRadius: BorderRadius.circular(999),
-                      onPressed: () => _confirmAndUnlock(context),
-                      child: const Row(
+                      onPressed: () => widget.controller.unlockAndTransfer(context, item),
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(CupertinoIcons.lock_fill, size: 12, color: Colors.white),
-                          SizedBox(width: 4),
+                          Icon(
+                            isFree
+                                ? CupertinoIcons.cloud_download_fill
+                                : CupertinoIcons.lock_fill,
+                            size: 12,
+                            color: isFree ? Colors.black : Colors.white,
+                          ),
+                          const SizedBox(width: 4),
                           Text(
-                            '立即解锁',
+                            isFree ? '转存' : '解锁并转存',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isFree ? Colors.black : Colors.white,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -652,6 +671,38 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: CupertinoButton(
+                    color: const Color(0xFF0284C7),
+                    borderRadius: BorderRadius.circular(12),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      widget.controller.transferToPan115(
+                        shareUrl: result.shareUrl,
+                        receiveCode: result.receiveCode,
+                        magnetUrl: result.magnetUrl,
+                      );
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(CupertinoIcons.cloud_download_fill, size: 16, color: Colors.white),
+                        const SizedBox(width: 6),
+                        Text(
+                          '一键转存至 115 ${Pan115Service.to.getTargetFolderName(widget.controller.mediaType)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   child: CupertinoButton(

@@ -159,11 +159,28 @@ class Dian115Service extends GetxService {
     throw Exception('检索返回数据异常');
   }
 
+  /// 获取当前已登录会话的 Cookie，用于客户端原生 WebView 免登
+  Future<Map<String, dynamic>> getAuthCookies() async {
+    try {
+      final resp = await _dio.get(_cleanUrl('/api/auth/cookies'));
+      if (resp.data is Map<String, dynamic>) {
+        return resp.data as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return const {};
+  }
+
   /// 资源解锁
-  Future<Dian115UnlockResult> unlockShare(int shareId, {int? resourceId}) async {
+  Future<Dian115UnlockResult> unlockShare(
+    int shareId, {
+    int? resourceId,
+    String? turnstileToken,
+  }) async {
     final body = <String, dynamic>{
       'share_id': shareId,
       if (resourceId != null) 'resource_id': resourceId,
+      if (turnstileToken != null && turnstileToken.isNotEmpty)
+        'turnstile_token': turnstileToken,
     };
 
     final resp = await _dio.post(
