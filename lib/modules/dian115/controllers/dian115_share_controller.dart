@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
 import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart';
 import 'package:moviepilot_mobile/modules/dian115/services/pan115_service.dart';
+import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_transfer_confirm_sheet.dart';
 import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_verify_sheet.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
 
@@ -244,6 +245,22 @@ class Dian115ShareController extends GetxController {
     }
   }
 
+  /// 呼起转存确认与目录选择弹窗
+  Future<({String cid, String folderName})?> showTransferConfirmSheet({
+    required BuildContext context,
+    required Dian115ShareItem item,
+    required bool isUnlock,
+  }) async {
+    return Dian115TransferConfirmSheet.show(
+      context,
+      item: item,
+      mediaType: mediaType,
+      mediaTitle: mediaTitle,
+      userPoints: userPoints.value,
+      isUnlock: isUnlock,
+    );
+  }
+
   /// 确认解锁并一键自动转存至 115 对应目录
   Future<void> unlockAndTransfer(BuildContext context, Dian115ShareItem item) async {
     // 1. 积分余额检查
@@ -252,75 +269,13 @@ class Dian115ShareController extends GetxController {
       return;
     }
 
-    final targetFolder = Pan115Service.to.getTargetFolderName(mediaType);
-    final targetCid = Pan115Service.to.getTargetCid(mediaType);
-
-    // 2. 确认对话框
-    final confirmed = await showCupertinoDialog<bool>(
+    // 2. 呼起支持自由切换目标目录（默认智能识别）的确认弹窗
+    final selection = await showTransferConfirmSheet(
       context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('确认解锁并转存'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.unlockCost > 0
-                    ? '确认消耗 ${item.unlockCost} 积分获取此片源并自动保存？'
-                    : '此为免费片源，确认获取并自动保存？',
-                style: const TextStyle(fontSize: 13),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '保存目标: $targetFolder',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '目录 CID: $targetCid',
-                      style: const TextStyle(fontSize: 10, color: CupertinoColors.systemGrey),
-                    ),
-                  ],
-                ),
-              ),
-              if (item.unlockCost > 0) ...[
-                const SizedBox(height: 8),
-                Text(
-                  '当前余额: ${userPoints.value} 积分 (解锁后剩余: ${(userPoints.value - item.unlockCost).clamp(0, 999999)} 积分)',
-                  style: const TextStyle(fontSize: 11, color: CupertinoColors.systemGrey),
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('确认解锁转存'),
-          ),
-        ],
-      ),
+      item: item,
+      isUnlock: true,
     );
-
-    if (confirmed != true) return;
+    if (selection == null) return;
 
     // 3. 执行解锁（含安全验证重试机制）
     final unlockResult = await unlock(item, context: context);
@@ -328,11 +283,14 @@ class Dian115ShareController extends GetxController {
       return;
     }
 
-    // 4. 解锁成功后立即无缝转存至 115
+    // 4. 解锁成功后立即转存至用户指定或预选的 115 目录
     await transferToPan115(
       shareUrl: unlockResult.shareUrl,
       receiveCode: unlockResult.receiveCode,
       magnetUrl: unlockResult.magnetUrl,
+      customCid: selection.cid,
+      customFolderName: selection.folderName,
+      item: item,
     );
   }
 
@@ -340,6 +298,9 @@ class Dian115ShareController extends GetxController {
     String? shareUrl,
     String? receiveCode,
     String? magnetUrl,
+    String? customCid,
+    String? customFolderName,
+    Dian115ShareItem? item,
   }) async {
     try {
       HapticFeedback.mediumImpact();
@@ -349,6 +310,9 @@ class Dian115ShareController extends GetxController {
         shareUrl: shareUrl,
         receiveCode: receiveCode,
         magnetUrl: magnetUrl,
+        customCid: customCid,
+        customFolderName: customFolderName,
+        item: item,
       );
       final isSuccess = res['success'] == true;
       final msg = res['msg']?.toString() ?? (isSuccess ? '转存成功' : '转存失败');

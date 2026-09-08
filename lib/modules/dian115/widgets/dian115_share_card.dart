@@ -370,11 +370,22 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                         minSize: 32,
                         color: const Color(0xFF10B981),
                         borderRadius: BorderRadius.circular(999),
-                        onPressed: () {
+                        onPressed: () async {
+                          final selection =
+                              await widget.controller.showTransferConfirmSheet(
+                            context: context,
+                            item: widget.item,
+                            isUnlock: false,
+                          );
+                          if (selection == null) return;
+
                           widget.controller.transferToPan115(
                             shareUrl: activeResult.shareUrl,
                             receiveCode: activeResult.receiveCode,
                             magnetUrl: activeResult.magnetUrl,
+                            customCid: selection.cid,
+                            customFolderName: selection.folderName,
+                            item: widget.item,
                           );
                         },
                         child: const Row(
@@ -691,12 +702,23 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                     color: const Color(0xFF0284C7),
                     borderRadius: BorderRadius.circular(12),
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    onPressed: () {
+                    onPressed: () async {
                       Navigator.of(ctx).pop();
+                      final selection =
+                          await widget.controller.showTransferConfirmSheet(
+                        context: context,
+                        item: widget.item,
+                        isUnlock: false,
+                      );
+                      if (selection == null) return;
+
                       widget.controller.transferToPan115(
                         shareUrl: result.shareUrl,
                         receiveCode: result.receiveCode,
                         magnetUrl: result.magnetUrl,
+                        customCid: selection.cid,
+                        customFolderName: selection.folderName,
+                        item: widget.item,
                       );
                     },
                     child: Row(
@@ -705,7 +727,7 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                         const Icon(CupertinoIcons.cloud_download_fill, size: 16, color: Colors.white),
                         const SizedBox(width: 6),
                         Text(
-                          '一键转存至 115 ${Pan115Service.to.getTargetFolderName(widget.controller.mediaType)}',
+                          '一键转存至 115 (${Pan115Service.to.getTargetFolderName(widget.controller.mediaType, widget.item)})',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 13,

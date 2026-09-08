@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
 import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -90,15 +91,43 @@ class Pan115Service extends GetxService {
     }
   }
 
-  String getTargetCid(String mediaType) {
-    if (mediaType.toLowerCase() == 'movie') {
+  static bool isMovieType({String? mediaType, Dian115ShareItem? item}) {
+    // 若片源明确包含分季或集数，则确认为剧集
+    if (item != null) {
+      if (item.season > 0) return false;
+      final s = item.seasons.trim();
+      if (s.isNotEmpty && s != '0') return false;
+      if (item.episodeCount > 0) return false;
+    }
+
+    if (mediaType == null || mediaType.isEmpty) {
+      return true;
+    }
+
+    final lower = mediaType.toLowerCase();
+    if (lower.contains('movie') || lower.contains('电影')) {
+      return true;
+    }
+    if (lower.contains('tv') ||
+        lower.contains('剧') ||
+        lower.contains('show') ||
+        lower.contains('series') ||
+        lower.contains('anime')) {
+      return false;
+    }
+
+    return true;
+  }
+
+  String getTargetCid(String mediaType, [Dian115ShareItem? item]) {
+    if (isMovieType(mediaType: mediaType, item: item)) {
       return movieCid.value.isNotEmpty ? movieCid.value : defaultMovieCid;
     }
     return tvCid.value.isNotEmpty ? tvCid.value : defaultTvCid;
   }
 
-  String getTargetFolderName(String mediaType) {
-    if (mediaType.toLowerCase() == 'movie') {
+  String getTargetFolderName(String mediaType, [Dian115ShareItem? item]) {
+    if (isMovieType(mediaType: mediaType, item: item)) {
       return '电影目录';
     }
     return '电视剧目录';
@@ -111,9 +140,16 @@ class Pan115Service extends GetxService {
     String? receiveCode,
     String? magnetUrl,
     String? customCid,
+    String? customFolderName,
+    Dian115ShareItem? item,
   }) async {
-    final effectiveCid = customCid ?? getTargetCid(mediaType);
-    final targetFolder = getTargetFolderName(mediaType);
+    final effectiveCid = customCid ?? getTargetCid(mediaType, item);
+    final targetFolder = customFolderName ??
+        (effectiveCid == (movieCid.value.isNotEmpty ? movieCid.value : defaultMovieCid)
+            ? '电影目录'
+            : (effectiveCid == (tvCid.value.isNotEmpty ? tvCid.value : defaultTvCid)
+                ? '电视剧目录'
+                : getTargetFolderName(mediaType, item)));
 
     final dianService = Dian115Service.to;
     final gatewayUrl = '${dianService.host.value}/api/pan115/transfer';

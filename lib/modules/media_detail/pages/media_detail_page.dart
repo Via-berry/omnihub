@@ -1820,10 +1820,14 @@ class MediaDetailPage extends GetWidget<MediaDetailController> {
 
     if (sourceType == SearchSourceType.dian115) {
       if (context.mounted) {
+        final rawType = detail?.type ?? '';
+        final isMovie = rawType.contains('电影') ||
+            rawType.toLowerCase().contains('movie') ||
+            rawType.isEmpty;
         Dian115ShareSheet.show(
           context,
           tmdbId: detail?.tmdb_id,
-          mediaType: detail?.type ?? 'movie',
+          mediaType: isMovie ? 'movie' : 'tv',
           mediaTitle: detail?.title ?? '',
         );
       }
