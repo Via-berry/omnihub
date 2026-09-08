@@ -92,7 +92,23 @@ class RecommendItemBaseCard extends GetView<SubscribeService> {
               ];
               return CupertinoContextMenu.builder(
                 enableHapticFeedback: true,
-                builder: (context, menuState) => child,
+                builder: (context, menuAnimation) {
+                  if (menuAnimation.value > 0 &&
+                      appService.canSubscribe &&
+                      item != null &&
+                      !controller.subscribeItems.containsKey(item!.subscribeKey)) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!controller.subscribeItems.containsKey(item!.subscribeKey)) {
+                        controller.fetchAndSaveSubscribeStatus(
+                          item!.mediaKey,
+                          season: item?.season,
+                          title: item?.title,
+                        );
+                      }
+                    });
+                  }
+                  return child;
+                },
                 actions: menuActions,
               );
             }),

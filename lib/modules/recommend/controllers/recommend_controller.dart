@@ -81,7 +81,8 @@ class RecommendController extends GetxController {
   static const int _localConfigVersion = 1;
   static const Duration _minRefreshInterval = Duration(seconds: 30);
   static const Duration _forceRefreshInterval = Duration(seconds: 10);
-  static const Duration _throttleGap = Duration(milliseconds: 350);
+  static const Duration _cookieRefreshCooldown = Duration(minutes: 10);
+  static const int _maxConcurrentRequests = 3;
 
   final _apiClient = Get.find<ApiClient>();
   final _log = Get.find<AppLog>();
@@ -107,9 +108,11 @@ class RecommendController extends GetxController {
 
   final bannerPageIndex = 0.obs;
 
-  Future<void> _requestQueue = Future.value();
+  int _activeRequestCount = 0;
+  final List<({String key, String subCategory})> _queuedTasks = [];
   final _pendingKeys = <String>{};
   final Map<String, DateTime> _lastFetchAt = {};
+  DateTime? _lastCookieRefreshAt;
   bool _cookieRefreshTriggered = false;
 
   List<RecommendCategory> get visibleCategories => _visibleCategories;
@@ -134,7 +137,6 @@ class RecommendController extends GetxController {
   void onClose() {
     categoryPageController.dispose();
     _bannerPageController?.dispose();
-    _trimInactiveDecodedImages();
     super.onClose();
   }
 
@@ -147,14 +149,25 @@ class RecommendController extends GetxController {
     prefetchAllVisibleCategories();
     ever(selectedCategory, (_) {
       if (!_appService.canDiscovery) return;
-      prefetchAllVisibleCategories(forceRefresh: true);
+      prefetchCurrentCategory(forceRefresh: true);
     });
   }
 
-  Future<void> ensureUserCookieRefreshed() async {
+  Future<void> ensureUserCookieRefreshed({bool force = false}) async {
     if (_cookieRefreshTriggered) return;
+    if (!force &&
+        _lastCookieRefreshAt != null &&
+        DateTime.now().difference(_lastCookieRefreshAt!) <
+            _cookieRefreshCooldown) {
+      return;
+    }
     _cookieRefreshTriggered = true;
-    await _refreshUserCookie();
+    try {
+      await _refreshUserCookie();
+      _lastCookieRefreshAt = DateTime.now();
+    } finally {
+      _cookieRefreshTriggered = false;
+    }
   }
 
   Future<void> _refreshUserCookie() async {
@@ -173,8 +186,6 @@ class RecommendController extends GetxController {
       );
     } catch (e, st) {
       _log.handle(e, stackTrace: st, message: '刷新推荐 Cookie 失败');
-    } finally {
-      _cookieRefreshTriggered = false;
     }
     return;
   }
@@ -234,7 +245,7 @@ class RecommendController extends GetxController {
 
   void prefetchCurrentCategory({bool forceRefresh = false}) {
     if (!_appService.canDiscovery) return;
-    _refreshUserCookie();
+    unawaited(ensureUserCookieRefreshed(force: forceRefresh));
     for (final subCategory in currentSubCategories) {
       ensureSubCategoryLoaded(subCategory, forceRefresh: forceRefresh);
     }
@@ -242,14 +253,14 @@ class RecommendController extends GetxController {
 
   void prefetchAllVisibleCategories({bool forceRefresh = false}) {
     if (!_appService.canDiscovery) return;
-    _refreshUserCookie();
+    unawaited(ensureUserCookieRefreshed(force: forceRefresh));
     for (final subCategory in allVisibleSubCategories) {
       ensureSubCategoryLoaded(subCategory, forceRefresh: forceRefresh);
     }
   }
 
   void _trimInactiveDecodedImages() {
-    PaintingBinding.instance.imageCache.clear();
+    // Keep decoded images in memory to avoid scroll stuttering and re-decoding
   }
 
   bool isCategoryVisible(RecommendCategory category) {
@@ -468,18 +479,29 @@ class RecommendController extends GetxController {
   void _enqueueFetch(String key, String subCategory) {
     if (_pendingKeys.contains(key)) return;
     _pendingKeys.add(key);
-    _requestQueue = _requestQueue
-        .then((_) async {
-          try {
-            await _fetchSubCategory(key, subCategory);
-          } finally {
-            _pendingKeys.remove(key);
-            await Future.delayed(_throttleGap);
-          }
-        })
-        .catchError((error, stack) {
-          _log.handle(error, stackTrace: stack, message: '推荐请求队列异常');
-        });
+    _queuedTasks.add((key: key, subCategory: subCategory));
+    _processQueue();
+  }
+
+  void _processQueue() {
+    while (_activeRequestCount < _maxConcurrentRequests &&
+        _queuedTasks.isNotEmpty) {
+      final task = _queuedTasks.removeAt(0);
+      _activeRequestCount++;
+      _executeFetch(task.key, task.subCategory);
+    }
+  }
+
+  Future<void> _executeFetch(String key, String subCategory) async {
+    try {
+      await _fetchSubCategory(key, subCategory);
+    } catch (error, stack) {
+      _log.handle(error, stackTrace: stack, message: '推荐请求异常');
+    } finally {
+      _pendingKeys.remove(key);
+      _activeRequestCount--;
+      _processQueue();
+    }
   }
 
   Future<void> _fetchSubCategory(String key, String subCategory) async {
@@ -502,16 +524,11 @@ class RecommendController extends GetxController {
       final category = _categoryForSubCategory(subCategory);
       final fallbackMediaType = category?.label ?? '电影';
       final items = _parseItems(list, fallbackMediaType: fallbackMediaType);
-      await ensureUserCookieRefreshed();
 
       itemsByKey[key] = items;
       itemsByKey.refresh();
-      _trimInactiveDecodedImages();
       _lastFetchAt[key] = DateTime.now();
       unawaited(Get.find<SearchKeywordHintsService>().ingestFromItems(items));
-      for (final item in items) {
-        _fetchItemsSubscribeStatus(item);
-      }
     } catch (e, st) {
       _log.handle(e, stackTrace: st, message: '推荐数据请求异常');
       errorByKey[key] = '请求异常';

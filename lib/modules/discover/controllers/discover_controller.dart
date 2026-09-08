@@ -387,7 +387,7 @@ class DiscoverController extends GetxController {
   }
 
   void _trimInactiveDecodedImages() {
-    PaintingBinding.instance.imageCache.clear();
+    // Keep decoded images in memory to avoid scroll stuttering and re-decoding
   }
 
   bool _shouldForceRefresh(String key) {
