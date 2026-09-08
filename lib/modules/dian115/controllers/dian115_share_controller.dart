@@ -184,7 +184,13 @@ class Dian115ShareController extends GetxController {
       // 3. 若触发人机安全验证，拉起应用内原生验证弹窗无缝过检
       if (context != null && context.mounted) {
         ToastUtil.info('此资源需进行安全验证，请在弹窗中轻触验证');
-        final verifiedResult = await Dian115VerifySheet.show(context, item: item);
+        final verifiedResult = await Dian115VerifySheet.show(
+          context,
+          item: item,
+          tmdbId: tmdbId,
+          mediaType: mediaType,
+          season: filterSeason.value >= 0 ? filterSeason.value : (initialSeason ?? 0),
+        );
         if (verifiedResult != null && verifiedResult.isSuccess) {
           await service.saveUnlockedInfo(item.id, verifiedResult);
           await _refreshStatus();
@@ -200,7 +206,13 @@ class Dian115ShareController extends GetxController {
       return null;
     } catch (e) {
       if (context != null && context.mounted) {
-        final verifiedResult = await Dian115VerifySheet.show(context, item: item);
+        final verifiedResult = await Dian115VerifySheet.show(
+          context,
+          item: item,
+          tmdbId: tmdbId,
+          mediaType: mediaType,
+          season: filterSeason.value >= 0 ? filterSeason.value : (initialSeason ?? 0),
+        );
         if (verifiedResult != null && verifiedResult.isSuccess) {
           await service.saveUnlockedInfo(item.id, verifiedResult);
           await _refreshStatus();
