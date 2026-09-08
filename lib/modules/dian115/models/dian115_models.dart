@@ -24,6 +24,12 @@ class Dian115ShareItem {
   final bool isVipSharer;
   final String createdAt;
   final int useCount;
+  final bool isUnlocked;
+  final String url115;
+  final String shareUrl;
+  final String shareCode;
+  final String receiveCode;
+  final String magnetUrl;
 
   const Dian115ShareItem({
     required this.id,
@@ -51,6 +57,12 @@ class Dian115ShareItem {
     this.isVipSharer = false,
     this.createdAt = '',
     this.useCount = 0,
+    this.isUnlocked = false,
+    this.url115 = '',
+    this.shareUrl = '',
+    this.shareCode = '',
+    this.receiveCode = '',
+    this.magnetUrl = '',
   });
 
   bool get is115 => shareKind == '115' || shareKindLabel.contains('115');
@@ -86,6 +98,17 @@ class Dian115ShareItem {
       isVipSharer: json['is_vip_sharer'] as bool? ?? false,
       createdAt: json['created_at']?.toString() ?? '',
       useCount: json['use_count'] as int? ?? 0,
+      isUnlocked: json['is_unlocked'] as bool? ?? false,
+      url115: json['url_115']?.toString() ?? '',
+      shareUrl: json['share_url']?.toString() ?? json['url_115']?.toString() ?? '',
+      shareCode: json['share_code']?.toString() ?? '',
+      receiveCode: json['receive_code']?.toString() ?? '',
+      magnetUrl: json['magnet_url']?.toString() ??
+          (json['urls'] is List && (json['urls'] as List).isNotEmpty
+              ? (json['urls'] as List).first.toString()
+              : '') ??
+          json['url']?.toString() ??
+          '',
     );
   }
 
@@ -115,6 +138,12 @@ class Dian115ShareItem {
         'is_vip_sharer': isVipSharer,
         'created_at': createdAt,
         'use_count': useCount,
+        'is_unlocked': isUnlocked,
+        'url_115': url115,
+        'share_url': shareUrl,
+        'share_code': shareCode,
+        'receive_code': receiveCode,
+        'magnet_url': magnetUrl,
       };
 }
 
@@ -214,15 +243,31 @@ class Dian115UnlockResult {
       code == 'turnstile_failed' || code == 'turnstile_required';
 
   factory Dian115UnlockResult.fromJson(Map<String, dynamic> json) {
+    String magnet = json['magnet_url']?.toString() ??
+        json['magnet']?.toString() ??
+        '';
+    if (magnet.isEmpty && json['urls'] is List && (json['urls'] as List).isNotEmpty) {
+      magnet = (json['urls'] as List).first.toString();
+    }
+    if (magnet.isEmpty && json['url'] != null && json['url'].toString().startsWith('magnet:')) {
+      magnet = json['url'].toString();
+    }
+
+    String share = json['share_url']?.toString() ??
+        json['url_115']?.toString() ??
+        '';
+    if (share.isEmpty && json['url'] != null && !json['url'].toString().startsWith('magnet:')) {
+      share = json['url'].toString();
+    }
+
     return Dian115UnlockResult(
       code: json['code']?.toString() ?? 'ok',
-      shareUrl: json['share_url']?.toString() ?? json['url']?.toString() ?? '',
+      shareUrl: share,
       receiveCode: json['receive_code']?.toString() ??
           json['code_pwd']?.toString() ??
           json['password']?.toString() ??
           '',
-      magnetUrl:
-          json['magnet_url']?.toString() ?? json['magnet']?.toString() ?? '',
+      magnetUrl: magnet,
       pointsCost: json['points_cost'] as int? ?? json['cost'] as int? ?? 0,
       unlockedAtTimestamp: json['unlocked_at'] as int?,
     );

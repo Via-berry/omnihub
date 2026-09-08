@@ -162,19 +162,37 @@ class Dian115ShareController extends GetxController {
     Dian115ShareItem item, {
     BuildContext? context,
   }) async {
-    // 1. 若本地已缓存该资源的有效解锁凭据，直接返回
+    // 1. 若本地已缓存或服务端已标明该资源的有效解锁凭据，直接返回
     if (service.isUnlocked(item.id)) {
       final cached = service.getUnlockedInfo(item.id);
       if (cached != null && cached.isSuccess) {
         return cached;
       }
     }
+    if (item.isUnlocked && (item.shareUrl.isNotEmpty || item.magnetUrl.isNotEmpty)) {
+      final cached = Dian115UnlockResult(
+        code: 'ok',
+        shareUrl: item.shareUrl,
+        receiveCode: item.receiveCode,
+        magnetUrl: item.magnetUrl,
+        pointsCost: item.unlockCost,
+      );
+      await service.saveUnlockedInfo(item.id, cached);
+      return cached;
+    }
 
     isUnlocking.value = true;
     try {
       HapticFeedback.mediumImpact();
-      // 2. 先尝试服务端直接静默解锁
-      final result = await service.unlockShare(item.id);
+      final targetSeason =
+          filterSeason.value >= 0 ? filterSeason.value : (initialSeason ?? 0);
+      // 2. 先尝试服务端直接静默解锁（若已解锁或可免检，服务端直接返回链接）
+      final result = await service.unlockShare(
+        item.id,
+        tmdbId: tmdbId,
+        mediaType: mediaType,
+        season: targetSeason,
+      );
       if (result.isSuccess) {
         await _refreshStatus();
         ToastUtil.success('解锁成功！已获得转存链接');

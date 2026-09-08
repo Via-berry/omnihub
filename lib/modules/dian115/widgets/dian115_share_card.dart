@@ -320,10 +320,24 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
 
               // 解锁/获取链接与转存按钮区域
               Obx(() {
-                final isUnlocked = service.isUnlocked(item.id);
-                final cachedResult = service.getUnlockedInfo(item.id);
+                final isCachedUnlocked = service.isUnlocked(item.id);
+                var cachedResult = service.getUnlockedInfo(item.id);
+                if (cachedResult == null &&
+                    item.isUnlocked &&
+                    (item.shareUrl.isNotEmpty || item.magnetUrl.isNotEmpty)) {
+                  cachedResult = Dian115UnlockResult(
+                    code: 'ok',
+                    shareUrl: item.shareUrl,
+                    receiveCode: item.receiveCode,
+                    magnetUrl: item.magnetUrl,
+                    pointsCost: item.unlockCost,
+                  );
+                }
 
-                if (isUnlocked && cachedResult != null && cachedResult.isSuccess) {
+                if ((isCachedUnlocked || item.isUnlocked) &&
+                    cachedResult != null &&
+                    cachedResult.isSuccess) {
+                  final activeResult = cachedResult;
                   return Row(
                     children: [
                       // 查看/复制链接次级按钮
@@ -332,7 +346,7 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                         minSize: 30,
                         color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(999),
-                        onPressed: () => _showLinkModal(context, cachedResult),
+                        onPressed: () => _showLinkModal(context, activeResult),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -358,9 +372,9 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                         borderRadius: BorderRadius.circular(999),
                         onPressed: () {
                           widget.controller.transferToPan115(
-                            shareUrl: cachedResult.shareUrl,
-                            receiveCode: cachedResult.receiveCode,
-                            magnetUrl: cachedResult.magnetUrl,
+                            shareUrl: activeResult.shareUrl,
+                            receiveCode: activeResult.receiveCode,
+                            magnetUrl: activeResult.magnetUrl,
                           );
                         },
                         child: const Row(

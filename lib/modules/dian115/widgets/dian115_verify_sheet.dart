@@ -305,6 +305,9 @@ class _Dian115VerifySheetState extends State<Dian115VerifySheet> {
         final unlockResult = await Dian115Service.to.unlockShare(
           widget.item.id,
           turnstileToken: token,
+          tmdbId: widget.tmdbId,
+          mediaType: widget.mediaType,
+          season: widget.season,
         );
         if (unlockResult.isSuccess) {
           _isUnlockedCaptured = true;
@@ -313,6 +316,36 @@ class _Dian115VerifySheetState extends State<Dian115VerifySheet> {
           if (mounted) {
             Navigator.of(context).pop(unlockResult);
           }
+        } else if (unlockResult.code == 'ok' || unlockResult.code == 'success') {
+          // 若 code 为 ok 但链接需刷新，通过 getShares 获取最新凭据
+          if (widget.tmdbId != null) {
+            try {
+              final fresh = await Dian115Service.to.getShares(
+                tmdbId: widget.tmdbId!,
+                mediaType: widget.mediaType,
+                season: widget.season,
+              );
+              for (final s in fresh.shares) {
+                if (s.id == widget.item.id && (s.shareUrl.isNotEmpty || s.magnetUrl.isNotEmpty)) {
+                  final res = Dian115UnlockResult(
+                    code: 'ok',
+                    shareUrl: s.shareUrl,
+                    receiveCode: s.receiveCode,
+                    magnetUrl: s.magnetUrl,
+                    pointsCost: s.unlockCost,
+                  );
+                  _isUnlockedCaptured = true;
+                  HapticFeedback.heavyImpact();
+                  ToastUtil.success('安全验证通过！片源已成功解锁');
+                  if (mounted) {
+                    Navigator.of(context).pop(res);
+                  }
+                  return;
+                }
+              }
+            } catch (_) {}
+          }
+          ToastUtil.error('解锁成功但未解析到链接，请刷新重试');
         } else {
           ToastUtil.error('解锁未成功：${unlockResult.code}');
         }

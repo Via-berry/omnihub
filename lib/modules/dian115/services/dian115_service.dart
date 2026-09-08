@@ -138,7 +138,20 @@ class Dian115Service extends GetxService {
     );
 
     if (resp.data is Map<String, dynamic>) {
-      return Dian115SharesResponse.fromJson(resp.data as Map<String, dynamic>);
+      final res = Dian115SharesResponse.fromJson(resp.data as Map<String, dynamic>);
+      for (final s in res.shares) {
+        if (s.isUnlocked && (s.shareUrl.isNotEmpty || s.magnetUrl.isNotEmpty)) {
+          final cached = Dian115UnlockResult(
+            code: 'ok',
+            shareUrl: s.shareUrl,
+            receiveCode: s.receiveCode,
+            magnetUrl: s.magnetUrl,
+            pointsCost: s.unlockCost,
+          );
+          unlockedMap[s.id] = cached;
+        }
+      }
+      return res;
     }
     throw Exception('返回数据格式异常');
   }
@@ -175,12 +188,18 @@ class Dian115Service extends GetxService {
     int shareId, {
     int? resourceId,
     String? turnstileToken,
+    int? tmdbId,
+    String? mediaType,
+    int? season,
   }) async {
     final body = <String, dynamic>{
       'share_id': shareId,
       if (resourceId != null) 'resource_id': resourceId,
       if (turnstileToken != null && turnstileToken.isNotEmpty)
         'turnstile_token': turnstileToken,
+      if (tmdbId != null) 'tmdb_id': tmdbId,
+      if (mediaType != null) 'media_type': mediaType,
+      if (season != null) 'season': season,
     };
 
     final resp = await _dio.post(
