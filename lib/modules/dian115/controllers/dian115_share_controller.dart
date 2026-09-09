@@ -31,6 +31,7 @@ class Dian115ShareController extends GetxController {
 
   final RxInt userPoints = 0.obs;
   final RxBool isOnline = false.obs;
+  final RxBool isAuthenticated = false.obs;
   final RxBool isTodaySigned = false.obs;
   final RxBool isSigningIn = false.obs;
   final RxBool isUnlocking = false.obs;
@@ -60,11 +61,19 @@ class Dian115ShareController extends GetxController {
     try {
       final status = await service.getStatus();
       isOnline.value = status.service == 'online';
+      isAuthenticated.value = status.isAuthenticated;
       userPoints.value = status.points;
       isTodaySigned.value = status.isTodaySigned;
     } catch (_) {
       isOnline.value = false;
+      isAuthenticated.value = false;
     }
+  }
+
+  /// 授权成功后自动重载全量状态与片源列表
+  Future<void> onReauthenticated() async {
+    await _refreshStatus();
+    await fetchShares();
   }
 
   Future<void> fetchShares() async {

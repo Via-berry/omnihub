@@ -183,6 +183,39 @@ class Dian115Service extends GetxService {
     return const {};
   }
 
+  /// 将客户端/移动端提取到的最新会话 Cookie 和用户数据同步给 NAS 网关
+  Future<bool> importSession({
+    required List<Map<String, dynamic>> cookies,
+    Map<String, dynamic>? userData,
+    String? cookieString,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'cookies': cookies,
+        if (userData != null) 'user_data': userData,
+        if (cookieString != null && cookieString.isNotEmpty)
+          'cookie_string': cookieString,
+      };
+
+      final resp = await _dio.post(
+        _cleanUrl('/api/auth/session'),
+        data: body,
+        options: Options(contentType: 'application/json'),
+      );
+
+      if (resp.data is Map<String, dynamic>) {
+        final success = resp.data['success'] as bool? ?? false;
+        if (success) {
+          await getStatus();
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Dian115Service importSession error: $e');
+    }
+    return false;
+  }
+
   /// 资源解锁
   Future<Dian115UnlockResult> unlockShare(
     int shareId, {

@@ -267,10 +267,12 @@ class SearchSourceSelectSheet extends StatelessWidget {
                     ),
                   ),
                   Obx(() {
-                    final points = dian115.accountStatus.value?.points;
+                    final status = dian115.accountStatus.value;
+                    final points = status?.points;
+                    final isAuthed = status?.isAuthenticated ?? false;
                     return Row(
                       children: [
-                        if (points != null && points > 0)
+                        if (isAuthed && points != null && points > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                             decoration: BoxDecoration(

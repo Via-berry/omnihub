@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/dian115/controllers/dian115_share_controller.dart';
 import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart';
 import 'package:moviepilot_mobile/modules/dian115/services/pan115_service.dart';
+import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_login_sheet.dart';
 import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_share_card.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
 
@@ -82,11 +83,57 @@ class _Dian115ShareSheetState extends State<Dian115ShareSheet> {
       child: Column(
         children: [
           _buildHeader(context),
+          _buildAuthBanner(context),
           _buildFilterBar(),
           Expanded(child: _buildBody()),
         ],
       ),
     );
+  }
+
+  Widget _buildAuthBanner(BuildContext context) {
+    return Obx(() {
+      if (controller.isOnline.value && !controller.isAuthenticated.value) {
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              const Icon(CupertinoIcons.exclamationmark_triangle_fill, size: 16, color: Color(0xFFFBBF24)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  '癫影网关登录凭证已过期，点击快速续期',
+                  style: TextStyle(color: Color(0xFFFBBF24), fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                color: const Color(0xFFF59E0B),
+                borderRadius: BorderRadius.circular(6),
+                minSize: 24,
+                onPressed: () async {
+                  final ok = await Dian115LoginSheet.show(context);
+                  if (ok == true) {
+                    controller.onReauthenticated();
+                  }
+                },
+                child: const Text(
+                  '一键续期',
+                  style: TextStyle(color: Color(0xFF11151F), fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      return const SizedBox.shrink();
+    });
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -262,41 +309,82 @@ class _Dian115ShareSheetState extends State<Dian115ShareSheet> {
               const Spacer(),
 
               // 真实积分展示
-              Obx(() => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: const Color(0xFFF59E0B).withValues(alpha: 0.28),
+              Obx(() {
+                if (!controller.isAuthenticated.value) {
+                  return GestureDetector(
+                    onTap: () async {
+                      final ok = await Dian115LoginSheet.show(context);
+                      if (ok == true) {
+                        controller.onReauthenticated();
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: Colors.amber.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('⚠️', style: TextStyle(fontSize: 10)),
+                          SizedBox(width: 3),
+                          Text(
+                            '凭证失效',
+                            style: TextStyle(
+                              color: Color(0xFFFBBF24),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('💰', style: TextStyle(fontSize: 10)),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${controller.userPoints.value}',
-                          style: const TextStyle(
-                            color: Color(0xFFFBBF24),
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                        const SizedBox(width: 1),
-                        const Text(
-                          '分',
-                          style: TextStyle(color: Color(0xFFFBBF24), fontSize: 9),
-                        ),
-                      ],
+                  );
+                }
+
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.28),
                     ),
-                  )),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('💰', style: TextStyle(fontSize: 10)),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${controller.userPoints.value}',
+                        style: const TextStyle(
+                          color: Color(0xFFFBBF24),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      const SizedBox(width: 1),
+                      const Text(
+                        '分',
+                        style: TextStyle(color: Color(0xFFFBBF24), fontSize: 9),
+                      ),
+                    ],
+                  ),
+                );
+              }),
               const SizedBox(width: 8),
 
               // 签到按钮：今日已签置灰不可点，未签可点签到+5
               Obx(() {
+                if (!controller.isAuthenticated.value) {
+                  return const SizedBox.shrink();
+                }
                 final isSigned = controller.isTodaySigned.value;
                 final isSigningIn = controller.isSigningIn.value;
 
