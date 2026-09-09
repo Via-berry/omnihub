@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
