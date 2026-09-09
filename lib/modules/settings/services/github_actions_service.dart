@@ -31,7 +31,7 @@ class GithubActionsService extends GetxService {
   DateTime? _cachedRunsTime;
   static const Duration _cacheTtl = Duration(seconds: 5);
 
-  final Map<int, (List<WorkflowJob> jobs, DateTime cachedAt)> _jobsCache = {};
+  final Map<int, _CachedJobs> _jobsCache = {};
 
   Future<List<WorkflowRun>> fetchWorkflowRuns({
     int perPage = 25,
@@ -108,11 +108,17 @@ class GithubActionsService extends GetxService {
         }
       }
 
-      _jobsCache[runId] = (jobs, DateTime.now());
+      _jobsCache[runId] = _CachedJobs(jobs, DateTime.now());
       return jobs;
     } catch (e, st) {
       _log.handle(e, stackTrace: st, message: '获取工作流 Jobs 详情失败');
       return cached?.jobs ?? const [];
     }
   }
+}
+
+class _CachedJobs {
+  const _CachedJobs(this.jobs, this.cachedAt);
+  final List<WorkflowJob> jobs;
+  final DateTime cachedAt;
 }
