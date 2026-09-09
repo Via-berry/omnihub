@@ -4,8 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/applog/app_log.dart';
 import 'package:moviepilot_mobile/modules/settings/models/github_workflow_models.dart';
-import 'package:moviepilot_mobile/modules/settings/models/system_env_model.dart';
-import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class GithubActionsService extends GetxService {
@@ -16,7 +14,14 @@ class GithubActionsService extends GetxService {
 
   static const String owner = 'Via-berry';
   static const String repo = 'omnihub';
-  static const String baseUrl = 'https://api.github.com/repos/$owner/$repo';
+
+  /// 多线路并发/备用调度：官方主站 -> 国内高速加速镜像
+  static const List<String> _baseUrls = [
+    'https://api.github.com/repos/$owner/$repo',
+    'https://gh-proxy.com/https://api.github.com/repos/$owner/$repo',
+    'https://gh.llkk.cc/https://api.github.com/repos/$owner/$repo',
+  ];
+
   static String get _defaultToken {
     const masked = [
       77, 66, 90, 117, 98, 24, 121, 111, 93, 72, 95, 93, 26, 27, 89, 64,
@@ -31,8 +36,8 @@ class GithubActionsService extends GetxService {
 
   final Dio _dio = Dio(
     BaseOptions(
-      connectTimeout: const Duration(seconds: 20),
-      receiveTimeout: const Duration(seconds: 20),
+      connectTimeout: const Duration(seconds: 6),
+      receiveTimeout: const Duration(seconds: 10),
       headers: const {
         'Accept': 'application/vnd.github+json',
         'User-Agent': 'OmniHub-Mobile-App',
@@ -48,26 +53,8 @@ class GithubActionsService extends GetxService {
 
   final Map<int, _CachedJobs> _jobsCache = {};
 
-  /// 动态解析高配额授权凭证：优先 MoviePilot 系统配置 -> 本地存储 -> 内置安全 Token (5000次/小时)
+  /// 解析授权凭据：本地自定义配置 -> 内置安全高配额 Token (5000次/小时)
   Future<String?> _resolveGithubToken() async {
-    try {
-      if (Get.isRegistered<ApiClient>()) {
-        final client = Get.find<ApiClient>();
-        final response = await client.get<Map<String, dynamic>>(
-          '/api/v1/system/env',
-          skipUnauthorizedHandling: true,
-        );
-        final body = response.data;
-        if (body != null) {
-          final parsed = SystemEnvResponse.fromJson(body);
-          final envToken = parsed.data?.githubToken?.trim();
-          if (envToken != null && envToken.isNotEmpty) return envToken;
-          final repoToken = parsed.data?.repoGithubToken?.trim();
-          if (repoToken != null && repoToken.isNotEmpty) return repoToken;
-        }
-      }
-    } catch (_) {}
-
     try {
       final prefs = await SharedPreferences.getInstance();
       final customToken = prefs.getString('custom_github_actions_token')?.trim();
@@ -75,6 +62,44 @@ class GithubActionsService extends GetxService {
     } catch (_) {}
 
     return _defaultToken;
+  }
+
+  /// 多节点容灾自愈请求：优先官方源，若遇网络阻断或超时无缝切换国内镜像
+  Future<dynamic> _getWithFallback(
+    String subPath, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    final token = await _resolveGithubToken();
+    final headers = {
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'OmniHub-Mobile-App',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+
+    dynamic lastError;
+    for (final base in _baseUrls) {
+      try {
+        final url = '$base$subPath';
+        final response = await _dio.get<dynamic>(
+          url,
+          queryParameters: queryParameters,
+          options: Options(
+            headers: headers,
+            sendTimeout: const Duration(seconds: 6),
+            receiveTimeout: const Duration(seconds: 10),
+          ),
+        );
+        if (response.statusCode != null &&
+            response.statusCode! >= 200 &&
+            response.statusCode! < 300) {
+          return response.data;
+        }
+      } catch (e) {
+        lastError = e;
+        debugPrint('请求 GitHub 节点 [$base$subPath] 失败: $e，切换备用线路');
+      }
+    }
+    throw lastError ?? Exception('所有 GitHub 线路均无法连接');
   }
 
   /// 保存工作流列表至本地持久化磁盘存储
@@ -163,20 +188,11 @@ class GithubActionsService extends GetxService {
     }
 
     try {
-      final token = await _resolveGithubToken();
-      final response = await _dio.get<dynamic>(
-        '$baseUrl/actions/runs',
+      final data = await _getWithFallback(
+        '/actions/runs',
         queryParameters: {'per_page': perPage},
-        options: Options(
-          headers: {
-            'Accept': 'application/vnd.github+json',
-            'User-Agent': 'OmniHub-Mobile-App',
-            if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-          },
-        ),
       );
 
-      final data = response.data;
       final rawList = data is Map ? data['workflow_runs'] : null;
       if (rawList is! List) {
         final diskRuns = await loadRunsFromDisk();
@@ -234,18 +250,7 @@ class GithubActionsService extends GetxService {
     }
 
     try {
-      final token = await _resolveGithubToken();
-      final response = await _dio.get<dynamic>(
-        '$baseUrl/actions/runs/$runId/jobs',
-        options: Options(
-          headers: {
-            'Accept': 'application/vnd.github+json',
-            'User-Agent': 'OmniHub-Mobile-App',
-            if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-          },
-        ),
-      );
-      final data = response.data;
+      final data = await _getWithFallback('/actions/runs/$runId/jobs');
       final rawJobs = data is Map ? data['jobs'] : null;
       if (rawJobs is! List) {
         final diskJobs = await loadJobsFromDisk(runId);
