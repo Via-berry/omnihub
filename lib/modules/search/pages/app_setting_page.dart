@@ -172,6 +172,37 @@ class AppSettingPage extends GetView<AppSettingController> {
       header: const SectionHeader(title: '关于应用', subtitle: '版本、日志、仓库'),
       separatorBuilder: _buildDivider,
       children: [
+        Obx(() {
+          final run = controller.latestWorkflowRun.value;
+          String subtitle = '查看 GitHub Actions 热更新与打包状态';
+          String? infoText;
+          if (run != null) {
+            if (run.isBuilding) {
+              subtitle = 'Shorebird Patch #${run.runNumber} · 正在打包中';
+              infoText = '打包中 ⏳';
+            } else if (run.isQueued) {
+              subtitle = 'Shorebird Patch #${run.runNumber} · 排队中';
+              infoText = '排队中';
+            } else if (run.isSuccess) {
+              subtitle = '最新构建已完成 · ${run.timeAgo}';
+              infoText = '已完成 ✓';
+            } else if (run.isFailed) {
+              subtitle = '最新构建失败 · ${run.timeAgo}';
+              infoText = '失败 ✕';
+            }
+          }
+          return _buildNavigationTile(
+            context,
+            title: '热更新构建进度',
+            subtitle: subtitle,
+            icon: Icons.bolt_rounded,
+            iconColor: run?.isBuilding == true
+                ? CupertinoColors.activeBlue
+                : CupertinoColors.systemTeal,
+            additionalInfo: infoText,
+            onTap: () => Get.toNamed('/settings/app/workflow-status'),
+          );
+        }),
         Obx(
           () => _buildNavigationTile(
             context,

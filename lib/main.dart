@@ -138,6 +138,8 @@ import 'modules/settings/pages/settings_search_download_page.dart';
 import 'modules/settings/pages/organize_scrape_page.dart';
 import 'modules/settings/pages/site_sync_page.dart';
 import 'modules/settings/pages/site_options_page.dart';
+import 'modules/settings/controllers/workflow_status_controller.dart';
+import 'modules/settings/pages/workflow_status_page.dart';
 import 'modules/storage/controllers/storage_list_controller.dart';
 import 'modules/storage/pages/storage_list_page.dart';
 import 'modules/directory/controllers/directory_list_controller.dart';
@@ -948,6 +950,14 @@ class MyApp extends StatelessWidget {
               Get.lazyPut(() => AppSettingController());
             }),
             middlewares: permissionGuards('/settings/app/app-setting'),
+          ),
+          GetPage(
+            name: '/settings/app/workflow-status',
+            page: () => const WorkflowStatusPage(),
+            binding: BindingsBuilder(() {
+              Get.lazyPut(() => WorkflowStatusController());
+            }),
+            middlewares: permissionGuards('/settings/app/workflow-status'),
           ),
           GetPage(
             name: '/settings/app/changelog',

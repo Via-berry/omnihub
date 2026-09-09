@@ -15,6 +15,8 @@ import 'package:moviepilot_mobile/utils/size_formatter.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shorebird_code_push/shorebird_code_push.dart';
+import 'package:moviepilot_mobile/modules/settings/models/github_workflow_models.dart';
+import 'package:moviepilot_mobile/modules/settings/services/github_actions_service.dart';
 
 class AppSettingController extends GetxController {
   final themeMode = ThemeMode.system.obs;
@@ -23,6 +25,8 @@ class AppSettingController extends GetxController {
   final isChangingAppIcon = false.obs;
   final service = Get.find<AppService>();
   final version = '1.0.0'.obs;
+  final latestWorkflowRun = Rxn<WorkflowRun>();
+  final isLoadingWorkflowStatus = false.obs;
   final showSearchButton = true.obs;
   final enableDownloaderManager = false.obs;
   final enableSpecialDownload = false.obs;
@@ -99,6 +103,20 @@ class AppSettingController extends GetxController {
     );
 
     loadAppVersion();
+    fetchLatestWorkflowStatus();
+  }
+
+  Future<void> fetchLatestWorkflowStatus({bool forceRefresh = false}) async {
+    isLoadingWorkflowStatus.value = true;
+    try {
+      final run = await GithubActionsService.instance.fetchLatestRun(
+        forceRefresh: forceRefresh,
+      );
+      latestWorkflowRun.value = run;
+    } catch (_) {
+    } finally {
+      isLoadingWorkflowStatus.value = false;
+    }
   }
 
   void updateThemeMode(ThemeMode mode) {
