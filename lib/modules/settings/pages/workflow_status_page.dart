@@ -68,7 +68,50 @@ class WorkflowStatusPage extends GetView<WorkflowStatusController> {
 
         final activeRun = controller.activeOrSelectedRun;
         if (activeRun == null) {
-          return const Center(child: Text('暂无工作流构建记录'));
+          return RefreshIndicator(
+            onRefresh: controller.refreshData,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.hourglass_empty_rounded,
+                        size: 52,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        '暂无工作流构建记录',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '可下拉刷新或点击下方按钮重新拉取',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      FilledButton.tonalIcon(
+                        onPressed: () => controller.loadInitial(),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('重新加载'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         return RefreshIndicator(

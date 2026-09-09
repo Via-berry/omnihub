@@ -65,9 +65,29 @@ class WorkflowStatusController extends GetxController {
     super.onClose();
   }
 
+  Future<void> _loadDiskCacheFirst() async {
+    try {
+      final diskRuns = await _service.loadRunsFromDisk();
+      if (diskRuns.isNotEmpty && allRuns.isEmpty) {
+        allRuns.assignAll(diskRuns);
+        final target = activeOrSelectedRun;
+        if (target != null) {
+          final diskJobs = await _service.loadJobsFromDisk(target.id);
+          if (diskJobs.isNotEmpty && jobs.isEmpty) {
+            jobs.assignAll(diskJobs);
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> loadInitial() async {
     isLoading.value = true;
     errorMessage.value = null;
+
+    // 先闪电读取本地持久化磁盘缓存，确保页面立即可用
+    await _loadDiskCacheFirst();
+
     try {
       await _fetchRunsInternal(forceRefresh: true);
       final target = activeOrSelectedRun;
@@ -76,7 +96,11 @@ class WorkflowStatusController extends GetxController {
       }
       _checkAndSetupPolling();
     } catch (e) {
-      errorMessage.value = '加载构建信息失败，请下拉重试';
+      if (allRuns.isEmpty) {
+        errorMessage.value = '加载构建信息失败，请下拉重试';
+      } else {
+        ToastUtil.error('网络同步失败，已展示最近缓存记录');
+      }
     } finally {
       isLoading.value = false;
       lastRefreshTime.value = DateTime.now();
@@ -98,7 +122,7 @@ class WorkflowStatusController extends GetxController {
       }
     } catch (e) {
       if (showToast) {
-        ToastUtil.error('刷新失败，请稍后重试');
+        ToastUtil.error('刷新失败，已维持当前记录');
       }
     } finally {
       isRefreshing.value = false;
@@ -124,7 +148,9 @@ class WorkflowStatusController extends GetxController {
 
   Future<void> _fetchRunsInternal({bool forceRefresh = false}) async {
     final runs = await _service.fetchWorkflowRuns(perPage: 25, forceRefresh: forceRefresh);
-    allRuns.assignAll(runs);
+    if (runs.isNotEmpty) {
+      allRuns.assignAll(runs);
+    }
 
     final currentSelected = selectedRun.value;
     if (currentSelected != null) {
@@ -139,7 +165,9 @@ class WorkflowStatusController extends GetxController {
     isLoadingJobs.value = true;
     try {
       final fetchedJobs = await _service.fetchJobsForRun(runId, forceRefresh: forceRefresh);
-      jobs.assignAll(fetchedJobs);
+      if (fetchedJobs.isNotEmpty) {
+        jobs.assignAll(fetchedJobs);
+      }
     } finally {
       isLoadingJobs.value = false;
     }
@@ -158,23 +186,25 @@ class WorkflowStatusController extends GetxController {
 
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
       final beforeStatus = activeOrSelectedRun?.status;
-      await _fetchRunsInternal(forceRefresh: true);
-      final target = activeOrSelectedRun;
-      if (target != null) {
-        await _fetchJobsForRun(target.id, forceRefresh: true);
-      }
-
-      final after = activeOrSelectedRun;
-      if (beforeStatus == 'in_progress' && after != null && !after.isBuilding) {
-        if (after.isSuccess) {
-          ToastUtil.success('🎉 热更新已打包发布完成！');
-        } else if (after.isFailed) {
-          ToastUtil.error('⚠️ 热更新构建打包失败');
+      try {
+        await _fetchRunsInternal(forceRefresh: true);
+        final target = activeOrSelectedRun;
+        if (target != null) {
+          await _fetchJobsForRun(target.id, forceRefresh: true);
         }
-      }
-      _checkAndSetupPolling();
+
+        final after = activeOrSelectedRun;
+        if (beforeStatus == 'in_progress' && after != null && !after.isBuilding) {
+          if (after.isSuccess) {
+            ToastUtil.success('🎉 热更新已打包发布完成！');
+          } else if (after.isFailed) {
+            ToastUtil.error('⚠️ 热更新构建打包失败');
+          }
+        }
+        _checkAndSetupPolling();
+      } catch (_) {}
     });
   }
 
