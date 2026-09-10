@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/applog/app_log.dart';
 import 'package:moviepilot_mobile/modules/search/models/app_update_info.dart';
+import 'package:moviepilot_mobile/modules/search/models/upstream_sync_info.dart';
 import 'package:moviepilot_mobile/modules/settings/models/system_env_model.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -318,6 +319,54 @@ class AppUpdateService extends GetxService {
     if (data is! Map) return false;
     final message = _stringValue(data['message']).toLowerCase();
     return message.contains('rate limit');
+  }
+
+  Future<UpstreamCheckResult> checkUpstreamSync(
+    UpstreamBaselineInfo baseline,
+  ) async {
+    final githubToken = await _loadConfiguredGithubToken();
+    final response = await _dio.get<dynamic>(
+      releasesApi,
+      queryParameters: const {'per_page': 10},
+      options: Options(headers: _githubHeaders(githubToken)),
+    );
+    final status = response.statusCode ?? 0;
+    if (status == 403 && _isRateLimited(response.data)) {
+      throw AppUpdateException(
+        githubToken == null
+            ? 'GitHub API 已限流，请先在系统基础设置中配置 Github Token'
+            : 'GitHub API 已限流，请检查 Github Token 是否有效',
+      );
+    }
+    final releases = response.data;
+    if (status < 200 || status >= 300 || releases is! List || releases.isEmpty) {
+      throw AppUpdateException('获取上游版本失败');
+    }
+
+    final latestRelease = releases.firstWhere(
+      (item) => item is Map && item['prerelease'] != true,
+      orElse: () => releases.first,
+    );
+
+    final tagName = _stringValue(latestRelease['tag_name']);
+    final releaseName = _stringValue(latestRelease['name']);
+    final notes = _stringValue(latestRelease['body']);
+    final htmlUrl =
+        _stringValue(latestRelease['html_url'], fallback: releasesUrl);
+    final publishedStr = _stringValue(latestRelease['published_at']);
+    final publishedAt = DateTime.tryParse(publishedStr);
+
+    final hasUpdate = tagName.isNotEmpty && tagName != baseline.baselineTag;
+
+    return UpstreamCheckResult(
+      baseline: baseline,
+      latestTag: tagName.isEmpty ? baseline.baselineTag : tagName,
+      latestReleaseName: releaseName.isEmpty ? tagName : releaseName,
+      latestNotes: notes,
+      releaseUrl: htmlUrl,
+      hasUpdate: hasUpdate,
+      publishedAt: publishedAt,
+    );
   }
 }
 

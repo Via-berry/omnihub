@@ -260,6 +260,62 @@ class AppSettingPage extends GetView<AppSettingController> {
           );
         }),
         Obx(() {
+          final baseline = controller.upstreamBaseline.value;
+          final check = controller.upstreamCheckResult.value;
+          final isChecking = controller.isCheckingUpstream.value;
+          final hasUpdate = check?.hasUpdate == true;
+
+          Widget? trailingBadge;
+          if (isChecking) {
+            trailingBadge = const CupertinoActivityIndicator(radius: 8);
+          } else if (hasUpdate) {
+            trailingBadge = Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemOrange.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: CupertinoColors.systemOrange.withValues(alpha: 0.32),
+                ),
+              ),
+              child: const Text(
+                '有上游新版',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: CupertinoColors.systemOrange,
+                ),
+              ),
+            );
+          } else {
+            trailingBadge = Text(
+              baseline.baselineTag,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            );
+          }
+
+          final subtitle = hasUpdate
+              ? '发现上游新版本 ${check?.latestTag} · 点击查看与同步'
+              : '基线: MoviePilotLite ${baseline.shortSummary} · 点击查看详情';
+
+          return _buildSettingTile(
+            context,
+            title: '上游代码基线',
+            subtitle: subtitle,
+            icon: Icons.merge_type_rounded,
+            iconColor: hasUpdate
+                ? CupertinoColors.systemOrange
+                : CupertinoColors.systemPurple,
+            additionalWidget: trailingBadge,
+            trailing: const CupertinoListTileChevron(),
+            onTap: () => controller.showUpstreamDetailSheet(context),
+          );
+        }),
+        Obx(() {
           final run = controller.latestWorkflowRun.value;
           String subtitle = '查看 GitHub Actions 热更新与打包状态';
           String? infoText;
@@ -586,7 +642,7 @@ class AppSettingPage extends GetView<AppSettingController> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return CupertinoListTile.notched(
+    final tile = CupertinoListTile.notched(
       padding: const EdgeInsetsDirectional.only(
         start: 14,
         end: 12,
@@ -624,6 +680,15 @@ class AppSettingPage extends GetView<AppSettingController> {
       trailing: trailing,
       onTap: onTap,
     );
+
+    if (onTap != null) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: tile,
+      );
+    }
+    return tile;
   }
 
   Widget _buildLeadingIcon(

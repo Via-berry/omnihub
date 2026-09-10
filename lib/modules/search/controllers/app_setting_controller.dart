@@ -1,11 +1,13 @@
+import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/search/models/app_update_info.dart';
+import 'package:moviepilot_mobile/modules/search/models/upstream_sync_info.dart';
 import 'package:moviepilot_mobile/modules/search/services/app_update_installer.dart';
 import 'package:moviepilot_mobile/modules/search/services/app_update_service.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
@@ -39,6 +41,12 @@ class AppSettingController extends GetxController {
   final downloadedApkPath = RxnString();
   CancelToken? _downloadCancelToken;
   late final AppUpdateService _updateService;
+
+  // 上游代码基线与同步
+  final upstreamBaseline = UpstreamBaselineInfo.defaultBaseline().obs;
+  final isCheckingUpstream = false.obs;
+  final upstreamCheckResult = Rxn<UpstreamCheckResult>();
+  bool get hasNewUpstream => upstreamCheckResult.value?.hasUpdate == true;
 
   // 背景图设置
   final backgroundImageEnabled = false.obs;
@@ -105,6 +113,8 @@ class AppSettingController extends GetxController {
     loadAppVersion();
     fetchLatestWorkflowStatus();
     checkUpdateSilently();
+    loadUpstreamBaseline();
+    checkUpstreamSilently();
   }
 
   Future<void> fetchLatestWorkflowStatus({bool forceRefresh = false}) async {
@@ -802,5 +812,350 @@ class AppSettingController extends GetxController {
   loadAppVersion() async {
     final packageInfo = await PackageInfo.fromPlatform();
     version.value = '${packageInfo.version}+${packageInfo.buildNumber}';
+  }
+
+  Future<void> loadUpstreamBaseline() async {
+    try {
+      final jsonStr = await rootBundle.loadString('upstream_baseline.json');
+      final data = json.decode(jsonStr) as Map<String, dynamic>;
+      upstreamBaseline.value = UpstreamBaselineInfo.fromJson(data);
+    } catch (_) {
+      upstreamBaseline.value = UpstreamBaselineInfo.defaultBaseline();
+    }
+  }
+
+  Future<void> checkUpstreamSilently() async {
+    try {
+      final res =
+          await _updateService.checkUpstreamSync(upstreamBaseline.value);
+      upstreamCheckResult.value = res;
+    } catch (_) {}
+  }
+
+  Future<void> checkForUpstreamUpdate({bool showToast = false}) async {
+    if (isCheckingUpstream.value) return;
+    isCheckingUpstream.value = true;
+    try {
+      final res =
+          await _updateService.checkUpstreamSync(upstreamBaseline.value);
+      upstreamCheckResult.value = res;
+      if (res.hasUpdate) {
+        if (showToast) {
+          ToastUtil.info('发现上游 MoviePilotLite 发布了 ${res.latestTag}');
+        }
+      } else {
+        if (showToast) {
+          ToastUtil.success('当前已与上游最新基线保持一致');
+        }
+      }
+    } catch (e) {
+      if (showToast) {
+        ToastUtil.error('检查上游更新失败: $e');
+      }
+    } finally {
+      isCheckingUpstream.value = false;
+    }
+  }
+
+  void showUpstreamDetailSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+        return Obx(() {
+          final baseline = upstreamBaseline.value;
+          final check = upstreamCheckResult.value;
+          final hasUpdate = check?.hasUpdate == true;
+          final isChecking = isCheckingUpstream.value;
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(top: 10, bottom: 12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.merge_type_rounded,
+                          color: colorScheme.primary,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '上游基线与同步',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '基准仓库: ${baseline.repo}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: isChecking
+                            ? const CupertinoActivityIndicator(radius: 9)
+                            : const Icon(Icons.refresh_rounded),
+                        tooltip: '重新检查上游',
+                        onPressed: isChecking
+                            ? null
+                            : () => checkForUpstreamUpdate(showToast: true),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 20),
+                Flexible(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: hasUpdate
+                              ? CupertinoColors.systemOrange
+                                  .withValues(alpha: 0.08)
+                              : colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: hasUpdate
+                                ? CupertinoColors.systemOrange
+                                    .withValues(alpha: 0.3)
+                                : colorScheme.outlineVariant
+                                    .withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  hasUpdate
+                                      ? Icons.new_releases_rounded
+                                      : Icons.verified_rounded,
+                                  color: hasUpdate
+                                      ? CupertinoColors.systemOrange
+                                      : CupertinoColors.activeGreen,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    hasUpdate
+                                        ? '上游发布了新版本: ${check!.latestTag}'
+                                        : '当前已同步至上游最新基准',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: hasUpdate
+                                          ? CupertinoColors.systemOrange
+                                          : colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '当前 OmniHub 代码基线: ${baseline.shortSummary}',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            Text(
+                              '最近合并时间: ${baseline.lastSyncedAt}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '已同步的官方能力',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...baseline.features.map(
+                        (f) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.check_circle_outline_rounded,
+                                size: 16,
+                                color: CupertinoColors.activeGreen,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  f,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (hasUpdate && check != null) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          '上游新版本说明 (${check.latestTag})',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: CupertinoColors.systemOrange,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            check.latestNotes.trim().isEmpty
+                                ? '暂无详细 Release 描述'
+                                : check.latestNotes.trim(),
+                            style: theme.textTheme.bodySmall,
+                            maxLines: 12,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: colorScheme.primary.withValues(alpha: 0.15),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.smart_toy_rounded,
+                              size: 18,
+                              color: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '长效同步机制：当上游发布新版本时，GitHub Actions 会自动创建 Issue 推送提醒；收到通知后，直接唤醒大模型助手说「帮我合并上游更新」，助手将全自动拉取并保留所有自定义模块！',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.open_in_browser_rounded,
+                                size: 18),
+                            label: const Text('上游开源页'),
+                            onPressed: () {
+                              WebUtil.open(
+                                url: check?.releaseUrl ??
+                                    'https://github.com/${baseline.repo}',
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: hasUpdate
+                                  ? CupertinoColors.systemOrange
+                                  : colorScheme.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                            icon: const Icon(Icons.copy_rounded, size: 18),
+                            label: const Text('复制同步指令'),
+                            onPressed: () {
+                              final text = check?.promptInstruction ??
+                                  '请检查并同步 MoviePilotLite 上游最新代码到 OmniHub，并保留自研模块！';
+                              Clipboard.setData(ClipboardData(text: text));
+                              ToastUtil.success('已复制同步提示词，发给大模型助手即可自动执行');
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
   }
 }

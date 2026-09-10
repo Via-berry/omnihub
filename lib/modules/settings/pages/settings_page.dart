@@ -79,21 +79,25 @@ class SettingsPage extends GetView<SettingsController> {
     required Color iconColor,
     required VoidCallback onTap,
   }) {
-    return CupertinoListTile.notched(
-      leading: Container(
-        width: 29,
-        height: 29,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: iconColor.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Icon(icon, size: 18, color: iconColor),
-      ),
-      title: Text(displayTitle),
-      // subtitle: displaySubtitle != null ? Text(displaySubtitle) : null,
-      trailing: const CupertinoListTileChevron(),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
+      child: CupertinoListTile.notched(
+        leading: Container(
+          width: 29,
+          height: 29,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon, size: 18, color: iconColor),
+        ),
+        title: Text(displayTitle),
+        // subtitle: displaySubtitle != null ? Text(displaySubtitle) : null,
+        trailing: const CupertinoListTileChevron(),
+        onTap: onTap,
+      ),
     );
   }
 

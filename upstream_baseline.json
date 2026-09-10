@@ -1,0 +1,14 @@
+﻿{
+  "upstream_repo": "singleton-altman/MoviePilotLite",
+  "baseline_tag": "release-v1.2.5",
+  "baseline_commit": "b3ad117",
+  "last_synced_at": "2026-09-10T16:48:00+08:00",
+  "features": [
+    "MoviePilot v3 接口认证与信封模型深度适配",
+    "插件配置差异备份、对比与增量恢复 (PluginBackupService)",
+    "探索页全新 AniList 动漫多维分类与筛选",
+    "探索页过滤弹层重构与选择芯片优化",
+    "演员头像高清解析与图片多级缓存增强",
+    "搜索进度条精确控制与仪表盘内存展示优化"
+  ]
+}

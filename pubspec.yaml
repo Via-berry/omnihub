@@ -69,6 +69,7 @@ flutter:
   assets:
   - shorebird.yaml
   - CHANGELOG.md
+  - upstream_baseline.json
   - assets/logo.svg
   - assets/app_icons/
   - assets/images/avatars/

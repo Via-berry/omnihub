@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/search/controllers/app_setting_controller.dart';
 import 'package:moviepilot_mobile/modules/settings/models/settings_config.dart';
@@ -24,6 +25,7 @@ class SettingsController extends GetxController {
   /// 单页设定：点击某分类下的某一行（子项或「服务」唯一行）
   void onRowTap(SettingsCategory category, SettingsSubItem? item) {
     final route = item?.route ?? category.directRoute;
+    debugPrint('SettingsController.onRowTap: route=$route, item=${item?.title}');
     if (!_appService.canAccessRoute(route)) {
       ToastUtil.info(_appService.accessDeniedMessage(route));
       return;
