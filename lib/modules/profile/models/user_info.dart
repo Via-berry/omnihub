@@ -24,8 +24,12 @@ class UserInfo with _$UserInfo {
     @JsonKey(includeFromJson: false) String? nickname,
   }) = _UserInfo;
 
-  factory UserInfo.fromJson(Map<String, dynamic> json) =>
-      _$UserInfoFromJson(json);
+  factory UserInfo.fromJson(Map<String, dynamic> json) {
+    if (json.containsKey('data') && json['data'] is Map) {
+      return _$UserInfoFromJson(Map<String, dynamic>.from(json['data'] as Map));
+    }
+    return _$UserInfoFromJson(json);
+  }
 }
 
 extension UserInfoSettingsX on UserInfo {

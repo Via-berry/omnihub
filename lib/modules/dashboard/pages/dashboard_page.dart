@@ -719,10 +719,11 @@ class DashboardPage extends GetView<DashboardController> {
         subtitle: '标题/副标题识别',
         onTap: () => _showRecognizeModal(context),
       ),
-      const ShortcutItem(
+      ShortcutItem(
         icon: CupertinoIcons.settings,
-        title: 'TODO: 规则',
-        subtitle: '规则测试',
+        title: '规则配置',
+        subtitle: '规则管理与测试',
+        onTap: () => Get.toNamed('/custom-rule'),
       ),
       ShortcutItem(
         icon: CupertinoIcons.doc_text,
@@ -736,10 +737,11 @@ class DashboardPage extends GetView<DashboardController> {
         subtitle: '网速连通性测试',
         onTap: () => _showNetworkTestModal(context),
       ),
-      const ShortcutItem(
+      ShortcutItem(
         icon: CupertinoIcons.text_alignleft,
-        title: 'TODO: 词表',
-        subtitle: '词表设置',
+        title: '词表管理',
+        subtitle: '词表过滤与映射',
+        onTap: () => ToastUtil.info('词表管理功能正在适配中，将在后续版本上线'),
       ),
       ShortcutItem(
         icon: CupertinoIcons.cube_box,

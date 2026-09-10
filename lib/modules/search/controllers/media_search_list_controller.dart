@@ -114,7 +114,7 @@ class MediaSearchListController extends GetxController {
   Future<void> _fetch({required int page, required bool append}) async {
     final term = keyword.value.trim();
     if (term.isEmpty) return;
-    await _refreshImageCookie();
+    unawaited(_refreshImageCookie());
     isLoading.value = true;
     error.value = null;
 
@@ -169,18 +169,7 @@ class MediaSearchListController extends GetxController {
       if (parsed.isEmpty && !append) {
         error.value = '没有找到匹配的媒体';
       }
-      for (final item in parsed) {
-        _subscribeService.fetchAndSaveSubscribeStatus(
-          item.mediaKey,
-          season: item.season,
-          title: item.title,
-        );
-      }
-      if (_appService.enableFetchMediaserverLibraryStatus.value) {
-        for (final item in parsed) {
-          unawaited(_fetchMediaserverExists(item, token));
-        }
-      }
+      unawaited(_batchFetchStatuses(parsed, token));
     } catch (e, st) {
       _log.handle(e, stackTrace: st, message: '媒体搜索失败');
       error.value = '搜索失败，请稍后重试';
@@ -314,6 +303,38 @@ class MediaSearchListController extends GetxController {
       _log.handle(e, stackTrace: st, message: '媒体入库状态查询失败');
       mediaserverInLibrary[key] = false;
       mediaserverInLibrary.refresh();
+    }
+  }
+
+  Future<void> _batchFetchStatuses(
+    List<RecommendApiItem> parsedList,
+    String token,
+  ) async {
+    const batchSize = 3;
+    final checkLibrary = _appService.enableFetchMediaserverLibraryStatus.value;
+    for (var i = 0; i < parsedList.length; i += batchSize) {
+      final end =
+          (i + batchSize < parsedList.length) ? i + batchSize : parsedList.length;
+      final batch = parsedList.sublist(i, end);
+      final futures = <Future<dynamic>>[];
+      for (final item in batch) {
+        futures.add(
+          _subscribeService.fetchAndSaveSubscribeStatus(
+            item.mediaKey,
+            season: item.season,
+            title: item.title,
+          ),
+        );
+        if (checkLibrary) {
+          futures.add(_fetchMediaserverExists(item, token));
+        }
+      }
+      try {
+        await Future.wait(futures);
+      } catch (_) {}
+      if (end < parsedList.length) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
     }
   }
 

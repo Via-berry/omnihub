@@ -367,10 +367,16 @@ class AppService extends GetxService {
           return profile;
         }
       }
+      if (normalizedServer != null && normalizedServer.isNotEmpty) {
+        final serverMatched = profiles
+            .where((p) => p.server.trim() == normalizedServer)
+            .toList();
+        if (serverMatched.isNotEmpty) return serverMatched.first;
+      }
+      return profiles.first;
     } catch (_) {
       return null;
     }
-    return null;
   }
 
   void restoreSessionFromProfile(LoginProfile profile) {

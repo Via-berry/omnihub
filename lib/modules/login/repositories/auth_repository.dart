@@ -123,7 +123,10 @@ class AuthRepository extends GetxService {
         return null;
       }
 
-      final updated = UserInfo.fromJson(data);
+      final payload = (data['data'] is Map)
+          ? Map<String, dynamic>.from(data['data'] as Map)
+          : data;
+      final updated = UserInfo.fromJson(payload);
       _appService.saveUserInfo(updated);
       _talker.info('更新用户信息成功');
       return updated;
@@ -148,9 +151,7 @@ class AuthRepository extends GetxService {
       _api.setToken(profile.accessToken);
       final currentUser = await getUserInfoByRole(role: userLookupKey);
       if (currentUser == null) {
-        _talker.warning('自动登录失败: 当前用户信息为空');
-        _appService.clearLoginState();
-        return false;
+        _talker.warning('自动登录获取最新用户信息失败，保持已恢复的本地会话');
       }
       _syncSystemMessagePolling();
       await _iosSharedSessionService.syncSession(
@@ -333,8 +334,10 @@ class AuthRepository extends GetxService {
     final response = await _api.get<dynamic>('/api/v1/user/');
     final data = response.data;
     if (data == null) return [];
-    final list = data is List ? data : <dynamic>[];
-    return list
+    final rawList = data is Map && data['data'] is List
+        ? data['data'] as List
+        : (data is List ? data : <dynamic>[]);
+    return rawList
         .whereType<Map<String, dynamic>>()
         .map((e) => UserInfo.fromJson(e))
         .toList();
@@ -350,7 +353,10 @@ class AuthRepository extends GetxService {
       _talker.warning('获取用户信息失败: 返回数据为空');
       return null;
     }
-    final userInfo = UserInfo.fromJson(data);
+    final payload = (data['data'] is Map)
+        ? Map<String, dynamic>.from(data['data'] as Map)
+        : data;
+    final userInfo = UserInfo.fromJson(payload);
     _appService.saveUserInfo(userInfo);
     _syncSystemMessagePolling();
     _talker.info('获取用户信息成功');

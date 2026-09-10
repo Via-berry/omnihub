@@ -53,8 +53,22 @@ class SystemEnvResponse with _$SystemEnvResponse {
     SystemEnvData? data,
   }) = _SystemEnvResponse;
 
-  factory SystemEnvResponse.fromJson(Map<String, dynamic> json) =>
-      _$SystemEnvResponseFromJson(json);
+  factory SystemEnvResponse.fromJson(Map<String, dynamic> json) {
+    if (json.containsKey('data') && json['data'] is Map<String, dynamic>) {
+      return _$SystemEnvResponseFromJson(json);
+    }
+    if (json.containsKey('data') && json['data'] is Map) {
+      return _$SystemEnvResponseFromJson({
+        ...json,
+        'data': Map<String, dynamic>.from(json['data'] as Map),
+      });
+    }
+    return SystemEnvResponse(
+      success: json['success'] as bool? ?? true,
+      message: json['message'] as String?,
+      data: SystemEnvData.fromJson(json),
+    );
+  }
 }
 
 /// 系统环境变量数据，对应 GET /api/v1/system/env 的 data 字段
