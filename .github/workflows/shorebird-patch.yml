@@ -9,6 +9,8 @@ on:
       - '**.md'
       - '.gitignore'
       - 'docs/**'
+      - '.github/workflows/upstream-sync.yml'
+      - 'upstream_baseline.json'
   workflow_dispatch:
 
 permissions:

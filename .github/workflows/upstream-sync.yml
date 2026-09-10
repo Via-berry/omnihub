@@ -1,4 +1,4 @@
-﻿name: Upstream Sync Monitor
+name: Upstream Sync Monitor
 
 on:
   schedule:
@@ -78,26 +78,27 @@ jobs:
 
             // 4. 创建提醒 Issue 触发移动端通知
             const releaseBody = latestRelease.body || "（上游未填写详细说明）";
-            const issueBody = `### 🚀 上游 MoviePilotLite 发布新版本！
-- **上游版本**: \`${latestTag}\` (${latestRelease.name || latestTag})
-- **当前 OmniHub 基线**: \`${baselineTag}\`
-- **发布时间**: ${latestRelease.published_at}
-- **上游发布主页**: [查看上游 Release](${latestRelease.html_url})
-
----
-
-### 📝 上游更新日志
-\`\`\`markdown
-${releaseBody.slice(0, 2000)}
-\`\`\`
-
----
-
-### 🤖 大模型一键同步指引
-收到此通知后，打开 Antigravity / 您的 AI 编程助手，直接输入以下提示词即可全自动完成合并：
-
-> **请帮我同步 MoviePilotLite 上游最新版本 \`${latestTag}\` 到 OmniHub，保留自研模块（Dian115、JAV、自定义应用设置与热更配置），并完成构建校验！**
-`;
+            const issueBody = [
+              "### 🚀 上游 MoviePilotLite 发布新版本！",
+              `- **上游版本**: \`${latestTag}\` (${latestRelease.name || latestTag})`,
+              `- **当前 OmniHub 基线**: \`${baselineTag}\``,
+              `- **发布时间**: ${latestRelease.published_at}`,
+              `- **上游发布主页**: [查看上游 Release](${latestRelease.html_url})`,
+              "",
+              "---",
+              "",
+              "### 📝 上游更新日志",
+              "```markdown",
+              releaseBody.slice(0, 2000),
+              "```",
+              "",
+              "---",
+              "",
+              "### 🤖 大模型一键同步指引",
+              "收到此通知后，打开 Antigravity / 您的 AI 编程助手，直接输入以下提示词即可全自动完成合并：",
+              "",
+              `> **请帮我同步 MoviePilotLite 上游最新版本 \`${latestTag}\` 到 OmniHub，保留自研模块（Dian115、JAV、自定义应用设置与热更配置），并完成构建校验！**`
+            ].join("\n");
 
             await github.rest.issues.create({
               owner: context.repo.owner,
