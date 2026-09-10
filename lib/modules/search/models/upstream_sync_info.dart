@@ -1,4 +1,4 @@
-﻿class UpstreamBaselineInfo {
+class UpstreamBaselineInfo {
   const UpstreamBaselineInfo({
     required this.repo,
     required this.baselineTag,
@@ -16,7 +16,7 @@
   factory UpstreamBaselineInfo.defaultBaseline() {
     return const UpstreamBaselineInfo(
       repo: "singleton-altman/MoviePilotLite",
-      baselineTag: "release-v1.2.5",
+      baselineTag: "release-v1.2.5-2026-09-07",
       baselineCommit: "b3ad117",
       lastSyncedAt: "2026-09-10",
       features: [
@@ -33,7 +33,7 @@
   factory UpstreamBaselineInfo.fromJson(Map<String, dynamic> json) {
     return UpstreamBaselineInfo(
       repo: json["upstream_repo"]?.toString() ?? "singleton-altman/MoviePilotLite",
-      baselineTag: json["baseline_tag"]?.toString() ?? "release-v1.2.5",
+      baselineTag: json["baseline_tag"]?.toString() ?? "release-v1.2.5-2026-09-07",
       baselineCommit: json["baseline_commit"]?.toString() ?? "b3ad117",
       lastSyncedAt: json["last_synced_at"]?.toString() ?? "2026-09-10",
       features: (json["features"] as List<dynamic>?)

@@ -1,6 +1,6 @@
-﻿{
+{
   "upstream_repo": "singleton-altman/MoviePilotLite",
-  "baseline_tag": "release-v1.2.5",
+  "baseline_tag": "release-v1.2.5-2026-09-07",
   "baseline_commit": "b3ad117",
   "last_synced_at": "2026-09-10T16:48:00+08:00",
   "features": [

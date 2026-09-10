@@ -356,7 +356,7 @@ class AppUpdateService extends GetxService {
     final publishedStr = _stringValue(latestRelease['published_at']);
     final publishedAt = DateTime.tryParse(publishedStr);
 
-    final hasUpdate = tagName.isNotEmpty && tagName != baseline.baselineTag;
+    final hasUpdate = tagName.isNotEmpty && !_isSameTag(tagName, baseline.baselineTag);
 
     return UpstreamCheckResult(
       baseline: baseline,
@@ -367,6 +367,15 @@ class AppUpdateService extends GetxService {
       hasUpdate: hasUpdate,
       publishedAt: publishedAt,
     );
+  }
+
+  bool _isSameTag(String a, String b) {
+    if (a.trim().toLowerCase() == b.trim().toLowerCase()) return true;
+    final cleanA =
+        a.replaceAll(RegExp(r'-\d{4}-\d{2}-\d{2}$'), '').trim().toLowerCase();
+    final cleanB =
+        b.replaceAll(RegExp(r'-\d{4}-\d{2}-\d{2}$'), '').trim().toLowerCase();
+    return cleanA.isNotEmpty && cleanA == cleanB;
   }
 }
 
