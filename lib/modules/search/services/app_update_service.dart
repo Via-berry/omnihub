@@ -68,6 +68,7 @@ class AppUpdateService extends GetxService {
   static const String releasesUrl =
       'https://github.com/singleton-altman/MoviePilotLite/releases';
   static const Duration cachedApkTtl = Duration(days: 7);
+  static const String downloadProxyUrl = 'https://ghproxy.net/';
   static final RegExp _androidReleaseTagPattern = RegExp(
     r'^release-v\d+(?:\.\d+){1,3}-\d{4}-\d{2}-\d{2}$',
     caseSensitive: false,
@@ -147,6 +148,7 @@ class AppUpdateService extends GetxService {
 
   Future<String> downloadApk(
     AppUpdateInfo info, {
+    bool useProxy = false,
     required void Function(int received, int total) onProgress,
     CancelToken? cancelToken,
   }) async {
@@ -165,7 +167,9 @@ class AppUpdateService extends GetxService {
     }
     try {
       await _dio.download(
-        info.apkDownloadUrl,
+        useProxy
+            ? '$downloadProxyUrl${info.apkDownloadUrl}'
+            : info.apkDownloadUrl,
         file.path,
         onReceiveProgress: onProgress,
         cancelToken: cancelToken,
@@ -173,6 +177,8 @@ class AppUpdateService extends GetxService {
           responseType: ResponseType.bytes,
           followRedirects: true,
           maxRedirects: 5,
+          validateStatus: (status) =>
+              status != null && status >= 200 && status < 300,
           headers: const {'accept': 'application/octet-stream'},
         ),
       );

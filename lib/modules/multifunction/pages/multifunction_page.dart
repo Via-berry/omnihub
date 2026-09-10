@@ -65,8 +65,7 @@ class MultifunctionPage extends GetView<MultifunctionController> {
             final pageWidth = constraints.maxWidth;
             final horizontalPadding = pageWidth >= 720 ? 24.0 : 20.0;
             final contentMaxWidth = pageWidth >= 1100 ? 1024.0 : 920.0;
-            final topPadding =
-                MediaQuery.paddingOf(context).top + kToolbarHeight + 12;
+            final topPadding = MediaQuery.paddingOf(context).top + 12;
 
             return Center(
               child: ConstrainedBox(

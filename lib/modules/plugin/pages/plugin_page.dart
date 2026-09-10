@@ -158,6 +158,9 @@ class PluginPage extends GetView<PluginController> {
       final loading = controller.isLoading.value;
       final error = controller.errorText.value;
       final items = controller.visibleItems;
+      final unavailableCount = controller.unavailableItems.length;
+      final cleaning = controller.isCleaningUnavailable.value;
+      controller.availabilityById.length;
 
       if (loading && items.isEmpty) {
         return const SliverFillRemaining(
@@ -205,60 +208,151 @@ class PluginPage extends GetView<PluginController> {
 
       final width = MediaQuery.sizeOf(context).width;
       final useGrid = width > _wideBreakpoint;
+      final listSliver = useGrid
+          ? SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                _horizontalPadding,
+                8,
+                _horizontalPadding,
+                0,
+              ),
+              sliver: SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: ((width - _horizontalPadding * 2) /
+                          (_itemWidth + _gridSpacing))
+                      .floor()
+                      .clamp(1, 10),
+                  mainAxisSpacing: _gridSpacing,
+                  crossAxisSpacing: _gridSpacing,
+                  mainAxisExtent: 160,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _buildCard(context, items[index]),
+                  childCount: items.length,
+                  addAutomaticKeepAlives: true,
+                  addRepaintBoundaries: true,
+                ),
+              ),
+            )
+          : SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                _horizontalPadding,
+                8,
+                _horizontalPadding,
+                0,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => Padding(
+                    padding: const EdgeInsets.only(bottom: _gridSpacing),
+                    child: _buildCard(context, items[index]),
+                  ),
+                  childCount: items.length,
+                  addAutomaticKeepAlives: true,
+                  addRepaintBoundaries: true,
+                ),
+              ),
+            );
 
-      if (useGrid) {
-        final availableWidth = width - _horizontalPadding * 2;
-        final crossAxisCount = (availableWidth / (_itemWidth + _gridSpacing))
-            .floor()
-            .clamp(1, 10);
-
-        return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            _horizontalPadding,
-            8,
-            _horizontalPadding,
-            0,
-          ),
-          sliver: SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              mainAxisSpacing: _gridSpacing,
-              crossAxisSpacing: _gridSpacing,
-              mainAxisExtent: 160,
+      return SliverMainAxisGroup(
+        slivers: [
+          if (unavailableCount > 2)
+            SliverToBoxAdapter(
+              child: _buildUnavailableCleanupBar(
+                context,
+                unavailableCount,
+                cleaning,
+              ),
             ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _buildCard(context, items[index]),
-              childCount: items.length,
-              addAutomaticKeepAlives: true,
-              addRepaintBoundaries: true,
-            ),
-          ),
-        );
-      }
-
-      return SliverPadding(
-        padding: const EdgeInsets.fromLTRB(
-          _horizontalPadding,
-          8,
-          _horizontalPadding,
-          0,
-        ),
-        sliver: SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) => Padding(
-              padding: const EdgeInsets.only(bottom: _gridSpacing),
-              child: _buildCard(context, items[index]),
-            ),
-            childCount: items.length,
-            addAutomaticKeepAlives: true,
-            addRepaintBoundaries: true,
-          ),
-        ),
+          listSliver,
+        ],
       );
     });
   }
 
+  Widget _buildUnavailableCleanupBar(
+    BuildContext context,
+    int count,
+    bool cleaning,
+  ) {
+    final palette = DashboardPalette.of(context);
+    final accent = palette.warningAccent;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        _horizontalPadding,
+        8,
+        _horizontalPadding,
+        0,
+      ),
+      child: Material(
+        color: accent.withValues(alpha: palette.isDark ? 0.16 : 0.10),
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          child: Row(
+            children: [
+              Icon(
+                CupertinoIcons.exclamationmark_triangle_fill,
+                size: 18,
+                color: accent,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '发现 $count 个不可用插件',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: palette.titleText,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: cleaning ? null : () => _cleanUnavailable(count),
+                child: cleaning
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: accent,
+                        ),
+                      )
+                    : Text(
+                        '一键清理',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: accent,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _cleanUnavailable(int count) {
+    ToastUtil.warning(
+      '将卸载 $count 个不可用插件，此操作不可撤销。',
+      title: '一键清理',
+      onConfirm: () {
+        controller.uninstallUnavailablePlugins().then((result) {
+          if (result.fail == 0) {
+            ToastUtil.success('已清理 ${result.ok} 个不可用插件');
+          } else {
+            ToastUtil.error('清理完成：成功 ${result.ok}，失败 ${result.fail}');
+          }
+        }).catchError((error) {
+          ToastUtil.error('清理失败: $error');
+        });
+      },
+    );
+  }
+
   Widget _buildCard(BuildContext context, PluginItem item) {
+    final availability = controller.availabilityOf(item.id);
     final iconUrl = item.pluginIcon != null && item.pluginIcon!.isNotEmpty
         ? ImageUtil.convertPluginIconUrl(item.pluginIcon!)
         : '';
@@ -278,6 +372,8 @@ class PluginPage extends GetView<PluginController> {
         }
       },
       child: PluginItemCard(
+        unavailable: availability.unavailable,
+        unavailableLabel: availability.label,
         onHandleTap: (type) {
           switch (type) {
             case PluginHandleType.web:

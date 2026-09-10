@@ -46,10 +46,9 @@ class SearchMediaResultPage extends GetView<SearchMediaController> {
         return const SizedBox.shrink();
       }
 
+      final color = _getProgressColor(controller.progressStatus.value);
       return Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          // 线性进度条
           TweenAnimationBuilder<double>(
             tween: Tween<double>(
               begin: 0,
@@ -61,76 +60,51 @@ class SearchMediaResultPage extends GetView<SearchMediaController> {
               return LinearProgressIndicator(
                 value: value > 0 ? value : null,
                 backgroundColor: Colors.grey.withValues(alpha: 0.2),
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  _getProgressColor(controller.progressStatus.value),
-                ),
+                valueColor: AlwaysStoppedAnimation<Color>(color),
                 minHeight: 3,
               );
             },
           ),
-          // 进度信息卡片
-          if (controller.progressMessage.value.isNotEmpty)
-            _buildProgressInfoCard(context),
-        ],
-      );
-    });
-  }
-
-  /// 构建进度信息卡片
-  Widget _buildProgressInfoCard(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                _getProgressColor(controller.progressStatus.value),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Expanded(
+            child: Row(
               children: [
-                Text(
-                  controller.progressMessage.value,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                if (controller.progressSource.value.isNotEmpty)
-                  Text(
-                    controller.progressSource.value,
-                    style: TextStyle(fontSize: 11),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    controller.progressMessage.value,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  controller.formattedProgress,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            controller.formattedProgress,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
         ],
-      ),
-    );
+      );
+    });
   }
 
   /// 根据状态获取进度条颜色

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:get/get.dart';
@@ -65,6 +66,8 @@ class SearchMediaController extends GetxController {
 
   SseClient? _sseClient;
   StreamSubscription<SseEvent>? _sseSubscription;
+  StreamSubscription<String>? _searchStreamSubscription;
+  bool _streamTerminalHandled = false;
 
   int _progressSessionId = 0;
 
@@ -189,11 +192,18 @@ class SearchMediaController extends GetxController {
       return;
     }
 
+    await _searchStreamSubscription?.cancel();
+    _searchStreamSubscription = null;
+    _stopProgressTracking();
+
+    _progressSessionId++;
+    final sessionId = _progressSessionId;
+    _streamTerminalHandled = false;
+
+    items.clear();
     isLoading.value = true;
     errorText.value = null;
-
-    // 开始进度跟踪
-    _startProgressTracking();
+    _resetProgressUi();
 
     try {
       final token =
@@ -202,86 +212,316 @@ class SearchMediaController extends GetxController {
           _apiClient.token;
       if (token == null || token.isEmpty) {
         errorText.value = '请先登录后再进行搜索';
-        isLoading.value = false;
-        _stopProgressTracking();
+        _finishSearchSession(sessionId);
         return;
       }
 
-      // 构建查询参数
-      final queryParameters = <String, dynamic>{
-        'mtype': mtype,
-        'area': area == 'title' ? 'title' : 'imdbid',
-        if (searchText.value.isNotEmpty) 'title': searchText.value,
-        if (year.isNotEmpty) 'year': year,
-        'sites': sites.join(','),
-        'keyword': searchText.value,
-      };
-
-      if (season != null && season!.isNotEmpty && season != '0') {
-        queryParameters['season'] = season!;
-      }
-      final identity = MediaIdentity.parse(mediaSearchKey);
-      final useV3 =
-          searchType == SearchType.media &&
-          identity != null &&
-          await _serverApiVersionService.isV3();
-      if (useV3) {
-        queryParameters['media_source'] = identity.source;
-      }
-      final endpoint = switch (searchType) {
-        SearchType.media => useV3
-            ? '/api/v1/search/media/${identity.id}'
-            : '/api/v1/search/media/$mediaSearchKey',
-        SearchType.title => '/api/v1/search/title',
-      };
-      final response = await _apiClient.get<dynamic>(
-        endpoint,
-        queryParameters: queryParameters,
+      final streamed = await _startStreamSearch(
         token: token,
-        timeout: 60 * max(sites.length, 1),
+        sessionId: sessionId,
       );
+      if (streamed) return;
 
-      final status = response.statusCode ?? 0;
-      if (status >= 400) {
-        errorText.value = '请求失败 (HTTP $status)';
-        isLoading.value = false;
-        _stopProgressTracking();
-        return;
-      }
-
-      final raw = response.data;
-      var list = _extractList(raw).toList();
-      // v3 的 /search/media 与 /search/title 声明了 list[TorrentInfo] 的 response_model，
-      // 而链路实际返回 Context，字段对不上会被序列化成一批空壳；
-      // 这种情况下回退到 /search/last 取同一次搜索缓存下来的完整结果。
-      if (_looksStrippedResult(list) &&
-          await _serverApiVersionService.isV3()) {
-        final fallback = await _fetchLastSearchResults(token);
-        if (fallback.isNotEmpty) list = fallback;
-      }
-      items
-        ..clear()
-        ..addAll(
-          list
-              .whereType<Map<String, dynamic>>()
-              .map(parseAndCacheSearchResultItem),
-        );
+      await _performBlockingSearch(token: token, sessionId: sessionId);
     } catch (e, st) {
+      if (sessionId != _progressSessionId) return;
       _log.handle(e, stackTrace: st, message: '搜索失败');
       errorText.value = '请求失败，请稍后重试 $e';
-    } finally {
-      isLoading.value = false;
-      // 延迟停止进度跟踪，让用户看到完成状态
-      final sessionId = _progressSessionId;
-      Future.delayed(const Duration(seconds: 1), () {
-        _stopProgressTracking(sessionId: sessionId);
-      });
+      _finishSearchSession(sessionId);
     }
+  }
+
+  void _resetProgressUi() {
+    isProgressActive.value = true;
+    searchProgress.value = 0;
+    progressMessage.value = '正在搜索...';
+    progressStatus.value = 'searching';
+    progressCurrent.value = 0;
+    progressTotal.value = 0;
+    progressSource.value = '';
+  }
+
+  void _finishSearchSession(int sessionId, {String? error}) {
+    if (sessionId != _progressSessionId) return;
+    if (error != null) errorText.value = error;
+    isLoading.value = false;
+    if (error == null) {
+      progressStatus.value = 'completed';
+      searchProgress.value = 1;
+    } else {
+      progressStatus.value = 'failed';
+    }
+    Future.delayed(const Duration(seconds: 1), () {
+      _stopProgressTracking(sessionId: sessionId);
+    });
+  }
+
+  Future<bool> _startStreamSearch({
+    required String token,
+    required int sessionId,
+  }) async {
+    try {
+      final stream = await _apiClient.streamLines(
+        _streamPath(),
+        token: token,
+        handleAuth: false,
+      );
+      if (sessionId != _progressSessionId) return true;
+      _searchStreamSubscription = stream.listen(
+        (line) {
+          if (sessionId != _progressSessionId) return;
+          _handleSearchStreamLine(line);
+        },
+        onError: (Object e, StackTrace st) {
+          if (!_consumeStreamTerminal(sessionId)) return;
+          _log.handle(e, stackTrace: st, message: '搜索 SSE 失败');
+          unawaited(_recoverAfterStream(token: token, sessionId: sessionId));
+        },
+        onDone: () {
+          if (!_consumeStreamTerminal(sessionId)) return;
+          unawaited(_completeStreamSearch(token: token, sessionId: sessionId));
+        },
+        cancelOnError: false,
+      );
+      return true;
+    } on ApiHttpException catch (e, st) {
+      _log.handle(
+        e,
+        stackTrace: st,
+        message: '搜索 SSE HTTP ${e.statusCode}，回退阻塞搜索',
+      );
+      return false;
+    } catch (e, st) {
+      _log.handle(e, stackTrace: st, message: '搜索 SSE 不可用，回退阻塞搜索');
+      return false;
+    }
+  }
+
+  String _streamPath() {
+    final query = Uri(queryParameters: _streamQueryParameters()).query;
+    final base = switch (searchType) {
+      SearchType.media => '/api/v1/search/media/$mediaSearchKey/stream',
+      SearchType.title => '/api/v1/search/title/stream',
+    };
+    return query.isEmpty ? base : '$base?$query';
+  }
+
+  Map<String, String> _streamQueryParameters() {
+    if (searchType == SearchType.title) {
+      return {
+        if (searchText.value.isNotEmpty) 'keyword': searchText.value,
+        'sites': sites.join(','),
+      };
+    }
+    return {
+      'mtype': mtype,
+      'area': area == 'title' ? 'title' : 'imdbid',
+      if (searchText.value.isNotEmpty) 'title': searchText.value,
+      if (year.isNotEmpty) 'year': year,
+      'sites': sites.join(','),
+      if (season != null && season!.isNotEmpty && season != '0')
+        'season': season!,
+    };
+  }
+
+  void _handleSearchStreamLine(String line) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) return;
+
+    var payload = trimmed;
+    if (payload.startsWith('data:')) {
+      payload = payload.substring(5).trimLeft();
+    }
+    if (payload.isEmpty || payload == '[DONE]') return;
+
+    Map<String, dynamic>? json;
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map<String, dynamic>) {
+        json = decoded;
+      } else if (decoded is Map) {
+        json = Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {
+      return;
+    }
+    if (json == null) return;
+
+    final type = json['type']?.toString() ?? '';
+    final text =
+        (json['text_i18n'] ?? json['text'])?.toString() ??
+        progressMessage.value;
+    final value = json['value'];
+    if (value is num) {
+      final normalized = value <= 1 ? value.toDouble() : value.toDouble() / 100;
+      searchProgress.value = normalized.clamp(0.0, 1.0);
+    }
+    if (text.trim().isNotEmpty) {
+      progressMessage.value = text;
+    }
+    final finished = json['finished'];
+    final total = json['total'];
+    if (finished is num) progressCurrent.value = finished.toInt();
+    if (total is num) progressTotal.value = total.toInt();
+    final site = json['site']?.toString() ?? '';
+    if (site.isNotEmpty) progressSource.value = site;
+
+    switch (type) {
+      case 'append':
+        _appendSearchItems(_extractSearchItems(json['items']));
+        break;
+      case 'replace':
+        items
+          ..clear()
+          ..addAll(_extractSearchItems(json['items']));
+        break;
+      case 'progress':
+        break;
+      case 'done':
+        _appendSearchItems(_extractSearchItems(json['items']));
+        progressStatus.value = 'completed';
+        searchProgress.value = 1;
+        break;
+      default:
+        _appendSearchItems(_extractSearchItems(json['items']));
+    }
+  }
+
+  List<SearchResultItem> _extractSearchItems(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => parseAndCacheSearchResultItem(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  void _appendSearchItems(List<SearchResultItem> next) {
+    if (next.isEmpty) return;
+    final existing = items.map(_itemKey).toSet();
+    final unique = <SearchResultItem>[];
+    for (final item in next) {
+      if (existing.add(_itemKey(item))) unique.add(item);
+    }
+    if (unique.isEmpty) return;
+    items.addAll(unique);
+  }
+
+  String _itemKey(SearchResultItem item) {
+    final torrent = item.torrent_info;
+    final enclosure = torrent?.enclosure?.trim() ?? '';
+    if (enclosure.isNotEmpty) return enclosure;
+    final pageUrl = torrent?.page_url?.trim() ?? '';
+    if (pageUrl.isNotEmpty) return pageUrl;
+    return '${torrent?.site}_${torrent?.title}_${torrent?.size}';
+  }
+
+  bool _consumeStreamTerminal(int sessionId) {
+    if (sessionId != _progressSessionId) return false;
+    if (_streamTerminalHandled) return false;
+    _streamTerminalHandled = true;
+    return true;
+  }
+
+  Future<void> _completeStreamSearch({
+    required String token,
+    required int sessionId,
+  }) async {
+    if (items.isEmpty) {
+      final fallback = await _fetchLastSearchResults(token);
+      if (sessionId != _progressSessionId) return;
+      _assignSearchResults(fallback);
+    }
+    _finishSearchSession(sessionId);
+  }
+
+  Future<void> _recoverAfterStream({
+    required String token,
+    required int sessionId,
+  }) async {
+    if (items.isNotEmpty) {
+      _finishSearchSession(sessionId);
+      return;
+    }
+    try {
+      await _performBlockingSearch(token: token, sessionId: sessionId);
+    } catch (e, st) {
+      _log.handle(e, stackTrace: st, message: '搜索 SSE 回退失败');
+      _finishSearchSession(sessionId, error: '请求失败，请稍后重试 $e');
+    }
+  }
+
+  Future<void> _performBlockingSearch({
+    required String token,
+    required int sessionId,
+  }) async {
+    _startProgressTracking();
+    final queryParameters = <String, dynamic>{
+      'mtype': mtype,
+      'area': area == 'title' ? 'title' : 'imdbid',
+      if (searchText.value.isNotEmpty) 'title': searchText.value,
+      if (year.isNotEmpty) 'year': year,
+      'sites': sites.join(','),
+      'keyword': searchText.value,
+    };
+
+    if (season != null && season!.isNotEmpty && season != '0') {
+      queryParameters['season'] = season!;
+    }
+    final identity = MediaIdentity.parse(mediaSearchKey);
+    final useV3 =
+        searchType == SearchType.media &&
+        identity != null &&
+        await _serverApiVersionService.isV3();
+    if (useV3) {
+      queryParameters['media_source'] = identity.source;
+    }
+    final endpoint = switch (searchType) {
+      SearchType.media => useV3
+          ? '/api/v1/search/media/${identity.id}'
+          : '/api/v1/search/media/$mediaSearchKey',
+      SearchType.title => '/api/v1/search/title',
+    };
+    final response = await _apiClient.get<dynamic>(
+      endpoint,
+      queryParameters: queryParameters,
+      token: token,
+      timeout: 60 * max(sites.length, 1),
+    );
+
+    if (sessionId != _progressSessionId) return;
+
+    final status = response.statusCode ?? 0;
+    if (status >= 400) {
+      _finishSearchSession(sessionId, error: '请求失败 (HTTP $status)');
+      return;
+    }
+
+    var list = _extractList(response.data).toList();
+    if (_looksStrippedResult(list) && await _serverApiVersionService.isV3()) {
+      final fallback = await _fetchLastSearchResults(token);
+      if (fallback.isNotEmpty) list = fallback;
+    }
+    if (sessionId != _progressSessionId) return;
+    _assignSearchResults(list);
+    _finishSearchSession(sessionId);
+  }
+
+  void _assignSearchResults(List<dynamic> list) {
+    items
+      ..clear()
+      ..addAll(
+        list.whereType<Map>().map(
+          (e) => parseAndCacheSearchResultItem(Map<String, dynamic>.from(e)),
+        ),
+      );
   }
 
   /// 开始 SSE 进度跟踪
   void _startProgressTracking() async {
-    _stopProgressTracking();
+    _sseSubscription?.cancel();
+    _sseSubscription = null;
+    _sseClient?.disconnect();
+    _sseClient = null;
 
     final baseUrl = _apiClient.baseUrl;
     if (baseUrl == null || baseUrl.isEmpty) {
@@ -292,17 +532,7 @@ class SearchMediaController extends GetxController {
     _log.info('Starting search progress tracking via SSE');
     _log.info('SSE baseUrl: $baseUrl, endpoint: $_progressPath');
 
-    // 重置进度状态
     isProgressActive.value = true;
-    searchProgress.value = 0.0;
-    progressMessage.value = '正在搜索...';
-    progressStatus.value = 'searching';
-    progressCurrent.value = 0;
-    progressTotal.value = 0;
-    progressSource.value = '';
-
-    _progressSessionId++;
-    final sessionId = _progressSessionId;
 
     try {
       // 获取 Cookie
@@ -449,6 +679,8 @@ class SearchMediaController extends GetxController {
 
   @override
   void onClose() {
+    unawaited(_searchStreamSubscription?.cancel());
+    _searchStreamSubscription = null;
     _stopProgressTracking();
     super.onClose();
   }

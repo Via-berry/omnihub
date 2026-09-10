@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/login/models/login_profile.dart';
 import 'package:moviepilot_mobile/modules/multifunction/models/multifunction_config.dart';
 import 'package:moviepilot_mobile/modules/multifunction/models/multifunction_models.dart';
+import 'package:moviepilot_mobile/modules/plugin/models/plugin_models.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/services/hive_service.dart';
@@ -192,60 +193,70 @@ class MultifunctionController extends GetxController {
     if (isLoadingDashboard.value) return;
     isLoadingDashboard.value = true;
     try {
-      subscribeDataReady.value = false;
-      calendarDataReady.value = false;
-      downloaderDataReady.value = false;
-      pluginDataReady.value = false;
-      userDataReady.value = false;
-      siteDataReady.value = false;
-      sidebarNavDataReady.value = false;
-
       List<Map<String, dynamic>> subscribes = const [];
       if (canAccessSubscribe) {
         try {
           subscribes = await _fetchSubscribeItems();
           subscribeDataReady.value = true;
+          _buildSubscribeInfo(subscribes);
+          try {
+            await _buildCalendarInfo(subscribes);
+            calendarDataReady.value = true;
+          } catch (_) {
+            if (!calendarDataReady.value) {
+              calendarInfo.value = const CalendarDashboardInfo();
+            }
+          }
         } catch (_) {
-          subscribes = const [];
-          subscribeDataReady.value = false;
-        }
-        _buildSubscribeInfo(subscribes);
-        try {
-          await _buildCalendarInfo(subscribes);
-          calendarDataReady.value = true;
-        } catch (_) {
-          calendarInfo.value = const CalendarDashboardInfo();
-          calendarDataReady.value = false;
+          if (!subscribeDataReady.value) {
+            _buildSubscribeInfo(const []);
+          }
         }
       } else {
         subscribeInfo.value = const SubscribeDashboardInfo();
         calendarInfo.value = const CalendarDashboardInfo();
+        subscribeDataReady.value = false;
+        calendarDataReady.value = false;
       }
       final dashboardTasks = <Future<void>>[
         _loadDownloaderInfo()
-            .then((ok) => downloaderDataReady.value = ok)
-            .catchError((_) => downloaderDataReady.value = false),
+            .then((ok) {
+              if (ok) downloaderDataReady.value = true;
+            })
+            .catchError((_) {}),
       ];
       if (canAccessManage) {
         dashboardTasks.addAll([
           _loadPluginCount()
-              .then((ok) => pluginDataReady.value = ok)
-              .catchError((_) => pluginDataReady.value = false),
+              .then((ok) {
+                if (ok) pluginDataReady.value = true;
+              })
+              .catchError((_) {}),
           _loadUserCount()
-              .then((ok) => userDataReady.value = ok)
-              .catchError((_) => userDataReady.value = false),
+              .then((ok) {
+                if (ok) userDataReady.value = true;
+              })
+              .catchError((_) {}),
           _loadSiteInfo()
-              .then((ok) => siteDataReady.value = ok)
-              .catchError((_) => siteDataReady.value = false),
+              .then((ok) {
+                if (ok) siteDataReady.value = true;
+              })
+              .catchError((_) {}),
           _loadSidebarNav()
-              .then((ok) => sidebarNavDataReady.value = ok)
-              .catchError((_) => sidebarNavDataReady.value = false),
+              .then((ok) {
+                if (ok) sidebarNavDataReady.value = true;
+              })
+              .catchError((_) {}),
         ]);
       } else {
         pluginInstalledCount.value = 0;
         userCount.value = 0;
         siteInfo.value = const SiteDashboardInfo();
         sidebarNavItems.clear();
+        pluginDataReady.value = false;
+        userDataReady.value = false;
+        siteDataReady.value = false;
+        sidebarNavDataReady.value = false;
       }
       await Future.wait(dashboardTasks);
     } finally {
@@ -419,9 +430,9 @@ class MultifunctionController extends GetxController {
     _isRefreshingDownloader = true;
     try {
       final ok = await _loadDownloaderInfo();
-      downloaderDataReady.value = ok;
+      if (ok) downloaderDataReady.value = true;
     } catch (_) {
-      downloaderDataReady.value = false;
+      // 保留已有数据，避免轮询失败清空列表
     } finally {
       _isRefreshingDownloader = false;
     }
@@ -618,7 +629,9 @@ class MultifunctionController extends GetxController {
       '/api/v1/download/clients',
     );
     if ((clientsResp.statusCode ?? 0) >= 400 || clientsResp.data == null) {
-      downloaderInfo.value = const DownloaderDashboardInfo();
+      if (!downloaderDataReady.value) {
+        downloaderInfo.value = const DownloaderDashboardInfo();
+      }
       return false;
     }
     final clients = clientsResp.data!
@@ -747,12 +760,9 @@ class MultifunctionController extends GetxController {
       return false;
     }
     final raw = response.data;
-    if (raw is List) {
-      pluginInstalledCount.value = raw.length;
-      return true;
-    }
-    pluginInstalledCount.value = 0;
-    return false;
+    final list = unwrapPluginList(raw);
+    pluginInstalledCount.value = list.length;
+    return true;
   }
 
   Future<bool> _loadUserCount() async {

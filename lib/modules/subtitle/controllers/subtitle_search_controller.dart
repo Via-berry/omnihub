@@ -90,14 +90,11 @@ class SubtitleSearchController extends GetxController {
         'sites': sites.join(','),
       };
       final seasonValue = season?.trim();
-      if (seasonValue != null &&
-          seasonValue.isNotEmpty &&
-          seasonValue != '0') {
+      if (seasonValue != null && seasonValue.isNotEmpty && seasonValue != '0') {
         query['season'] = seasonValue;
       }
       final identity = MediaIdentity.parse(mediaSearchKey);
-      final useV3 =
-          identity != null && await _serverApiVersionService.isV3();
+      final useV3 = identity != null && await _serverApiVersionService.isV3();
       if (useV3) query['media_source'] = identity.source;
       final requestMediaId = useV3 ? identity.id : mediaSearchKey;
 
@@ -161,7 +158,8 @@ class SubtitleSearchController extends GetxController {
 
     final type = json['type']?.toString() ?? '';
     final text =
-        (json['text_i18n'] ?? json['text'])?.toString() ?? progressMessage.value;
+        (json['text_i18n'] ?? json['text'])?.toString() ??
+        progressMessage.value;
     final value = json['value'];
     if (value is num) {
       final normalized = value <= 1 ? value.toDouble() : value.toDouble() / 100;

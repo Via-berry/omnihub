@@ -657,27 +657,41 @@ class ApiClient extends g.GetxController {
     String path, {
     String? token,
     int? timeout,
+    Map<String, dynamic>? headers,
+    bool handleAuth = true,
   }) async {
     await _ensureReady();
     final authToken = token ?? this.token;
     _log.info('API流式请求: $path, token: ${authToken != null ? '***' : 'null'}');
+    final requestHeaders = <String, dynamic>{
+      'accept': 'text/event-stream',
+      'cache-control': 'no-cache',
+      if (authToken != null) 'authorization': 'Bearer $authToken',
+      ...?headers,
+    };
+    if (!kIsWeb && !requestHeaders.containsKey('Cookie')) {
+      final cookieHeader = await getCookieHeader() ?? _appService.cookie;
+      if (cookieHeader != null && cookieHeader.isNotEmpty) {
+        requestHeaders['Cookie'] = cookieHeader;
+      }
+    }
     final response = await _dio.get<ResponseBody>(
       path,
       options: Options(
         responseType: ResponseType.stream,
         sendTimeout: const Duration(seconds: 30),
         receiveTimeout: timeout == null ? null : Duration(seconds: timeout),
-        headers: {
-          'accept': 'text/event-stream',
-          if (authToken != null) 'authorization': 'Bearer $authToken',
-        },
+        headers: requestHeaders,
         validateStatus: (status) => true,
       ),
     );
     final status = response.statusCode ?? 0;
     if (status == 401 || status == 403) {
-      _handleUnauthorized(status);
-      throw ApiAuthException(status, response.statusMessage);
+      if (handleAuth) {
+        _handleUnauthorized(status);
+        throw ApiAuthException(status, response.statusMessage);
+      }
+      throw ApiHttpException(status, response.statusMessage);
     }
     if (status >= 400) {
       throw ApiHttpException(status, response.statusMessage);

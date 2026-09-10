@@ -158,8 +158,7 @@ class PluginListController extends GetxController {
         items.clear();
         return;
       }
-      final raw = response.data;
-      final list = raw is List ? raw : <dynamic>[];
+      final list = unwrapPluginList(response.data);
       final parsed = <PluginItem>[];
       for (final item in list) {
         if (item is! Map) continue;

@@ -12,6 +12,9 @@ import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/services/hive_service.dart';
 import 'package:moviepilot_mobile/utils/image_util.dart';
+import 'package:moviepilot_mobile/utils/prefs_keys.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PluginController extends GetxController {
   final _apiClient = Get.find<ApiClient>();
@@ -20,15 +23,20 @@ class PluginController extends GetxController {
   final _hive = Get.find<HiveService>();
   final _backupService = PluginBackupService();
   final items = <PluginItem>[].obs;
+  final availabilityById = <String, PluginAvailability>{}.obs;
   final keyword = ''.obs;
   final isLoading = false.obs;
+  final isCleaningUnavailable = false.obs;
   final errorText = RxnString();
   final isBackingUp = false.obs;
   final isRestoring = false.obs;
   final restoreProgress = Rxn<PluginBatchInstallProgress>();
+  final autoBackupEnabled = false.obs;
 
   bool _visibleCacheDirty = true;
   List<PluginItem> _cachedVisible = [];
+  bool _autoBackupRunning = false;
+  Future<void>? _autoBackupPrefFuture;
 
   bool get _canAccessPlugins => _appService.canManage;
 
@@ -48,6 +56,7 @@ class PluginController extends GetxController {
     super.onInit();
     ever(keyword, (_) => _visibleCacheDirty = true);
     ever(items, (_) => _visibleCacheDirty = true);
+    _loadAutoBackupPref();
   }
 
   void updateKeyword(String value) {
@@ -69,6 +78,14 @@ class PluginController extends GetxController {
     return _cachedVisible;
   }
 
+  PluginAvailability availabilityOf(String id) {
+    return availabilityById[id] ?? const PluginAvailability();
+  }
+
+  List<PluginItem> get unavailableItems {
+    return items.where((item) => availabilityOf(item.id).unavailable).toList();
+  }
+
   bool _matchKeyword(PluginItem item, String keywordLower) {
     final buffer = StringBuffer()
       ..write(item.pluginName)
@@ -84,7 +101,82 @@ class PluginController extends GetxController {
   @override
   void onReady() {
     super.onReady();
+    // 列表加载留给页面；每日自动备份由 Index 启动链路触发，避免依赖进入插件页。
     load();
+  }
+
+  Future<void> _loadAutoBackupPref() {
+    return _autoBackupPrefFuture ??= () async {
+      final prefs = await SharedPreferences.getInstance();
+      autoBackupEnabled.value =
+          prefs.getBool(kPluginAutoBackupEnabledKey) ?? false;
+    }();
+  }
+
+  Future<void> setAutoBackupEnabled(bool enabled) async {
+    await _loadAutoBackupPref();
+    autoBackupEnabled.value = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(kPluginAutoBackupEnabledKey, enabled);
+    if (enabled) {
+      await runDailyAutoBackupIfNeeded();
+    }
+  }
+
+  String _todayKey([DateTime? now]) {
+    final t = now ?? DateTime.now();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${t.year}-${two(t.month)}-${two(t.day)}';
+  }
+
+  /// App 启动进入主页后调用；不依赖打开插件/备份中心页面。
+  Future<void> runDailyAutoBackupIfNeeded() async {
+    if (_autoBackupRunning) return;
+    if (kIsWeb) return;
+    await _loadAutoBackupPref();
+    if (!autoBackupEnabled.value) return;
+    if (!_canAccessPlugins) return;
+
+    final scopeKey = _appService.pluginCacheScopeKey;
+    if (scopeKey.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final today = _todayKey();
+    final lastKey = kPluginAutoBackupLastDateKey(scopeKey);
+    if (prefs.getString(lastKey) == today) return;
+
+    final existing = await _backupService.listBackups(scopeKey);
+    if (_backupService.hasAutoBackupOnDate(existing, DateTime.now())) {
+      await prefs.setString(lastKey, today);
+      return;
+    }
+
+    _autoBackupRunning = true;
+    try {
+      if (items.isEmpty) {
+        await loadFromCache();
+      }
+      if (items.isEmpty) {
+        await load();
+      }
+      if (items.isEmpty) {
+        _log.info('插件每日自动备份跳过：当前无已安装插件');
+        return;
+      }
+
+      final enriched = await enrichPluginsRepoUrl(items.toList());
+      final saved = await _backupService.saveBackup(
+        scopeKey: scopeKey,
+        plugins: enriched,
+        auto: true,
+      );
+      await prefs.setString(lastKey, today);
+      _log.info('插件每日自动备份完成: ${saved.fileName}');
+    } catch (e, st) {
+      _log.handle(e, stackTrace: st, message: '插件每日自动备份失败');
+    } finally {
+      _autoBackupRunning = false;
+    }
   }
 
   Future<Map<String, int>> loadInstallCount() async {
@@ -198,6 +290,7 @@ class PluginController extends GetxController {
       errorText.value = '当前帐号无管理权限';
       _clearLocalCache();
       items.clear();
+      availabilityById.clear();
       _visibleCacheDirty = true;
       isLoading.value = false;
       return;
@@ -217,24 +310,26 @@ class PluginController extends GetxController {
       if (status >= 400) {
         errorText.value = '请求失败 (HTTP $status)';
         items.clear();
+        availabilityById.clear();
         return;
       }
-      final raw = response.data;
-      final list = raw is List ? raw : <dynamic>[];
+      final list = unwrapPluginList(response.data);
       final parsed = <PluginItem>[];
+      final availability = <String, PluginAvailability>{};
       for (final item in list) {
         if (item is! Map) continue;
         try {
           final map = Map<String, dynamic>.from(item);
-          parsed.add(
-            PluginItem.fromJson(map).copyWith(
-              installCount: lookupPluginInstallCount(installCount, map['id']),
-            ),
+          final parsedItem = PluginItem.fromJson(map).copyWith(
+            installCount: lookupPluginInstallCount(installCount, map['id']),
           );
+          parsed.add(parsedItem);
+          availability[parsedItem.id] = pluginAvailabilityFromJson(map);
         } catch (e, st) {
           _log.handle(e, stackTrace: st, message: '解析插件失败');
         }
       }
+      availabilityById.assignAll(availability);
       items.assignAll(parsed);
       _visibleCacheDirty = true;
       _preloadPalettes(limit: 12);
@@ -243,6 +338,7 @@ class PluginController extends GetxController {
       _log.handle(e, stackTrace: st, message: '获取插件列表失败');
       errorText.value = '请求失败，请稍后重试';
       items.clear();
+      availabilityById.clear();
     } finally {
       isLoading.value = false;
     }
@@ -365,6 +461,8 @@ class PluginController extends GetxController {
       plugins: plugins,
       fileName: backup.fileName,
       filePath: backup.filePath,
+      imported: backup.imported,
+      auto: backup.auto,
     );
   }
 
@@ -384,11 +482,64 @@ class PluginController extends GetxController {
       plugins: plugins,
       fileName: backup.fileName,
       filePath: backup.filePath,
+      imported: backup.imported,
+      auto: backup.auto,
     );
+  }
+
+  Future<PluginBackupFile> importPluginBackup({
+    String? path,
+    List<int>? bytes,
+    String fileName = '',
+  }) async {
+    if (kIsWeb) {
+      throw UnsupportedError('当前平台不支持导入备份');
+    }
+    final scopeKey = _appService.pluginCacheScopeKey;
+    if (scopeKey.isEmpty) {
+      throw StateError('无法确定当前服务器作用域');
+    }
+    final PluginBackupFile parsed;
+    if (bytes != null) {
+      parsed = await readPluginBackupBytes(bytes, fileName: fileName);
+    } else if (path != null && path.isNotEmpty) {
+      parsed = await readPluginBackup(path);
+    } else {
+      throw StateError('无法读取所选文件');
+    }
+    final saved = await _backupService.importBackup(
+      scopeKey: scopeKey,
+      source: parsed,
+    );
+    _log.info('插件备份已导入本地: ${saved.fileName} (${saved.plugins.length})');
+    return saved;
   }
 
   Future<void> deletePluginBackup(String path) {
     return _backupService.deleteBackup(path);
+  }
+
+  Future<ShareResultStatus> exportPluginBackup(String path) async {
+    if (kIsWeb) {
+      throw UnsupportedError('当前平台不支持导出备份');
+    }
+    final payload = await _backupService.readBackupExportPayload(path);
+    final result = await SharePlus.instance.share(
+      ShareParams(
+        files: [
+          XFile(
+            path,
+            mimeType: 'application/json',
+            name: payload.fileName,
+          ),
+        ],
+        subject: '插件备份 ${payload.fileName}',
+      ),
+    );
+    if (result.status == ShareResultStatus.unavailable) {
+      throw StateError('当前设备不支持分享导出');
+    }
+    return result.status;
   }
 
   Future<PluginBatchInstallProgress> restorePlugins(
@@ -508,6 +659,34 @@ class PluginController extends GetxController {
     if (!_canAccessPlugins) return false;
     final response = await _apiClient.delete<dynamic>('/api/v1/plugin/$id');
     return response.statusCode == 200 && response.data['success'] == true;
+  }
+
+  Future<({int ok, int fail})> uninstallUnavailablePlugins() async {
+    final targets = unavailableItems;
+    if (targets.length <= 2) {
+      return (ok: 0, fail: 0);
+    }
+    isCleaningUnavailable.value = true;
+    var ok = 0;
+    var fail = 0;
+    try {
+      for (final item in targets) {
+        try {
+          final success = await uninstallPlugin(item.id);
+          if (success) {
+            ok++;
+          } else {
+            fail++;
+          }
+        } catch (_) {
+          fail++;
+        }
+      }
+      await load(force: true);
+      return (ok: ok, fail: fail);
+    } finally {
+      isCleaningUnavailable.value = false;
+    }
   }
 }
 

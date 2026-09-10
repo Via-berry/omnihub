@@ -14,12 +14,16 @@ class PluginItemCard extends StatelessWidget {
     required this.item,
     required this.iconUrl,
     required this.installCount,
+    this.unavailable = false,
+    this.unavailableLabel = '不可用',
     this.onHandleTap,
   });
 
   final PluginItem item;
   final String iconUrl;
   final int installCount;
+  final bool unavailable;
+  final String unavailableLabel;
   final Function(PluginHandleType type)? onHandleTap;
 
   static const double _radius = 18;
@@ -399,6 +403,13 @@ class PluginItemCard extends StatelessWidget {
     DashboardPaletteData palette,
     bool installedView,
   ) {
+    if (unavailable) {
+      return (
+        label: unavailableLabel,
+        icon: CupertinoIcons.exclamationmark_triangle_fill,
+        color: palette.warningAccent,
+      );
+    }
     if (item.hasUpdate) {
       return (
         label: '可更新',

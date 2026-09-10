@@ -331,7 +331,10 @@ class AppSettingController extends GetxController {
     }
   }
 
-  Future<void> downloadLatestApk(AppUpdateInfo info) async {
+  Future<void> downloadLatestApk(
+    AppUpdateInfo info, {
+    bool useProxy = false,
+  }) async {
     if (isDownloadingUpdate.value) {
       _showDownloadProgressSheet();
       return;
@@ -349,6 +352,7 @@ class AppSettingController extends GetxController {
     try {
       final path = await _updateService.downloadApk(
         info,
+        useProxy: useProxy,
         cancelToken: _downloadCancelToken,
         onProgress: (received, total) {
           if (total > 0) {
@@ -561,6 +565,24 @@ class AppSettingController extends GetxController {
                       ),
                     ),
                   ),
+                  if (canDownloadApk && info.hasApk)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: CupertinoButton(
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        color: colorScheme.primaryContainer,
+                        onPressed: () {
+                          Get.back();
+                          downloadLatestApk(info, useProxy: true);
+                        },
+                        child: Text(
+                          '加速下载（ghproxy.net）',
+                          style: TextStyle(
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                     child: Row(
