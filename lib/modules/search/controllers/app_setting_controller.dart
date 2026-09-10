@@ -104,6 +104,7 @@ class AppSettingController extends GetxController {
 
     loadAppVersion();
     fetchLatestWorkflowStatus();
+    checkUpdateSilently();
   }
 
   Future<void> fetchLatestWorkflowStatus({bool forceRefresh = false}) async {
@@ -215,6 +216,31 @@ class AppSettingController extends GetxController {
     return ok;
   }
 
+  bool get hasNewVersion => updateInfo.value?.isNewer == true;
+
+  String get latestVersionLabel {
+    final info = updateInfo.value;
+    if (info == null) return '';
+    return info.latestLabel;
+  }
+
+  String? get currentPatchLabel {
+    final patch = _updateService.currentPatchNumber.value;
+    return patch != null ? '补丁 #$patch' : null;
+  }
+
+  Future<void> checkUpdateSilently() async {
+    try {
+      if (Platform.isIOS && _updateService.isShorebirdAvailable) {
+        await _updateService.loadPatchNumber();
+      }
+      final info = await _updateService.fetchLatestRelease();
+      updateInfo.value = info;
+    } catch (_) {
+      // 页面载入静默检测失败时不打扰用户
+    }
+  }
+
   String get updateStatusText {
     if (isCheckingUpdate.value) return '检查中';
     if (isDownloadingUpdate.value) {
@@ -249,6 +275,10 @@ class AppSettingController extends GetxController {
         apkPath != null &&
         apkPath.isNotEmpty) {
       await installDownloadedApk();
+      return;
+    }
+    if (info != null && info.isNewer) {
+      _showUpdateDialog(info);
       return;
     }
     await checkForUpdate(showUpToDate: true);

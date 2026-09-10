@@ -28,6 +28,7 @@ class AppSettingPage extends GetView<AppSettingController> {
           _buildSearchAndDownloadSection(context),
           _buildBrowserSection(context),
           _buildAboutSection(context),
+          _buildAppFooter(context),
         ],
       ),
     );
@@ -167,11 +168,97 @@ class AppSettingPage extends GetView<AppSettingController> {
 
   Widget _buildAboutSection(BuildContext context) {
     return Section(
-      margin: EdgeInsets.zero,
+      margin: const EdgeInsets.only(bottom: 20),
       padding: EdgeInsets.zero,
-      header: const SectionHeader(title: '关于应用', subtitle: '版本、日志、仓库'),
+      header: const SectionHeader(title: '关于应用', subtitle: '版本、构建与开源信息'),
       separatorBuilder: _buildDivider,
       children: [
+        Obx(() {
+          final hasNew = controller.hasNewVersion;
+          final isChecking = controller.isCheckingUpdate.value;
+          final isDownloading = controller.isDownloadingUpdate.value;
+          final currentVer = controller.version.value;
+          final latestVer = controller.latestVersionLabel;
+
+          String subtitle;
+          Widget? trailingBadge;
+
+          if (isDownloading) {
+            final percent = (controller.downloadProgress.value * 100)
+                .clamp(0, 100)
+                .toStringAsFixed(0);
+            subtitle = '正在下载更新安装包...';
+            trailingBadge = Text(
+              '$percent%',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.activeBlue,
+              ),
+            );
+          } else if (isChecking) {
+            subtitle = '正在检查版本更新...';
+            trailingBadge = const CupertinoActivityIndicator(radius: 8);
+          } else if (hasNew) {
+            subtitle = '发现新版本 $latestVer · 点击查看并升级';
+            trailingBadge = Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemOrange.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: CupertinoColors.systemOrange.withValues(alpha: 0.32),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: CupertinoColors.systemOrange,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Text(
+                    '可更新',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: CupertinoColors.systemOrange,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          } else {
+            final patch = controller.currentPatchLabel;
+            subtitle = '当前已是最新版本${patch != null ? " ($patch)" : ""} · 点击检查';
+            trailingBadge = Text(
+              'v$currentVer',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            );
+          }
+
+          return _buildSettingTile(
+            context,
+            title: '版本更新',
+            subtitle: subtitle,
+            icon: Icons.system_update_alt_rounded,
+            iconColor: hasNew
+                ? CupertinoColors.systemOrange
+                : CupertinoColors.systemBlue,
+            additionalWidget: trailingBadge,
+            trailing: const CupertinoListTileChevron(),
+            onTap: () => controller.handleVersionTap(context),
+          );
+        }),
         Obx(() {
           final run = controller.latestWorkflowRun.value;
           String subtitle = '查看 GitHub Actions 热更新与打包状态';
@@ -203,31 +290,25 @@ class AppSettingPage extends GetView<AppSettingController> {
             onTap: () => Get.toNamed('/settings/app/workflow-status'),
           );
         }),
-        Obx(
-          () => _buildNavigationTile(
-            context,
-            title: '当前版本',
-            subtitle: '检查版本更新',
-            icon: Icons.info_outline,
-            iconColor: CupertinoColors.systemBlue,
-            additionalInfo: controller.updateStatusText,
-            onTap: () => controller.handleVersionTap(context),
-          ),
-        ),
         _buildNavigationTile(
           context,
           title: '更新日志',
           subtitle: '查看版本演进与功能更新记录',
-          icon: Icons.history,
+          icon: Icons.history_rounded,
           iconColor: CupertinoColors.systemOrange,
           onTap: () => Get.toNamed('/settings/app/changelog'),
         ),
         _buildNavigationTile(
           context,
           title: '开源仓库',
-          subtitle: '前往 GitHub 查看项目与发布信息',
-          icon: Icons.open_in_new_rounded,
-          iconColor: CupertinoColors.systemGrey,
+          subtitle: 'GitHub · singleton-altman/MoviePilotLite',
+          icon: Icons.code_rounded,
+          iconColor: CupertinoColors.systemIndigo,
+          trailing: const Icon(
+            Icons.open_in_new_rounded,
+            size: 16,
+            color: CupertinoColors.systemGrey,
+          ),
           onTap: () => WebUtil.open(url: _repoUrl, internal: false),
         ),
       ],
@@ -239,8 +320,13 @@ class AppSettingPage extends GetView<AppSettingController> {
     final primary = theme.colorScheme.primary;
     final onSurface = theme.colorScheme.onSurface;
 
-    return Obx(
-      () => Container(
+    return Obx(() {
+      final hasNew = controller.hasNewVersion;
+      final patchLabel = controller.currentPatchLabel;
+      final isChecking = controller.isCheckingUpdate.value;
+      final isDownloading = controller.isDownloadingUpdate.value;
+
+      return Container(
         margin: const EdgeInsets.only(bottom: 20),
         decoration: BoxDecoration(
           color: theme.cardColor,
@@ -260,7 +346,7 @@ class AppSettingPage extends GetView<AppSettingController> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
                     width: 52,
@@ -269,6 +355,9 @@ class AppSettingPage extends GetView<AppSettingController> {
                     decoration: BoxDecoration(
                       color: primary.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: primary.withValues(alpha: 0.16),
+                      ),
                     ),
                     child: Assets.logo.svg(
                       colorFilter: ColorFilter.mode(primary, BlendMode.srcIn),
@@ -279,129 +368,158 @@ class AppSettingPage extends GetView<AppSettingController> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'MoviePilot',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'MoviePilot',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: onSurface.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'v${controller.version.value}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: onSurface.withValues(alpha: 0.72),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '移动端设置与体验偏好',
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: onSurface.withValues(alpha: 0.62),
+                            fontSize: 13,
+                            color: onSurface.withValues(alpha: 0.58),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  CupertinoButton(
-                    minimumSize: Size.zero,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    color: primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(999),
-                    onPressed: () =>
-                        WebUtil.open(url: _repoUrl, internal: false),
-                    child: Text(
-                      'GitHub',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: primary,
-                      ),
-                    ),
-                  ),
                 ],
               ),
-              const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.045),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _buildInfoColumn(
-                        context,
-                        label: '当前版本',
-                        value: controller.updateStatusText,
-                        onTap: () => controller.handleVersionTap(context),
+              const SizedBox(height: 16),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => controller.handleVersionTap(context),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                  decoration: BoxDecoration(
+                    color: hasNew
+                        ? CupertinoColors.systemOrange.withValues(alpha: 0.10)
+                        : primary.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: hasNew
+                          ? CupertinoColors.systemOrange.withValues(alpha: 0.32)
+                          : primary.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        hasNew
+                            ? Icons.new_releases_rounded
+                            : (isChecking
+                                ? Icons.sync_rounded
+                                : (isDownloading
+                                    ? Icons.downloading_rounded
+                                    : Icons.verified_rounded)),
+                        size: 18,
+                        color: hasNew
+                            ? CupertinoColors.systemOrange
+                            : (isChecking
+                                ? primary
+                                : (isDownloading
+                                    ? CupertinoColors.activeGreen
+                                    : primary)),
                       ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 30,
-                      margin: const EdgeInsets.symmetric(horizontal: 14),
-                      color: theme.dividerColor.withValues(alpha: 0.28),
-                    ),
-                    Expanded(
-                      child: _buildInfoColumn(
-                        context,
-                        label: '项目属性',
-                        value: '开源移动客户端 · Shorebird 热更新生效',
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          hasNew
+                              ? '发现新版本 ${controller.latestVersionLabel} · 点击立即更新'
+                              : (isChecking
+                                  ? '正在检查版本更新...'
+                                  : (isDownloading
+                                      ? '正在下载更新安装包 (${(controller.downloadProgress.value * 100).toStringAsFixed(0)}%)'
+                                      : '当前已是最新版本${patchLabel != null ? " · $patchLabel" : ""}')),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight:
+                                hasNew ? FontWeight.w600 : FontWeight.w500,
+                            color: hasNew
+                                ? CupertinoColors.systemOrange
+                                : onSurface.withValues(alpha: 0.82),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 14),
-              Text(
-                'Copyright © 2026 Altman. All rights reserved.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 12,
-                  color: onSurface.withValues(alpha: 0.48),
+                      const SizedBox(width: 6),
+                      Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 14,
+                        color: hasNew
+                            ? CupertinoColors.systemOrange
+                            : onSurface.withValues(alpha: 0.36),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 
-  Widget _buildInfoColumn(
-    BuildContext context, {
-    required String label,
-    required String value,
-    VoidCallback? onTap,
-  }) {
+  Widget _buildAppFooter(BuildContext context) {
     final theme = Theme.of(context);
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            fontSize: 12,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.50),
-          ),
+    final onSurface = theme.colorScheme.onSurface;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      child: Center(
+        child: Column(
+          children: [
+            Text(
+              'MoviePilot 移动端助手',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: onSurface.withValues(alpha: 0.38),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Copyright © 2026 Altman. All rights reserved.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 11,
+                color: onSurface.withValues(alpha: 0.30),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.86),
-          ),
-        ),
-      ],
-    );
-    if (onTap == null) return content;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: content,
+      ),
     );
   }
 
@@ -413,6 +531,8 @@ class AppSettingPage extends GetView<AppSettingController> {
     required Color iconColor,
     VoidCallback? onTap,
     String? additionalInfo,
+    Widget? additionalWidget,
+    Widget? trailing,
   }) {
     return _buildSettingTile(
       context,
@@ -421,7 +541,9 @@ class AppSettingPage extends GetView<AppSettingController> {
       icon: icon,
       iconColor: iconColor,
       additionalInfo: additionalInfo,
-      trailing: onTap != null ? const CupertinoListTileChevron() : null,
+      additionalWidget: additionalWidget,
+      trailing:
+          trailing ?? (onTap != null ? const CupertinoListTileChevron() : null),
       onTap: onTap,
     );
   }
@@ -459,6 +581,7 @@ class AppSettingPage extends GetView<AppSettingController> {
     Widget? trailing,
     VoidCallback? onTap,
     String? additionalInfo,
+    Widget? additionalWidget,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -489,14 +612,15 @@ class AppSettingPage extends GetView<AppSettingController> {
               ),
             )
           : null,
-      additionalInfo: additionalInfo != null
-          ? Text(
-              additionalInfo,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            )
-          : null,
+      additionalInfo: additionalWidget ??
+          (additionalInfo != null
+              ? Text(
+                  additionalInfo,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                )
+              : null),
       trailing: trailing,
       onTap: onTap,
     );

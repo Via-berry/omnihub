@@ -226,12 +226,16 @@ class SearchSourceSelectSheet extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Text(
-                              '115 网盘资源（癫影）',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                            const Flexible(
+                              child: Text(
+                                '115 网盘资源（癫影）',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             const SizedBox(width: 6),
