@@ -123,10 +123,10 @@ class AuthRepository extends GetxService {
         return null;
       }
 
-      final payload = (data['data'] is Map)
+      final responseData = (data['data'] is Map)
           ? Map<String, dynamic>.from(data['data'] as Map)
           : data;
-      final updated = UserInfo.fromJson(payload);
+      final updated = UserInfo.fromJson(responseData);
       _appService.saveUserInfo(updated);
       _talker.info('更新用户信息成功');
       return updated;

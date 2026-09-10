@@ -31,7 +31,7 @@ double? _doubleFromJson(dynamic v) {
 List<String> _stringListFromJson(dynamic v) {
   if (v is List) {
     return v
-        .map((e) => e == null ? null : e.toString())
+        .map((e) => e?.toString())
         .whereType<String>()
         .toList();
   }

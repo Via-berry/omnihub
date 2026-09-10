@@ -28,6 +28,7 @@ import 'package:moviepilot_mobile/modules/system_message/controllers/system_mess
 import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:moviepilot_mobile/utils/open_url.dart';
 import 'package:moviepilot_mobile/utils/size_formatter.dart';
+import 'package:moviepilot_mobile/utils/toast_util.dart';
 import 'package:moviepilot_mobile/widgets/constrained_page_content.dart';
 import 'package:moviepilot_mobile/widgets/dashboard_scaffold.dart';
 
