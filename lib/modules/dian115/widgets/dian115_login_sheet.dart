@@ -344,51 +344,47 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
         } catch (_) {}
       }
 
-      // 2. 尝试从 webview 提取最新 Cookie
-      try {
-        final cookieResult = await _webController.runJavaScriptReturningResult(
-          "document.cookie || ''",
-        );
-        String cookieStr = cookieResult.toString();
-        if (cookieStr.startsWith('"') &&
-            cookieStr.endsWith('"') &&
-            cookieStr.length >= 2) {
-          cookieStr = jsonDecode(cookieStr);
+      // 2. 多次重试提取全量有效 Cookie（利用 WebKit/Android 底层 CookieManager 穿透 HttpOnly 沙箱）
+      Map<String, Map<String, dynamic>> cookieMap = {};
+      for (int attempt = 0; attempt < 4; attempt++) {
+        if (attempt > 0) {
+          await Future.delayed(const Duration(milliseconds: 400));
         }
-
-        if (cookieStr.isNotEmpty) {
-          _cachedCookieStr = cookieStr;
-          final cookieList = <Map<String, dynamic>>[];
-          final parts = cookieStr.split(';');
-          for (final p in parts) {
-            final trimmed = p.trim();
-            if (trimmed.isEmpty) continue;
-            final kv = trimmed.split('=');
-            if (kv.length >= 2) {
-              cookieList.add({
-                'name': kv[0].trim(),
-                'value': kv.sublist(1).join('=').trim(),
-                'domain': 'm.dian115.com',
-                'path': '/',
-              });
-            }
-          }
-          if (cookieList.isNotEmpty) {
-            _cachedCookies = cookieList;
+        cookieMap = await _extractCookies();
+        if (cookieMap.isNotEmpty) {
+          // 只要捕获到核心鉴权 cookie（包含 portal、session、browser、token 等），即可立即继续
+          final hasAuthCookie = cookieMap.keys.any((k) {
+            final lower = k.toLowerCase();
+            return lower.contains('portal') ||
+                lower.contains('session') ||
+                lower.contains('browser') ||
+                lower.contains('token') ||
+                lower.contains('auth');
+          });
+          if (hasAuthCookie) {
+            break;
           }
         }
-      } catch (_) {}
+      }
 
-      // 如果既没有提取到 Cookie 也没有用户数据，提示未登录
-      if ((_cachedCookies == null || _cachedCookies!.isEmpty) && _cachedUserData == null) {
+      if (cookieMap.isNotEmpty) {
+        _cachedCookies = cookieMap.values.toList();
+        _cachedCookieStr = _cachedCookies!
+            .map((c) => '${c['name']}=${c['value']}')
+            .join('; ');
+      }
+
+      // 如果未提取到任何有效 Cookie，前置拦截并提示，避免提交空 Cookie 引发网关 400 错误
+      if (_cachedCookies == null || _cachedCookies!.isEmpty) {
         if (mounted) {
           setState(() {
             _isSyncing = false;
-            _statusText = '未检测到登录状态，请先在下方完成人机验证与登录';
-            _syncErrorMessage = '未检测到已登录的会话凭证，请轻触人机验证并完成登录。';
+            _hasAutoSyncTriggered = false;
+            _statusText = '未捕获到登录 Cookie，请先在下方完成人机验证与登录';
+            _syncErrorMessage = '未检测到有效登录 Cookie。请在网页中轻触人机验证（绿勾）并点击登录，待页面登录成功后再重试。';
           });
           if (isManual) {
-            ToastUtil.error('未检测到登录状态，请先完成登录');
+            ToastUtil.error('未检测到登录状态，请先在网页中完成登录');
           }
         }
         return;
@@ -417,6 +413,7 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
               : '同步未完成：无法连接到网关 ${Dian115Service.to.host.value}';
           setState(() {
             _isSyncing = false;
+            _hasAutoSyncTriggered = false;
             _syncErrorMessage = errorMsg;
             _statusText = '网关连接失败，请查看下方提示';
           });
@@ -427,12 +424,84 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
       if (mounted) {
         setState(() {
           _isSyncing = false;
+          _hasAutoSyncTriggered = false;
           _syncErrorMessage = '同步发生异常: $e';
           _statusText = '同步异常: $e';
         });
         ToastUtil.error('同步异常: $e');
       }
     }
+  }
+
+  /// 提取全量 Cookie（优先利用原生平台底层 CookieManager 穿透 HttpOnly 安全沙箱）
+  Future<Map<String, Map<String, dynamic>>> _extractCookies() async {
+    final cookieMap = <String, Map<String, dynamic>>{};
+
+    // 1. 原生平台底层 CookieManager (iOS WKHTTPCookieStore / Android CookieManager)
+    try {
+      final cookieManager = WebViewCookieManager();
+      final urlsToTry = [
+        Uri.parse('https://m.dian115.com'),
+        Uri.parse('https://dian115.com'),
+      ];
+      for (final u in urlsToTry) {
+        try {
+          final nativeCookies = await cookieManager.platform.getCookies(u);
+          for (final c in nativeCookies) {
+            final name = c.name.trim();
+            final value = c.value.trim();
+            if (name.isNotEmpty && value.isNotEmpty) {
+              cookieMap[name] = {
+                'name': name,
+                'value': value,
+                'domain': c.domain.isNotEmpty ? c.domain : 'm.dian115.com',
+                'path': c.path.isNotEmpty ? c.path : '/',
+              };
+            }
+          }
+        } catch (e) {
+          debugPrint('Platform getCookies for $u error: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('WebViewCookieManager instance error: $e');
+    }
+
+    // 2. JavaScript document.cookie 补充合并
+    try {
+      final cookieResult = await _webController.runJavaScriptReturningResult(
+        "document.cookie || ''",
+      );
+      String cookieStr = cookieResult.toString();
+      if (cookieStr.startsWith('"') &&
+          cookieStr.endsWith('"') &&
+          cookieStr.length >= 2) {
+        cookieStr = jsonDecode(cookieStr);
+      }
+
+      if (cookieStr.isNotEmpty) {
+        final parts = cookieStr.split(';');
+        for (final p in parts) {
+          final trimmed = p.trim();
+          if (trimmed.isEmpty) continue;
+          final kv = trimmed.split('=');
+          if (kv.length >= 2) {
+            final name = kv[0].trim();
+            final val = kv.sublist(1).join('=').trim();
+            if (name.isNotEmpty && val.isNotEmpty && !cookieMap.containsKey(name)) {
+              cookieMap[name] = {
+                'name': name,
+                'value': val,
+                'domain': 'm.dian115.com',
+                'path': '/',
+              };
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    return cookieMap;
   }
 
   void _showHostSettingsDialog(BuildContext context) {

@@ -246,7 +246,26 @@ class Dian115Service extends GetxService {
           lastSyncError.value = '无法连接到 NAS 网关 (${host.value})，连接超时或网络不可达';
         }
       } else {
-        lastSyncError.value = '网关请求失败 (${e.response?.statusCode ?? e.message})';
+        String? detailMsg;
+        if (e.response?.data is Map<String, dynamic>) {
+          final data = e.response!.data as Map<String, dynamic>;
+          detailMsg = data['detail']?.toString() ?? data['message']?.toString();
+        } else if (e.response?.data is String) {
+          try {
+            final data = jsonDecode(e.response!.data as String);
+            if (data is Map<String, dynamic>) {
+              detailMsg =
+                  data['detail']?.toString() ?? data['message']?.toString();
+            }
+          } catch (_) {}
+        }
+        if (detailMsg != null && detailMsg.isNotEmpty) {
+          lastSyncError.value =
+              '网关请求失败 (${e.response?.statusCode ?? 400}): $detailMsg';
+        } else {
+          lastSyncError.value =
+              '网关请求失败 (${e.response?.statusCode ?? e.message})';
+        }
       }
       debugPrint('Dian115Service importSession DioException: $e');
     } catch (e) {
