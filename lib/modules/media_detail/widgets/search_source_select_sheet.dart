@@ -6,6 +6,7 @@ import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart'
 enum SearchSourceType {
   pt,
   dian115,
+  pansou,
 }
 
 class SearchSourceSelectSheet extends StatelessWidget {
@@ -302,6 +303,107 @@ class SearchSourceSelectSheet extends StatelessWidget {
                       ],
                     );
                   }),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 渠道 3：PanSou 网盘聚合搜索
+          InkWell(
+            onTap: () => Navigator.of(context).pop(SearchSourceType.pansou),
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF083344).withValues(alpha: 0.35),
+                    const Color(0xFF0F172A),
+                    const Color(0xFF161B22),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
+                      ),
+                    ),
+                    child: const Icon(
+                      CupertinoIcons.search_circle_fill,
+                      color: Color(0xFF00E5FF),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Flexible(
+                              child: Text(
+                                'PanSou 网盘聚合',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: const Text(
+                                '免解锁·115/磁力',
+                                style: TextStyle(
+                                  color: Color(0xFF00E5FF),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '多频道并发 · 115 分享/磁力/电驴一键转存',
+                          style: TextStyle(
+                            color: const Color(0xFF00E5FF).withValues(alpha: 0.70),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    CupertinoIcons.chevron_right,
+                    size: 16,
+                    color: Color(0xFF00E5FF),
+                  ),
                 ],
               ),
             ),

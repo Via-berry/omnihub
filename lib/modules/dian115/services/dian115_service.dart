@@ -20,6 +20,21 @@ class Dian115Service extends GetxService {
   final RxString host = defaultHost.obs;
   final RxMap<int, Dian115UnlockResult> unlockedMap = <int, Dian115UnlockResult>{}.obs;
   final Rx<Dian115StatusResult?> accountStatus = Rx<Dian115StatusResult?>(null);
+  final RxString lastSyncError = ''.obs;
+
+  bool get isLanHost {
+    final h = host.value.toLowerCase();
+    return h.contains('192.168.') ||
+        h.contains('10.') ||
+        h.contains('172.16.') ||
+        h.contains('172.17.') ||
+        h.contains('172.18.') ||
+        h.contains('172.19.') ||
+        h.contains('172.2') ||
+        h.contains('172.3') ||
+        h.contains('localhost') ||
+        h.contains('127.0.0.1');
+  }
 
   late final Dio _dio;
 
@@ -190,6 +205,7 @@ class Dian115Service extends GetxService {
     Map<String, dynamic>? userData,
     String? cookieString,
   }) async {
+    lastSyncError.value = '';
     try {
       final body = <String, dynamic>{
         'cookies': cookies,
@@ -201,17 +217,40 @@ class Dian115Service extends GetxService {
       final resp = await _dio.post(
         _cleanUrl('/api/auth/session'),
         data: body,
-        options: Options(contentType: 'application/json'),
+        options: Options(
+          contentType: 'application/json',
+          sendTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 6),
+        ),
       );
 
       if (resp.data is Map<String, dynamic>) {
-        final success = resp.data['success'] as bool? ?? false;
+        final data = resp.data as Map<String, dynamic>;
+        final success = data['success'] as bool? ?? false;
         if (success) {
-          await getStatus();
+          await getStatus().catchError((_) => const Dian115StatusResult());
           return true;
+        } else {
+          lastSyncError.value = data['message'] as String? ?? '网关未能识别该会话';
         }
       }
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        if (isLanHost) {
+          lastSyncError.value =
+              '无法连接到 NAS 网关 (${host.value})。检测到当前网关为局域网 IP，若处于移动网络 (5G/4G)，请连接家庭 WiFi 或开启回家代理。';
+        } else {
+          lastSyncError.value = '无法连接到 NAS 网关 (${host.value})，连接超时或网络不可达';
+        }
+      } else {
+        lastSyncError.value = '网关请求失败 (${e.response?.statusCode ?? e.message})';
+      }
+      debugPrint('Dian115Service importSession DioException: $e');
     } catch (e) {
+      lastSyncError.value = '同步异常: $e';
       debugPrint('Dian115Service importSession error: $e');
     }
     return false;

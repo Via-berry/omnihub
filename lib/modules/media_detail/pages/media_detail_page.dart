@@ -11,6 +11,7 @@ import 'package:moviepilot_mobile/modules/media_detail/pages/media_season_detail
 import 'package:moviepilot_mobile/modules/media_detail/widgets/media_detail_season_card.dart';
 import 'package:moviepilot_mobile/modules/search/pages/search_mid_sheet.dart';
 import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_share_sheet.dart';
+import 'package:moviepilot_mobile/modules/pansou/widgets/pansou_share_sheet.dart';
 import 'package:moviepilot_mobile/modules/media_detail/widgets/search_source_select_sheet.dart';
 import 'package:moviepilot_mobile/modules/recommend/models/recommend_api_item.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
@@ -1825,6 +1826,22 @@ class MediaDetailPage extends GetWidget<MediaDetailController> {
             rawType.toLowerCase().contains('movie') ||
             rawType.isEmpty;
         Dian115ShareSheet.show(
+          context,
+          tmdbId: detail?.tmdb_id,
+          mediaType: isMovie ? 'movie' : 'tv',
+          mediaTitle: detail?.title ?? '',
+        );
+      }
+      return;
+    }
+
+    if (sourceType == SearchSourceType.pansou) {
+      if (context.mounted) {
+        final rawType = detail?.type ?? '';
+        final isMovie = rawType.contains('电影') ||
+            rawType.toLowerCase().contains('movie') ||
+            rawType.isEmpty;
+        PansouShareSheet.show(
           context,
           tmdbId: detail?.tmdb_id,
           mediaType: isMovie ? 'movie' : 'tv',

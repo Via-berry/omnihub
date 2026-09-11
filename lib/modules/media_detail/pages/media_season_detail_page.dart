@@ -8,6 +8,7 @@ import 'package:moviepilot_mobile/modules/media_detail/models/media_notexists.da
 import 'package:moviepilot_mobile/modules/media_detail/models/season_episode_detail.dart';
 import 'package:moviepilot_mobile/modules/search/pages/search_mid_sheet.dart';
 import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_share_sheet.dart';
+import 'package:moviepilot_mobile/modules/pansou/widgets/pansou_share_sheet.dart';
 import 'package:moviepilot_mobile/modules/media_detail/widgets/search_source_select_sheet.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
 import 'package:moviepilot_mobile/services/app_service.dart';
@@ -187,6 +188,19 @@ class _MediaSeasonDetailPageState extends State<MediaSeasonDetailPage> {
     if (sourceType == SearchSourceType.dian115) {
       if (context.mounted) {
         Dian115ShareSheet.show(
+          context,
+          tmdbId: detail?.tmdb_id ?? int.tryParse(widget.tmdbId),
+          mediaType: 'tv',
+          season: _seasonNumber ?? 0,
+          mediaTitle: widget.title,
+        );
+      }
+      return;
+    }
+
+    if (sourceType == SearchSourceType.pansou) {
+      if (context.mounted) {
+        PansouShareSheet.show(
           context,
           tmdbId: detail?.tmdb_id ?? int.tryParse(widget.tmdbId),
           mediaType: 'tv',
