@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/search/models/app_update_info.dart';
+import 'package:moviepilot_mobile/modules/search/models/omnihub_release_log.dart';
 import 'package:moviepilot_mobile/modules/search/models/upstream_sync_info.dart';
 import 'package:moviepilot_mobile/modules/search/services/app_update_installer.dart';
 import 'package:moviepilot_mobile/modules/search/services/app_update_service.dart';
@@ -21,6 +22,8 @@ import 'package:moviepilot_mobile/modules/settings/models/github_workflow_models
 import 'package:moviepilot_mobile/modules/settings/services/github_actions_service.dart';
 
 class AppSettingController extends GetxController {
+  OmniHubReleaseItem get latestRelease => OmniHubReleaseHistory.latest;
+  List<OmniHubReleaseItem> get omnihubReleases => OmniHubReleaseHistory.releases;
   final themeMode = ThemeMode.system.obs;
   final primaryColor = Color(0xFF007AFF).obs;
   final selectedAppIconId = 'default'.obs;

@@ -15,6 +15,8 @@ class AppSettingPage extends GetView<AppSettingController> {
 
   static const String _repoUrl =
       'https://github.com/singleton-altman/MoviePilotLite';
+  static const String _omnihubRepoUrl =
+      'https://github.com/Via-berry/omnihub';
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +26,7 @@ class AppSettingPage extends GetView<AppSettingController> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           _buildAppInfoCard(context),
+          _buildVersionAndReleaseSection(context),
           _buildAppearanceSection(context),
           _buildSearchAndDownloadSection(context),
           _buildBrowserSection(context),
@@ -166,13 +169,44 @@ class AppSettingPage extends GetView<AppSettingController> {
     );
   }
 
-  Widget _buildAboutSection(BuildContext context) {
+  Widget _buildVersionAndReleaseSection(BuildContext context) {
     return Section(
       margin: const EdgeInsets.only(bottom: 20),
       padding: EdgeInsets.zero,
-      header: const SectionHeader(title: '关于应用', subtitle: '版本、构建与开源信息'),
+      header: const SectionHeader(
+        title: '版本与发布',
+        subtitle: '热更新补丁、发版日志与基线',
+      ),
       separatorBuilder: _buildDivider,
       children: [
+        _buildSettingTile(
+          context,
+          title: 'OmniHub 发布日志',
+          subtitle:
+              '${controller.latestRelease.date} · ${controller.latestRelease.summary}',
+          icon: Icons.history_edu_rounded,
+          iconColor: CupertinoColors.systemOrange,
+          additionalWidget: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemOrange.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: CupertinoColors.systemOrange.withValues(alpha: 0.32),
+              ),
+            ),
+            child: Text(
+              controller.latestRelease.displayTag,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.systemOrange,
+              ),
+            ),
+          ),
+          trailing: const CupertinoListTileChevron(),
+          onTap: () => Get.toNamed('/settings/app/changelog'),
+        ),
         Obx(() {
           final hasNew = controller.hasNewVersion;
           final isChecking = controller.isCheckingUpdate.value;
@@ -260,6 +294,37 @@ class AppSettingPage extends GetView<AppSettingController> {
           );
         }),
         Obx(() {
+          final run = controller.latestWorkflowRun.value;
+          String subtitle = '查看 GitHub Actions 热更新与打包状态';
+          String? infoText;
+          if (run != null) {
+            if (run.isBuilding) {
+              subtitle = 'Shorebird Patch #${run.runNumber} · 正在打包中';
+              infoText = '打包中 ⏳';
+            } else if (run.isQueued) {
+              subtitle = 'Shorebird Patch #${run.runNumber} · 排队中';
+              infoText = '排队中';
+            } else if (run.isSuccess) {
+              subtitle = '最新构建已完成 · ${run.timeAgo}';
+              infoText = '已完成 ✓';
+            } else if (run.isFailed) {
+              subtitle = '最新构建失败 · ${run.timeAgo}';
+              infoText = '失败 ✕';
+            }
+          }
+          return _buildNavigationTile(
+            context,
+            title: '热更新构建进度',
+            subtitle: subtitle,
+            icon: Icons.bolt_rounded,
+            iconColor: run?.isBuilding == true
+                ? CupertinoColors.activeBlue
+                : CupertinoColors.systemTeal,
+            additionalInfo: infoText,
+            onTap: () => Get.toNamed('/settings/app/workflow-status'),
+          );
+        }),
+        Obx(() {
           final baseline = controller.upstreamBaseline.value;
           final check = controller.upstreamCheckResult.value;
           final isChecking = controller.isCheckingUpstream.value;
@@ -315,51 +380,36 @@ class AppSettingPage extends GetView<AppSettingController> {
             onTap: () => controller.showUpstreamDetailSheet(context),
           );
         }),
-        Obx(() {
-          final run = controller.latestWorkflowRun.value;
-          String subtitle = '查看 GitHub Actions 热更新与打包状态';
-          String? infoText;
-          if (run != null) {
-            if (run.isBuilding) {
-              subtitle = 'Shorebird Patch #${run.runNumber} · 正在打包中';
-              infoText = '打包中 ⏳';
-            } else if (run.isQueued) {
-              subtitle = 'Shorebird Patch #${run.runNumber} · 排队中';
-              infoText = '排队中';
-            } else if (run.isSuccess) {
-              subtitle = '最新构建已完成 · ${run.timeAgo}';
-              infoText = '已完成 ✓';
-            } else if (run.isFailed) {
-              subtitle = '最新构建失败 · ${run.timeAgo}';
-              infoText = '失败 ✕';
-            }
-          }
-          return _buildNavigationTile(
-            context,
-            title: '热更新构建进度',
-            subtitle: subtitle,
-            icon: Icons.bolt_rounded,
-            iconColor: run?.isBuilding == true
-                ? CupertinoColors.activeBlue
-                : CupertinoColors.systemTeal,
-            additionalInfo: infoText,
-            onTap: () => Get.toNamed('/settings/app/workflow-status'),
-          );
-        }),
+      ],
+    );
+  }
+
+  Widget _buildAboutSection(BuildContext context) {
+    return Section(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: EdgeInsets.zero,
+      header: const SectionHeader(title: '关于与开源', subtitle: '开源协议与代码仓库'),
+      separatorBuilder: _buildDivider,
+      children: [
         _buildNavigationTile(
           context,
-          title: '更新日志',
-          subtitle: '查看版本演进与功能更新记录',
-          icon: Icons.history_rounded,
-          iconColor: CupertinoColors.systemOrange,
-          onTap: () => Get.toNamed('/settings/app/changelog'),
+          title: 'OmniHub 项目仓库',
+          subtitle: 'GitHub · Via-berry/omnihub',
+          icon: Icons.hub_rounded,
+          iconColor: CupertinoColors.systemIndigo,
+          trailing: const Icon(
+            Icons.open_in_new_rounded,
+            size: 16,
+            color: CupertinoColors.systemGrey,
+          ),
+          onTap: () => WebUtil.open(url: _omnihubRepoUrl, internal: false),
         ),
         _buildNavigationTile(
           context,
-          title: '开源仓库',
+          title: '上游官方仓库',
           subtitle: 'GitHub · singleton-altman/MoviePilotLite',
           icon: Icons.code_rounded,
-          iconColor: CupertinoColors.systemIndigo,
+          iconColor: CupertinoColors.systemBlue,
           trailing: const Icon(
             Icons.open_in_new_rounded,
             size: 16,
@@ -427,7 +477,7 @@ class AppSettingPage extends GetView<AppSettingController> {
                         Row(
                           children: [
                             Text(
-                              'MoviePilot',
+                              'OmniHub',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w700,
@@ -456,7 +506,7 @@ class AppSettingPage extends GetView<AppSettingController> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '移动端设置与体验偏好',
+                          'MoviePilot 移动端增强定制版',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontSize: 13,
                             color: onSurface.withValues(alpha: 0.58),
@@ -467,7 +517,78 @@ class AppSettingPage extends GetView<AppSettingController> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Get.toNamed('/settings/app/changelog'),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: theme.dividerColor.withValues(alpha: 0.16),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: CupertinoColors.systemOrange
+                              .withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.bolt_rounded,
+                          size: 16,
+                          color: CupertinoColors.systemOrange,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '最新发版 · ${controller.latestRelease.title}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: onSurface.withValues(alpha: 0.88),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${controller.latestRelease.date} · ${controller.latestRelease.displayTag} · 点击查看更新详情',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 11,
+                                color: onSurface.withValues(alpha: 0.50),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 13,
+                        color: onSurface.withValues(alpha: 0.36),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => controller.handleVersionTap(context),
@@ -558,7 +679,7 @@ class AppSettingPage extends GetView<AppSettingController> {
         child: Column(
           children: [
             Text(
-              'MoviePilot 移动端助手',
+              'OmniHub · MoviePilot 移动端助手',
               style: theme.textTheme.bodySmall?.copyWith(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -567,7 +688,7 @@ class AppSettingPage extends GetView<AppSettingController> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Copyright © 2026 Altman. All rights reserved.',
+              'Copyright © 2026 OmniHub & Altman. All rights reserved.',
               style: theme.textTheme.bodySmall?.copyWith(
                 fontSize: 11,
                 color: onSurface.withValues(alpha: 0.30),

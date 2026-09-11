@@ -1,9 +1,10 @@
 {
   "upstream_repo": "singleton-altman/MoviePilotLite",
-  "baseline_tag": "release-v1.2.5-2026-09-07",
+  "baseline_tag": "release-v1.2.5-2026-09-11",
   "baseline_commit": "b3ad117",
-  "last_synced_at": "2026-09-10T16:48:00+08:00",
+  "last_synced_at": "2026-09-11T19:40:00+08:00",
   "features": [
+    "官方发布正式 arm64-v8a 独立架构 APK 与代理更新下载支持",
     "MoviePilot v3 接口认证与信封模型深度适配",
     "插件配置差异备份、对比与增量恢复 (PluginBackupService)",
     "探索页全新 AniList 动漫多维分类与筛选",
