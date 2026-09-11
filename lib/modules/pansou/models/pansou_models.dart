@@ -304,3 +304,39 @@ class _ParsedMeta {
     required this.totalSizeHuman,
   });
 }
+
+class Pansou115SnapInfo {
+  final bool isValid;
+  final int fileSizeBytes;
+  final String fileSizeHuman;
+  final int fileCount;
+  final String shareTitle;
+  final String? errorMessage;
+
+  const Pansou115SnapInfo({
+    required this.isValid,
+    this.fileSizeBytes = 0,
+    this.fileSizeHuman = '',
+    this.fileCount = 0,
+    this.shareTitle = '',
+    this.errorMessage,
+  });
+
+  static String formatBytes(int bytes) {
+    if (bytes <= 0) return '';
+    const kb = 1024;
+    const mb = kb * 1024;
+    const gb = mb * 1024;
+    const tb = gb * 1024;
+    if (bytes >= tb) {
+      return '${(bytes / tb).toStringAsFixed(2)} TB';
+    } else if (bytes >= gb) {
+      return '${(bytes / gb).toStringAsFixed(2)} GB';
+    } else if (bytes >= mb) {
+      return '${(bytes / mb).toStringAsFixed(1)} MB';
+    } else {
+      return '${(bytes / kb).toStringAsFixed(0)} KB';
+    }
+  }
+}
+

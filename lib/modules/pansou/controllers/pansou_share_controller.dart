@@ -27,6 +27,8 @@ class PansouShareController extends GetxController {
   final RxString selectedFilter = 'all'.obs;
   final RxMap<String, bool> isTransferring = <String, bool>{}.obs;
   final RxMap<String, bool> transferredMap = <String, bool>{}.obs;
+  final RxMap<String, Pansou115SnapInfo> snapInfoMap = <String, Pansou115SnapInfo>{}.obs;
+  final RxSet<String> probingIds = <String>{}.obs;
 
   @override
   void onInit() {
@@ -90,11 +92,54 @@ class PansouShareController extends GetxController {
       items.assignAll(results);
       if (results.isEmpty) {
         errorMessage.value = '未找到与「$kw」相关的 115 / 磁力资源';
+      } else {
+        // 后台静默并发探测 115 真实容量与链接有效性
+        _autoProbe115Resources(results);
       }
     } catch (e) {
       errorMessage.value = '搜索失败，请检查 PanSou 服务地址是否可用';
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// 异步单条探测
+  Future<void> probe115Item(PansouItem item) async {
+    if (!item.is115) return;
+    if (snapInfoMap.containsKey(item.uniqueId)) return;
+    if (probingIds.contains(item.uniqueId)) return;
+
+    probingIds.add(item.uniqueId);
+    try {
+      final snap = await PansouService.to.fetch115ShareSnap(
+        item.url,
+        receiveCode: item.password,
+      );
+      if (snap != null) {
+        snapInfoMap[item.uniqueId] = snap;
+      }
+    } finally {
+      probingIds.remove(item.uniqueId);
+    }
+  }
+
+  /// 后台并发探测 115 资源（批次限制防频控）
+  Future<void> _autoProbe115Resources(List<PansouItem> rawItems) async {
+    final targets = rawItems.where((e) => e.is115).toList();
+    if (targets.isEmpty) return;
+
+    // 优先探测文案缺失体积的资源，随后探测已有体积以验证真实性
+    targets.sort((a, b) {
+      if (a.totalSizeHuman.isEmpty && b.totalSizeHuman.isNotEmpty) return -1;
+      if (a.totalSizeHuman.isNotEmpty && b.totalSizeHuman.isEmpty) return 1;
+      return 0;
+    });
+
+    const batchSize = 3;
+    for (var i = 0; i < targets.length; i += batchSize) {
+      final batch = targets.skip(i).take(batchSize);
+      await Future.wait(batch.map((item) => probe115Item(item)));
+      await Future.delayed(const Duration(milliseconds: 150));
     }
   }
 

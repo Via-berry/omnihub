@@ -187,4 +187,108 @@ class PansouService extends GetxService {
       return false;
     }
   }
+
+  final Map<String, Pansou115SnapInfo> _snapCache = {};
+
+  /// 解析 115 分享链接真实容量与有效性
+  Future<Pansou115SnapInfo?> fetch115ShareSnap(
+    String shareUrl, {
+    String? receiveCode,
+  }) async {
+    final cleanUrl = shareUrl.trim();
+    if (cleanUrl.isEmpty) return null;
+
+    final match = RegExp(r'/s/([a-zA-Z0-9]+)').firstMatch(cleanUrl);
+    if (match == null) return null;
+    final shareCode = match.group(1)!;
+
+    var pwd = receiveCode?.trim() ?? '';
+    if (pwd.isEmpty) {
+      final uri = Uri.tryParse(cleanUrl);
+      pwd = uri?.queryParameters['password'] ??
+          uri?.queryParameters['pwd'] ??
+          '';
+    }
+
+    final cacheKey = '${shareCode}_$pwd';
+    if (_snapCache.containsKey(cacheKey)) {
+      return _snapCache[cacheKey];
+    }
+
+    const snapUrl = 'https://webapi.115.com/share/snap';
+    try {
+      final resp = await _dio.get(
+        snapUrl,
+        queryParameters: {
+          'share_code': shareCode,
+          if (pwd.isNotEmpty) 'receive_code': pwd,
+        },
+        options: Options(
+          headers: {
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/javascript, */*',
+          },
+          sendTimeout: const Duration(seconds: 8),
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      );
+
+      final rawData = resp.data;
+      Map<String, dynamic>? dataMap;
+      if (rawData is Map<String, dynamic>) {
+        dataMap = rawData;
+      } else if (rawData is String) {
+        final decoded = jsonDecode(rawData);
+        if (decoded is Map<String, dynamic>) {
+          dataMap = decoded;
+        }
+      }
+
+      if (dataMap == null) return null;
+
+      final state = dataMap['state'] == true;
+      if (!state) {
+        final errorMsg = dataMap['error']?.toString() ?? '分享已失效';
+        final invalidInfo = Pansou115SnapInfo(
+          isValid: false,
+          errorMessage: errorMsg,
+        );
+        _snapCache[cacheKey] = invalidInfo;
+        return invalidInfo;
+      }
+
+      final dataObj = dataMap['data'];
+      var fileSizeBytes = 0;
+      var shareTitle = '';
+      var fileCount = 0;
+
+      if (dataObj is Map<String, dynamic>) {
+        final shareInfo = dataObj['shareinfo'];
+        if (shareInfo is Map<String, dynamic>) {
+          fileSizeBytes = shareInfo['file_size'] as int? ??
+              int.tryParse(shareInfo['file_size']?.toString() ?? '') ??
+              0;
+          shareTitle = shareInfo['share_title']?.toString() ?? '';
+        }
+        fileCount = dataObj['count'] as int? ??
+            int.tryParse(dataObj['count']?.toString() ?? '') ??
+            0;
+      }
+
+      final snapResult = Pansou115SnapInfo(
+        isValid: true,
+        fileSizeBytes: fileSizeBytes,
+        fileSizeHuman: Pansou115SnapInfo.formatBytes(fileSizeBytes),
+        fileCount: fileCount,
+        shareTitle: shareTitle,
+      );
+
+      _snapCache[cacheKey] = snapResult;
+      return snapResult;
+    } catch (e) {
+      debugPrint('获取 115 分享快照失败 ($shareCode): $e');
+      return null;
+    }
+  }
 }

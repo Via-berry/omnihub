@@ -118,67 +118,113 @@ class _PansouShareCardState extends State<PansouShareCard> {
           const SizedBox(height: 10),
 
           // 核心规格胶囊展示区
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              if (item.resolution.isNotEmpty)
-                _buildPill(
-                  item.resolution,
-                  bgColor: item.resolution == '4K'
-                      ? const Color(0xFF10B981).withValues(alpha: 0.20)
-                      : const Color(0xFF0EA5E9).withValues(alpha: 0.20),
-                  textColor: item.resolution == '4K'
-                      ? const Color(0xFF34D399)
-                      : const Color(0xFF38BDF8),
-                  borderColor: item.resolution == '4K'
-                      ? const Color(0xFF10B981).withValues(alpha: 0.40)
-                      : const Color(0xFF0EA5E9).withValues(alpha: 0.40),
-                  isBold: true,
-                ),
-              if (item.hdr.isNotEmpty)
-                _buildPill(
-                  item.hdr,
-                  bgColor: const Color(0xFFF59E0B).withValues(alpha: 0.20),
-                  textColor: const Color(0xFFFBBF24),
-                  borderColor: const Color(0xFFF59E0B).withValues(alpha: 0.35),
-                  isBold: true,
-                ),
-              if (item.videoCodec.isNotEmpty)
-                _buildPill(
-                  item.videoCodec,
-                  bgColor: Colors.white.withValues(alpha: 0.08),
-                  textColor: Colors.white.withValues(alpha: 0.85),
-                ),
-              if (item.audioCodec.isNotEmpty)
-                _buildPill(
-                  item.audioCodec,
-                  bgColor: Colors.white.withValues(alpha: 0.08),
-                  textColor: Colors.white.withValues(alpha: 0.85),
-                ),
-              if (item.hasChineseSubtitle)
-                _buildPill(
-                  '内封中字',
-                  icon: CupertinoIcons.checkmark_alt,
-                  bgColor: const Color(0xFFEC4899).withValues(alpha: 0.18),
-                  textColor: const Color(0xFFF472B6),
-                  borderColor: const Color(0xFFEC4899).withValues(alpha: 0.35),
-                  isBold: true,
-                ),
-              if (item.season > 0)
-                _buildPill(
-                  '第 ${item.season} 季',
-                  bgColor: const Color(0xFF06B6D4).withValues(alpha: 0.15),
-                  textColor: const Color(0xFF22D3EE),
-                ),
-              if (item.totalSizeHuman.isNotEmpty)
-                _buildPill(
-                  item.totalSizeHuman,
-                  bgColor: Colors.white.withValues(alpha: 0.06),
-                  textColor: Colors.white.withValues(alpha: 0.7),
-                ),
-            ],
-          ),
+          Obx(() {
+            final snap = widget.controller.snapInfoMap[item.uniqueId];
+            final isProbing =
+                widget.controller.probingIds.contains(item.uniqueId);
+            final effectiveSize =
+                (snap != null && snap.fileSizeHuman.isNotEmpty)
+                    ? snap.fileSizeHuman
+                    : item.totalSizeHuman;
+            final isShareInvalid = snap != null && !snap.isValid;
+
+            return Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (isShareInvalid)
+                  _buildPill(
+                    snap.errorMessage ?? '分享已失效',
+                    icon: CupertinoIcons.exclamationmark_triangle_fill,
+                    bgColor: const Color(0xFFEF4444).withValues(alpha: 0.20),
+                    textColor: const Color(0xFFF87171),
+                    borderColor:
+                        const Color(0xFFEF4444).withValues(alpha: 0.40),
+                    isBold: true,
+                  ),
+                if (item.resolution.isNotEmpty)
+                  _buildPill(
+                    item.resolution,
+                    bgColor: item.resolution == '4K'
+                        ? const Color(0xFF10B981).withValues(alpha: 0.20)
+                        : const Color(0xFF0EA5E9).withValues(alpha: 0.20),
+                    textColor: item.resolution == '4K'
+                        ? const Color(0xFF34D399)
+                        : const Color(0xFF38BDF8),
+                    borderColor: item.resolution == '4K'
+                        ? const Color(0xFF10B981).withValues(alpha: 0.40)
+                        : const Color(0xFF0EA5E9).withValues(alpha: 0.40),
+                    isBold: true,
+                  ),
+                if (item.hdr.isNotEmpty)
+                  _buildPill(
+                    item.hdr,
+                    bgColor: const Color(0xFFF59E0B).withValues(alpha: 0.20),
+                    textColor: const Color(0xFFFBBF24),
+                    borderColor:
+                        const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                    isBold: true,
+                  ),
+                if (item.videoCodec.isNotEmpty)
+                  _buildPill(
+                    item.videoCodec,
+                    bgColor: Colors.white.withValues(alpha: 0.08),
+                    textColor: Colors.white.withValues(alpha: 0.85),
+                  ),
+                if (item.audioCodec.isNotEmpty)
+                  _buildPill(
+                    item.audioCodec,
+                    bgColor: Colors.white.withValues(alpha: 0.08),
+                    textColor: Colors.white.withValues(alpha: 0.85),
+                  ),
+                if (item.hasChineseSubtitle)
+                  _buildPill(
+                    '内封中字',
+                    icon: CupertinoIcons.checkmark_alt,
+                    bgColor: const Color(0xFFEC4899).withValues(alpha: 0.18),
+                    textColor: const Color(0xFFF472B6),
+                    borderColor:
+                        const Color(0xFFEC4899).withValues(alpha: 0.35),
+                    isBold: true,
+                  ),
+                if (item.season > 0)
+                  _buildPill(
+                    '第 ${item.season} 季',
+                    bgColor: const Color(0xFF06B6D4).withValues(alpha: 0.15),
+                    textColor: const Color(0xFF22D3EE),
+                  ),
+                if (snap != null && snap.fileCount > 0)
+                  _buildPill(
+                    '共 ${snap.fileCount} 个文件',
+                    bgColor: Colors.white.withValues(alpha: 0.06),
+                    textColor: Colors.white.withValues(alpha: 0.75),
+                  ),
+                if (effectiveSize.isNotEmpty)
+                  _buildPill(
+                    effectiveSize,
+                    icon: (snap != null && snap.fileSizeHuman.isNotEmpty)
+                        ? CupertinoIcons.check_mark_circled
+                        : null,
+                    bgColor: (snap != null && snap.fileSizeHuman.isNotEmpty)
+                        ? const Color(0xFF00E5FF).withValues(alpha: 0.15)
+                        : Colors.white.withValues(alpha: 0.06),
+                    textColor: (snap != null && snap.fileSizeHuman.isNotEmpty)
+                        ? const Color(0xFF00E5FF)
+                        : Colors.white.withValues(alpha: 0.85),
+                    borderColor: (snap != null && snap.fileSizeHuman.isNotEmpty)
+                        ? const Color(0xFF00E5FF).withValues(alpha: 0.35)
+                        : null,
+                    isBold: true,
+                  )
+                else if (item.is115 && isProbing)
+                  _buildPill(
+                    '探测大小中...',
+                    bgColor: Colors.white.withValues(alpha: 0.05),
+                    textColor: Colors.white38,
+                  ),
+              ],
+            );
+          }),
 
           // 展开内容详情抽屉
           if (item.note.isNotEmpty || item.images.isNotEmpty) ...[
@@ -368,10 +414,38 @@ class _PansouShareCardState extends State<PansouShareCard> {
                   const SizedBox(width: 8),
 
                   Obx(() {
+                    final snap = widget.controller.snapInfoMap[item.uniqueId];
+                    final isInvalid = snap != null && !snap.isValid;
                     final isBusy =
                         widget.controller.isTransferring[item.uniqueId] == true;
                     final isDone =
                         widget.controller.transferredMap[item.uniqueId] == true;
+
+                    if (isInvalid) {
+                      return CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        minimumSize: const Size(0, 32),
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(999),
+                        onPressed: null,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(CupertinoIcons.clear_circled_solid,
+                                size: 13, color: Colors.white38),
+                            SizedBox(width: 4),
+                            Text(
+                              '已失效',
+                              style: TextStyle(
+                                color: Colors.white38,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
 
                     return CupertinoButton(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
