@@ -179,12 +179,13 @@ class Dian115ShareController extends GetxController {
         return cached;
       }
     }
-    if (item.isUnlocked && (item.shareUrl.isNotEmpty || item.magnetUrl.isNotEmpty)) {
+    if (item.isUnlocked && (item.shareUrl.isNotEmpty || item.magnetUrl.isNotEmpty || item.urls.isNotEmpty)) {
       final cached = Dian115UnlockResult(
         code: 'ok',
         shareUrl: item.shareUrl,
         receiveCode: item.receiveCode,
         magnetUrl: item.magnetUrl,
+        urls: item.urls,
         pointsCost: item.unlockCost,
       );
       await service.saveUnlockedInfo(item.id, cached);
@@ -293,10 +294,15 @@ class Dian115ShareController extends GetxController {
     }
 
     // 4. 解锁成功后立即转存至用户指定或预选的 115 目录
+    final effectiveOfflineUrls = unlockResult.urls.isNotEmpty
+        ? unlockResult.urls
+        : (item.urls.isNotEmpty ? item.urls : null);
+
     await transferToPan115(
       shareUrl: unlockResult.shareUrl,
       receiveCode: unlockResult.receiveCode,
       magnetUrl: unlockResult.magnetUrl,
+      magnetUrls: effectiveOfflineUrls,
       customCid: selection.cid,
       customFolderName: selection.folderName,
       item: item,
@@ -307,18 +313,25 @@ class Dian115ShareController extends GetxController {
     String? shareUrl,
     String? receiveCode,
     String? magnetUrl,
+    List<String>? magnetUrls,
     String? customCid,
     String? customFolderName,
     Dian115ShareItem? item,
   }) async {
     try {
       HapticFeedback.mediumImpact();
-      ToastUtil.info('正在请求 115 转存...');
+      final totalUrls = magnetUrls?.length ?? item?.urls.length ?? (magnetUrl != null && magnetUrl.isNotEmpty ? 1 : 0);
+      if (totalUrls > 1) {
+        ToastUtil.info('正在请求 115 批量转存 ($totalUrls 个链接)...');
+      } else {
+        ToastUtil.info('正在请求 115 转存...');
+      }
       final res = await Pan115Service.to.transfer(
         mediaType: mediaType,
         shareUrl: shareUrl,
         receiveCode: receiveCode,
         magnetUrl: magnetUrl,
+        magnetUrls: magnetUrls,
         customCid: customCid,
         customFolderName: customFolderName,
         item: item,

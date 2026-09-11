@@ -33,11 +33,22 @@ class _PansouShareCardState extends State<PansouShareCard> {
     final item = widget.item;
     final sb = StringBuffer();
     sb.writeln(item.title);
-    sb.writeln(item.url);
+    if (item.urls.isNotEmpty) {
+      for (final u in item.urls) {
+        sb.writeln(u);
+      }
+    } else {
+      sb.writeln(item.url);
+    }
     if (item.password.isNotEmpty) {
       sb.writeln('提取码: ${item.password}');
     }
-    _copyToClipboard(sb.toString().trim(), '资源信息与链接已复制');
+    _copyToClipboard(
+      sb.toString().trim(),
+      item.urls.length > 1
+          ? '资源信息与全部 ${item.urls.length} 个链接已复制'
+          : '资源信息与链接已复制',
+    );
   }
 
   @override
@@ -192,6 +203,15 @@ class _PansouShareCardState extends State<PansouShareCard> {
                     '第 ${item.season} 季',
                     bgColor: const Color(0xFF06B6D4).withValues(alpha: 0.15),
                     textColor: const Color(0xFF22D3EE),
+                  ),
+                if (item.hasMultipleUrls)
+                  _buildPill(
+                    '共 ${item.urls.length} 个链接',
+                    icon: CupertinoIcons.link,
+                    bgColor: const Color(0xFF6366F1).withValues(alpha: 0.18),
+                    textColor: const Color(0xFF818CF8),
+                    borderColor: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                    isBold: true,
                   ),
                 if (snap != null && snap.fileCount > 0)
                   _buildPill(

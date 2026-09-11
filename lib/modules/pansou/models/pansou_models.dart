@@ -1,3 +1,5 @@
+import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
+
 enum PansouItemType {
   pan115,
   magnet,
@@ -41,6 +43,7 @@ class PansouItem {
   final PansouItemType type;
   final String rawType;
   final String url;
+  final List<String> urls;
   final String password;
   final String note;
   final String title;
@@ -62,6 +65,7 @@ class PansouItem {
     required this.type,
     required this.rawType,
     required this.url,
+    this.urls = const [],
     required this.password,
     required this.note,
     required this.title,
@@ -81,18 +85,30 @@ class PansouItem {
   bool get isMagnet => type == PansouItemType.magnet;
   bool get isEd2k => type == PansouItemType.ed2k;
   bool get isOfflineDownload => isMagnet || isEd2k;
+  bool get hasMultipleUrls => urls.length > 1;
+  int get offlineUrlCount => urls.isNotEmpty ? urls.length : (url.isNotEmpty ? 1 : 0);
 
   factory PansouItem.fromMergedJson({
     required String rawType,
     required Map<String, dynamic> json,
     int index = 0,
   }) {
-    final url = json['url']?.toString().trim() ?? '';
+    final rawUrl = json['url']?.toString().trim() ?? '';
     final password = json['password']?.toString().trim() ?? '';
     final note = json['note']?.toString().trim() ?? '';
     final datetime = json['datetime']?.toString().trim() ?? '';
     final source = json['source']?.toString().trim() ?? '';
-    final parsedType = PansouItemType.fromRaw(rawType, url);
+    final parsedType = PansouItemType.fromRaw(rawType, rawUrl);
+
+    final allUrls = extractAllOfflineUrls(
+      rawUrls: json['urls'],
+      rawUrl: rawUrl,
+      rawNote: note,
+    );
+    final effectiveUrl = allUrls.isNotEmpty ? allUrls.first : rawUrl;
+    final effectiveUrls = allUrls.isNotEmpty
+        ? allUrls
+        : (effectiveUrl.isNotEmpty ? [effectiveUrl] : const <String>[]);
 
     final rawImages = json['images'];
     final images = <String>[];
@@ -104,13 +120,14 @@ class PansouItem {
       }
     }
 
-    final meta = _parseMetadata(note: note, url: url);
+    final meta = _parseMetadata(note: note, url: effectiveUrl);
 
     return PansouItem(
-      uniqueId: '${source}_${url.hashCode}_$index',
+      uniqueId: '${source}_${effectiveUrl.hashCode}_$index',
       type: parsedType,
       rawType: rawType,
-      url: url,
+      url: effectiveUrl,
+      urls: effectiveUrls,
       password: password,
       note: note,
       title: meta.title.isNotEmpty ? meta.title : (note.isNotEmpty ? note : '未知资源'),

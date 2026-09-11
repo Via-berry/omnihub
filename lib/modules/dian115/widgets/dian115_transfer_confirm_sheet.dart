@@ -230,6 +230,42 @@ class _Dian115TransferConfirmSheetState
             ],
           ),
 
+          // 多链接全量转存提示
+          if (item.urls.length > 1) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    CupertinoIcons.square_stack_3d_up_fill,
+                    size: 14,
+                    color: Color(0xFF818CF8),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '该资源共包含 ${item.urls.length} 个分集/离线链接，将全部批量添加至目标目录',
+                      style: const TextStyle(
+                        color: Color(0xFFC7D2FE),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // 若需要解锁扣分，展示积分明细
           if (widget.isUnlock && item.unlockCost > 0) ...[
             const SizedBox(height: 14),

@@ -8,7 +8,6 @@ import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart'
 import 'package:moviepilot_mobile/modules/dian115/services/pan115_service.dart';
 import 'package:moviepilot_mobile/utils/open_url.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
-import 'package:moviepilot_mobile/utils/web_view_screen.dart';
 
 class Dian115ShareCard extends StatefulWidget {
   const Dian115ShareCard({
@@ -183,6 +182,15 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                   bgColor: const Color(0xFF06B6D4).withValues(alpha: 0.15),
                   textColor: const Color(0xFF22D3EE),
                 ),
+              if (item.urls.length > 1)
+                _buildPill(
+                  '共 ${item.urls.length} 个链接',
+                  icon: CupertinoIcons.link,
+                  bgColor: const Color(0xFF6366F1).withValues(alpha: 0.18),
+                  textColor: const Color(0xFF818CF8),
+                  borderColor: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                  isBold: true,
+                ),
             ],
           ),
 
@@ -330,6 +338,7 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                     shareUrl: item.shareUrl,
                     receiveCode: item.receiveCode,
                     magnetUrl: item.magnetUrl,
+                    urls: item.urls,
                     pointsCost: item.unlockCost,
                   );
                 }
@@ -383,6 +392,9 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                             shareUrl: activeResult.shareUrl,
                             receiveCode: activeResult.receiveCode,
                             magnetUrl: activeResult.magnetUrl,
+                            magnetUrls: activeResult.urls.isNotEmpty
+                                ? activeResult.urls
+                                : widget.item.urls,
                             customCid: selection.cid,
                             customFolderName: selection.folderName,
                             item: widget.item,
@@ -523,55 +535,6 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
           ),
         ],
       ),
-    );
-  }
-
-  void _confirmAndUnlock(BuildContext context) {
-    final item = widget.item;
-    final currentPoints = widget.controller.userPoints.value;
-
-    showCupertinoDialog(
-      context: context,
-      builder: (ctx) {
-        return CupertinoAlertDialog(
-          title: const Text('确认解锁网盘资源'),
-          content: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '确认消耗 ${item.unlockCost} 积分获取此片源转存链接？',
-                  style: const TextStyle(fontSize: 13),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '当前可用余额: $currentPoints 积分\n解锁后剩余: ${(currentPoints - item.unlockCost).clamp(0, 999999)} 积分',
-                  style: const TextStyle(fontSize: 11, color: CupertinoColors.systemGrey),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('取消'),
-            ),
-            CupertinoDialogAction(
-              isDefaultAction: true,
-              onPressed: () async {
-                Navigator.of(ctx).pop();
-                final res = await widget.controller.unlock(item);
-                if (res != null && mounted) {
-                  _showLinkModal(context, res);
-                }
-              },
-              child: const Text('确认解锁'),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -716,6 +679,9 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                         shareUrl: result.shareUrl,
                         receiveCode: result.receiveCode,
                         magnetUrl: result.magnetUrl,
+                        magnetUrls: result.urls.isNotEmpty
+                            ? result.urls
+                            : widget.item.urls,
                         customCid: selection.cid,
                         customFolderName: selection.folderName,
                         item: widget.item,
@@ -810,19 +776,21 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        '离线磁力链接:',
-                        style: TextStyle(color: Colors.white54, fontSize: 10),
+                      Text(
+                        result.urls.length > 1
+                            ? '离线下载链接 (共 ${result.urls.length} 个):'
+                            : '离线磁力链接:',
+                        style: const TextStyle(color: Colors.white54, fontSize: 10),
                       ),
                       const SizedBox(height: 2),
                       SelectableText(
-                        result.magnetUrl,
+                        result.urls.isNotEmpty ? result.urls.join('\n') : result.magnetUrl,
                         style: const TextStyle(
                           color: Color(0xFFA78BFA),
                           fontSize: 11,
                           fontFamily: 'monospace',
                         ),
-                        maxLines: 3,
+                        maxLines: result.urls.length > 1 ? 5 : 3,
                       ),
                     ],
                   ),
@@ -835,18 +803,25 @@ class _Dian115ShareCardState extends State<Dian115ShareCard> {
                     borderRadius: BorderRadius.circular(12),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text: result.magnetUrl));
+                      final allText = result.urls.isNotEmpty ? result.urls.join('\n') : result.magnetUrl;
+                      Clipboard.setData(ClipboardData(text: allText));
                       Navigator.of(ctx).pop();
-                      ToastUtil.success('已复制磁力链接！');
+                      ToastUtil.success(
+                        result.urls.length > 1
+                            ? '已复制全部 ${result.urls.length} 个离线链接！'
+                            : '已复制磁力链接！',
+                      );
                     },
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(CupertinoIcons.link, size: 16, color: Colors.white),
-                        SizedBox(width: 6),
+                        const Icon(CupertinoIcons.link, size: 16, color: Colors.white),
+                        const SizedBox(width: 6),
                         Text(
-                          '复制磁力链接',
-                          style: TextStyle(
+                          result.urls.length > 1
+                              ? '复制全部 ${result.urls.length} 个离线链接'
+                              : '复制磁力链接',
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 13,
                             fontWeight: FontWeight.bold,

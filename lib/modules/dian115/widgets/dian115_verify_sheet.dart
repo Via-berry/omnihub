@@ -7,7 +7,6 @@ import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
 import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 /// 癫影资源原生安全验证与解锁弹窗
@@ -271,6 +270,7 @@ class _Dian115VerifySheetState extends State<Dian115VerifySheet> {
               share_url: data.data.share_url || '',
               receive_code: data.data.receive_code || '',
               magnet_url: data.data.magnet_url || '',
+              urls: data.data.urls || [],
               points_cost: data.data.points_cost || 0
             });
           }
@@ -332,6 +332,7 @@ class _Dian115VerifySheetState extends State<Dian115VerifySheet> {
                     shareUrl: s.shareUrl,
                     receiveCode: s.receiveCode,
                     magnetUrl: s.magnetUrl,
+                    urls: s.urls,
                     pointsCost: s.unlockCost,
                   );
                   _isUnlockedCaptured = true;

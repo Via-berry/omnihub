@@ -1,3 +1,54 @@
+List<String> extractAllOfflineUrls({
+  dynamic rawUrls,
+  String? rawUrl,
+  String? rawMagnet,
+  String? rawNote,
+}) {
+  final result = <String>[];
+  final seen = <String>{};
+
+  void addUrl(String? u) {
+    if (u == null) return;
+    final trimmed = u.trim();
+    if (trimmed.isEmpty) return;
+
+    if (trimmed.contains('ed2k://') || trimmed.contains('magnet:?')) {
+      final matches =
+          RegExp(r'(ed2k://[^\s\r\n]+|magnet:\?[^\s\r\n]+)').allMatches(trimmed);
+      if (matches.isNotEmpty) {
+        for (final m in matches) {
+          final matched = m.group(0)?.trim() ?? '';
+          if (matched.isNotEmpty && seen.add(matched)) {
+            result.add(matched);
+          }
+        }
+        return;
+      }
+    }
+
+    if (seen.add(trimmed)) {
+      result.add(trimmed);
+    }
+  }
+
+  if (rawUrls is List) {
+    for (final item in rawUrls) {
+      addUrl(item?.toString());
+    }
+  }
+
+  addUrl(rawUrl);
+  addUrl(rawMagnet);
+
+  if (result.isEmpty &&
+      rawNote != null &&
+      (rawNote.contains('ed2k://') || rawNote.contains('magnet:?'))) {
+    addUrl(rawNote);
+  }
+
+  return result;
+}
+
 class Dian115ShareItem {
   final int id;
   final String shareKind;
@@ -30,6 +81,7 @@ class Dian115ShareItem {
   final String shareCode;
   final String receiveCode;
   final String magnetUrl;
+  final List<String> urls;
 
   const Dian115ShareItem({
     required this.id,
@@ -63,12 +115,22 @@ class Dian115ShareItem {
     this.shareCode = '',
     this.receiveCode = '',
     this.magnetUrl = '',
+    this.urls = const [],
   });
 
   bool get is115 => shareKind == '115' || shareKindLabel.contains('115');
   bool get isMagnet => shareKind == 'offline' || shareKindLabel.contains('磁力');
+  bool get hasMultipleUrls => urls.length > 1;
+  int get offlineUrlCount => urls.isNotEmpty ? urls.length : (magnetUrl.isNotEmpty ? 1 : 0);
 
   factory Dian115ShareItem.fromJson(Map<String, dynamic> json) {
+    final allUrls = extractAllOfflineUrls(
+      rawUrls: json['urls'] ?? json['magnet_urls'],
+      rawUrl: json['url']?.toString(),
+      rawMagnet: json['magnet_url']?.toString() ?? json['magnet']?.toString(),
+      rawNote: json['tag_raw']?.toString(),
+    );
+
     return Dian115ShareItem(
       id: json['id'] as int? ?? 0,
       shareKind: json['share_kind']?.toString() ?? '',
@@ -103,12 +165,10 @@ class Dian115ShareItem {
       shareUrl: json['share_url']?.toString() ?? json['url_115']?.toString() ?? '',
       shareCode: json['share_code']?.toString() ?? '',
       receiveCode: json['receive_code']?.toString() ?? '',
-      magnetUrl: json['magnet_url']?.toString() ??
-          (json['urls'] is List && (json['urls'] as List).isNotEmpty
-              ? (json['urls'] as List).first.toString()
-              : '') ??
-          json['url']?.toString() ??
-          '',
+      magnetUrl: allUrls.isNotEmpty
+          ? allUrls.first
+          : (json['magnet_url']?.toString() ?? json['url']?.toString() ?? ''),
+      urls: allUrls,
     );
   }
 
@@ -144,6 +204,7 @@ class Dian115ShareItem {
         'share_code': shareCode,
         'receive_code': receiveCode,
         'magnet_url': magnetUrl,
+        'urls': urls,
       };
 }
 
@@ -223,6 +284,7 @@ class Dian115UnlockResult {
   final String shareUrl;
   final String receiveCode;
   final String magnetUrl;
+  final List<String> urls;
   final int pointsCost;
   final int? unlockedAtTimestamp;
 
@@ -231,27 +293,27 @@ class Dian115UnlockResult {
     this.shareUrl = '',
     this.receiveCode = '',
     this.magnetUrl = '',
+    this.urls = const [],
     this.pointsCost = 0,
     this.unlockedAtTimestamp,
   });
 
   bool get isSuccess =>
       (code == 'ok' || code == 'success' || code.isEmpty) &&
-      (shareUrl.isNotEmpty || magnetUrl.isNotEmpty);
+      (shareUrl.isNotEmpty || magnetUrl.isNotEmpty || urls.isNotEmpty);
 
   bool get isTurnstileRequired =>
       code == 'turnstile_failed' || code == 'turnstile_required';
 
+  bool get hasMultipleUrls => urls.length > 1;
+  int get offlineUrlCount => urls.isNotEmpty ? urls.length : (magnetUrl.isNotEmpty ? 1 : 0);
+
   factory Dian115UnlockResult.fromJson(Map<String, dynamic> json) {
-    String magnet = json['magnet_url']?.toString() ??
-        json['magnet']?.toString() ??
-        '';
-    if (magnet.isEmpty && json['urls'] is List && (json['urls'] as List).isNotEmpty) {
-      magnet = (json['urls'] as List).first.toString();
-    }
-    if (magnet.isEmpty && json['url'] != null && json['url'].toString().startsWith('magnet:')) {
-      magnet = json['url'].toString();
-    }
+    final allUrls = extractAllOfflineUrls(
+      rawUrls: json['urls'] ?? json['magnet_urls'],
+      rawUrl: json['url']?.toString(),
+      rawMagnet: json['magnet_url']?.toString() ?? json['magnet']?.toString(),
+    );
 
     String share = json['share_url']?.toString() ??
         json['url_115']?.toString() ??
@@ -267,7 +329,10 @@ class Dian115UnlockResult {
           json['code_pwd']?.toString() ??
           json['password']?.toString() ??
           '',
-      magnetUrl: magnet,
+      magnetUrl: allUrls.isNotEmpty
+          ? allUrls.first
+          : (json['magnet_url']?.toString() ?? json['magnet']?.toString() ?? ''),
+      urls: allUrls,
       pointsCost: json['points_cost'] as int? ?? json['cost'] as int? ?? 0,
       unlockedAtTimestamp: json['unlocked_at'] as int?,
     );
@@ -278,6 +343,7 @@ class Dian115UnlockResult {
         'share_url': shareUrl,
         'receive_code': receiveCode,
         'magnet_url': magnetUrl,
+        'urls': urls,
         'points_cost': pointsCost,
         'unlocked_at': unlockedAtTimestamp ?? DateTime.now().millisecondsSinceEpoch,
       };

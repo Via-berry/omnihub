@@ -158,6 +158,9 @@ class PansouShareController extends GetxController {
       shareUrl: item.is115 ? item.url : '',
       receiveCode: item.password,
       magnetUrl: item.isOfflineDownload ? item.url : '',
+      urls: item.isOfflineDownload && item.urls.isNotEmpty
+          ? item.urls
+          : (item.url.isNotEmpty ? [item.url] : const []),
       resolution: item.resolution,
       season: item.season,
     );
@@ -180,6 +183,7 @@ class PansouShareController extends GetxController {
         shareUrl: item.is115 ? item.url : null,
         receiveCode: item.is115 ? item.password : null,
         magnetUrl: item.isOfflineDownload ? item.url : null,
+        magnetUrls: item.isOfflineDownload && item.urls.isNotEmpty ? item.urls : null,
         customCid: selection.cid,
         customFolderName: selection.folderName,
         item: dummyItem,

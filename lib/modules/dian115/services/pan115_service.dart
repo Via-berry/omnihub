@@ -139,6 +139,7 @@ class Pan115Service extends GetxService {
     String? shareUrl,
     String? receiveCode,
     String? magnetUrl,
+    List<String>? magnetUrls,
     String? customCid,
     String? customFolderName,
     Dian115ShareItem? item,
@@ -151,6 +152,42 @@ class Pan115Service extends GetxService {
                 ? '电视剧目录'
                 : getTargetFolderName(mediaType, item)));
 
+    // 汇总收集所有有效的离线下载链接 (支持 ed2k、magnet 等多链接批量)
+    final effectiveOfflineUrls = <String>[];
+    final seen = <String>{};
+    void addOffline(String? u) {
+      if (u == null) return;
+      final trimmed = u.trim();
+      if (trimmed.isEmpty) return;
+      if (trimmed.contains('ed2k://') || trimmed.contains('magnet:?')) {
+        final matches = RegExp(r'(ed2k://[^\s\r\n]+|magnet:\?[^\s\r\n]+)').allMatches(trimmed);
+        if (matches.isNotEmpty) {
+          for (final m in matches) {
+            final link = m.group(0)?.trim() ?? '';
+            if (link.isNotEmpty && seen.add(link)) {
+              effectiveOfflineUrls.add(link);
+            }
+          }
+          return;
+        }
+      }
+      if (seen.add(trimmed)) {
+        effectiveOfflineUrls.add(trimmed);
+      }
+    }
+
+    if (magnetUrls != null) {
+      for (final u in magnetUrls) {
+        addOffline(u);
+      }
+    }
+    addOffline(magnetUrl);
+    if (item != null && item.urls.isNotEmpty) {
+      for (final u in item.urls) {
+        addOffline(u);
+      }
+    }
+
     final dianService = Dian115Service.to;
     final gatewayUrl = '${dianService.host.value}/api/pan115/transfer';
 
@@ -160,7 +197,12 @@ class Pan115Service extends GetxService {
       'cookie': cookie.value,
       if (shareUrl != null && shareUrl.isNotEmpty) 'share_url': shareUrl,
       if (receiveCode != null && receiveCode.isNotEmpty) 'receive_code': receiveCode,
-      if (magnetUrl != null && magnetUrl.isNotEmpty) 'magnet_url': magnetUrl,
+      if (effectiveOfflineUrls.isNotEmpty) ...{
+        'magnet_url': effectiveOfflineUrls.first,
+        'magnet_urls': effectiveOfflineUrls,
+      } else if (magnetUrl != null && magnetUrl.isNotEmpty) ...{
+        'magnet_url': magnetUrl,
+      },
     };
 
     try {
@@ -176,6 +218,8 @@ class Pan115Service extends GetxService {
           'success': data['state'] == true || data['success'] == true,
           'target_folder': targetFolder,
           'cid': effectiveCid,
+          'total_count': data['total_count'],
+          'success_count': data['success_count'],
           'msg': data['msg'] ?? data['message'] ?? '转存完成',
           'raw': data,
         };
@@ -191,7 +235,8 @@ class Pan115Service extends GetxService {
       targetFolder: targetFolder,
       shareUrl: shareUrl,
       receiveCode: receiveCode,
-      magnetUrl: magnetUrl,
+      effectiveOfflineUrls: effectiveOfflineUrls,
+      singleMagnetUrl: magnetUrl,
     );
   }
 
@@ -201,7 +246,8 @@ class Pan115Service extends GetxService {
     required String targetFolder,
     String? shareUrl,
     String? receiveCode,
-    String? magnetUrl,
+    List<String> effectiveOfflineUrls = const [],
+    String? singleMagnetUrl,
   }) async {
     final directDio = Dio(
       BaseOptions(
@@ -218,36 +264,81 @@ class Pan115Service extends GetxService {
       ),
     );
 
-    // 1. 离线磁力下载
-    if (magnetUrl != null && magnetUrl.trim().isNotEmpty) {
-      try {
-        final resp = await directDio.post(
-          'https://115.com/web/lixian/?ct=lixian&ac=add_task_url',
-          data: {
-            'url': magnetUrl.trim(),
-            'wp_path_id': effectiveCid,
-          },
-          options: Options(
-            contentType: Headers.formUrlEncodedContentType,
-          ),
-        );
-        final resData = resp.data is String ? jsonDecode(resp.data) : resp.data;
-        final state = resData is Map ? resData['state'] == true : false;
-        return {
-          'success': state,
-          'target_folder': targetFolder,
-          'cid': effectiveCid,
-          'msg': state ? '离线任务已成功添加至 $targetFolder' : (resData?['error_msg'] ?? '离线添加失败'),
-          'raw': resData,
-        };
-      } catch (e) {
-        return {
-          'success': false,
-          'target_folder': targetFolder,
-          'cid': effectiveCid,
-          'msg': '离线任务发起异常: $e',
-        };
+    // 1. 离线磁力/电驴批量下载
+    final targetUrls = effectiveOfflineUrls.isNotEmpty
+        ? effectiveOfflineUrls
+        : (singleMagnetUrl != null && singleMagnetUrl.trim().isNotEmpty
+            ? [singleMagnetUrl.trim()]
+            : <String>[]);
+
+    if (targetUrls.isNotEmpty) {
+      var successCount = 0;
+      var duplicateCount = 0;
+      final errorMsgs = <String>[];
+
+      for (var i = 0; i < targetUrls.length; i++) {
+        final currentUrl = targetUrls[i];
+        try {
+          final resp = await directDio.post(
+            'https://115.com/web/lixian/?ct=lixian&ac=add_task_url',
+            data: {
+              'url': currentUrl,
+              'wp_path_id': effectiveCid,
+            },
+            options: Options(
+              contentType: Headers.formUrlEncodedContentType,
+            ),
+          );
+          final resData = resp.data is String ? jsonDecode(resp.data) : resp.data;
+          final state = resData is Map ? resData['state'] == true : false;
+          final errcode = resData is Map ? resData['errcode'] : null;
+
+          if (state) {
+            successCount++;
+          } else if (errcode == 10008) {
+            duplicateCount++;
+            successCount++;
+          } else {
+            errorMsgs.add(resData?['error_msg']?.toString() ?? '第${i + 1}个链接添加失败');
+          }
+        } catch (e) {
+          errorMsgs.add('第${i + 1}个链接请求异常: $e');
+        }
+
+        if (i < targetUrls.length - 1) {
+          await Future.delayed(const Duration(milliseconds: 120));
+        }
       }
+
+      final total = targetUrls.length;
+      final isAllSuccess = successCount == total;
+      final hasAnySuccess = successCount > 0;
+
+      String msg;
+      if (total == 1) {
+        msg = isAllSuccess
+            ? (duplicateCount > 0
+                ? '该离线任务已在 $targetFolder 下载列表中'
+                : '离线任务已成功添加至 $targetFolder')
+            : (errorMsgs.isNotEmpty ? errorMsgs.first : '离线添加失败');
+      } else {
+        if (isAllSuccess) {
+          msg = '已成功将全部 $total 个离线链接添加至 $targetFolder';
+        } else if (hasAnySuccess) {
+          msg = '部分完成：已成功添加 $successCount/$total 个任务至 $targetFolder';
+        } else {
+          msg = '全部离线任务添加失败 (${errorMsgs.take(2).join(", ")})';
+        }
+      }
+
+      return {
+        'success': hasAnySuccess,
+        'target_folder': targetFolder,
+        'cid': effectiveCid,
+        'total_count': total,
+        'success_count': successCount,
+        'msg': msg,
+      };
     }
 
     // 2. 115 分享链接转存
