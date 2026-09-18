@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/jav/controllers/jav_controller.dart';
 import 'package:moviepilot_mobile/modules/jav/models/jav_models.dart';
 import 'package:moviepilot_mobile/modules/jav/services/jav_safe_service.dart';
+import 'package:moviepilot_mobile/modules/jav/widgets/jav_paginator.dart';
 import 'package:moviepilot_mobile/modules/jav/widgets/jav_safe_cover.dart';
 
 class JavDiscoverView extends StatelessWidget {
@@ -26,20 +27,13 @@ class JavDiscoverView extends StatelessWidget {
         children: [
           _buildAppBar(context),
           Expanded(
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (ScrollNotification scrollInfo) {
-                if (scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 260) {
-                  controller.loadMoreLibraryMovies();
-                }
-                return false;
-              },
-              child: CustomScrollView(
-                controller: scrollController,
-                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-          slivers: [
-            CupertinoSliverRefreshControl(
-              onRefresh: () => controller.fetchLibraryMovies(isRefresh: true),
-            ),
+            child: CustomScrollView(
+              controller: scrollController,
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              slivers: [
+                CupertinoSliverRefreshControl(
+                  onRefresh: () => controller.fetchLibraryMovies(page: controller.libraryPage.value),
+                ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -128,26 +122,22 @@ class JavDiscoverView extends StatelessWidget {
                       if (i > 0) const SizedBox(height: 10),
                       _buildMediaRowCard(context, rest[i]),
                     ],
-                    // 底部加载更多指示器
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: controller.isLibraryLoadingMore.value
-                            ? const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  CupertinoActivityIndicator(color: Colors.cyanAccent, radius: 10),
-                                  SizedBox(width: 8),
-                                  Text('正在翻页加载母库作品...', style: TextStyle(color: Colors.white60, fontSize: 12)),
-                                ],
-                              )
-                            : Text(
-                                controller.libraryHasMore.value ? '滑动自动加载下一页' : '— 已加载全部作品 —',
-                                style: const TextStyle(color: Colors.white30, fontSize: 11),
-                              ),
-                      ),
+                    // 底部优雅分页器
+                    JavPaginator(
+                      currentPage: controller.libraryPage.value,
+                      hasMore: controller.libraryHasMore.value,
+                      isLoading: controller.isLibraryLoading.value,
+                      onPageChanged: (newPage) {
+                        controller.fetchLibraryMovies(page: newPage);
+                        if (scrollController?.hasClients ?? false) {
+                          scrollController!.animateTo(
+                            0,
+                            duration: const Duration(milliseconds: 280),
+                            curve: Curves.easeOut,
+                          );
+                        }
+                      },
                     ),
-                    const SizedBox(height: 80),
                   ]),
                 ),
               );
@@ -155,9 +145,8 @@ class JavDiscoverView extends StatelessWidget {
           ],
         ),
       ),
-    ),
-  ],
-),
+    ],
+  ),
 );
   }
 

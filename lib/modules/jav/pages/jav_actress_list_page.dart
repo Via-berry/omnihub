@@ -6,6 +6,7 @@ import 'package:moviepilot_mobile/modules/jav/controllers/jav_controller.dart';
 import 'package:moviepilot_mobile/modules/jav/models/jav_models.dart';
 import 'package:moviepilot_mobile/modules/jav/services/jav_api_service.dart';
 import 'package:moviepilot_mobile/modules/jav/services/jav_safe_service.dart';
+import 'package:moviepilot_mobile/modules/jav/widgets/jav_paginator.dart';
 import 'package:moviepilot_mobile/widgets/cached_image.dart';
 
 enum ActressSortType {
@@ -31,7 +32,6 @@ class _JavActressListPageState extends State<JavActressListPage> {
 
   final List<JavActress> _rawList = [];
   bool _isLoading = true;
-  bool _isLoadingMore = false;
   bool _hasMore = true;
   int _page = 1;
   final ScrollController _scrollController = ScrollController();
@@ -41,8 +41,7 @@ class _JavActressListPageState extends State<JavActressListPage> {
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
-    _fetchActresses(isRefresh: true);
+    _fetchActresses(page: 1);
   }
 
   @override
@@ -52,22 +51,9 @@ class _JavActressListPageState extends State<JavActressListPage> {
     super.dispose();
   }
 
-  void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 400) {
-      if (!_isLoading && !_isLoadingMore && _hasMore) {
-        _fetchActresses(isRefresh: false);
-      }
-    }
-  }
-
-  Future<void> _fetchActresses({bool isRefresh = true}) async {
-    if (isRefresh) {
-      _page = 1;
-      _hasMore = true;
-      setState(() => _isLoading = true);
-    } else {
-      setState(() => _isLoadingMore = true);
-    }
+  Future<void> _fetchActresses({int page = 1}) async {
+    _page = page;
+    setState(() => _isLoading = true);
 
     _cancelToken?.cancel();
     _cancelToken = CancelToken();
@@ -80,30 +66,23 @@ class _JavActressListPageState extends State<JavActressListPage> {
       );
       if (mounted) {
         setState(() {
-          if (isRefresh) {
-            _rawList.clear();
-          }
-          if (list.isEmpty) {
-            _hasMore = false;
-          } else {
-            final existingIds = _rawList.map((e) => e.starId).toSet();
-            final newItems = list.where((e) => e.starId.isNotEmpty && !existingIds.contains(e.starId)).toList();
-            _rawList.addAll(newItems.isNotEmpty ? newItems : list);
-            if (list.length < 30) {
-              _hasMore = false;
-            } else {
-              _page++;
-            }
-          }
+          _rawList.clear();
+          _rawList.addAll(list);
+          _hasMore = list.length >= 30;
           _isLoading = false;
-          _isLoadingMore = false;
         });
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOut,
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _isLoadingMore = false;
         });
       }
     }
@@ -226,7 +205,7 @@ class _JavActressListPageState extends State<JavActressListPage> {
                     physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                     slivers: [
                       CupertinoSliverRefreshControl(
-                        onRefresh: () => _fetchActresses(isRefresh: true),
+                        onRefresh: () => _fetchActresses(page: _page),
                       ),
                       if (sorted.isEmpty && !_isLoading)
                         const SliverFillRemaining(
@@ -253,29 +232,17 @@ class _JavActressListPageState extends State<JavActressListPage> {
                             ),
                           ),
                         ),
-                      if (_isLoadingMore)
-                        const SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 20),
-                            child: Center(
-                              child: CupertinoActivityIndicator(color: Colors.cyanAccent, radius: 12),
-                            ),
-                          ),
-                        )
-                      else if (!_hasMore && _rawList.isNotEmpty)
-                        const SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
-                            child: Center(
-                              child: Text(
-                                '已加载全部女优',
-                                style: TextStyle(color: Colors.white30, fontSize: 12),
-                              ),
-                            ),
+                      if (_rawList.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: JavPaginator(
+                            currentPage: _page,
+                            hasMore: _hasMore,
+                            isLoading: _isLoading,
+                            onPageChanged: (newPage) => _fetchActresses(page: newPage),
                           ),
                         ),
                       const SliverToBoxAdapter(
-                        child: SizedBox(height: 50),
+                        child: SizedBox(height: 40),
                       ),
                     ],
                   ),

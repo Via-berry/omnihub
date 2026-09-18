@@ -212,20 +212,18 @@ class JavController extends GetxController {
     libraryCategory.value = cat;
     selectedGenreId.value = 'all';
     libraryGenres.clear();
-    await fetchLibraryMovies(isRefresh: true);
+    await fetchLibraryMovies(page: 1);
   }
 
   Future<void> selectLibraryGenre(String genreId) async {
     if (selectedGenreId.value == genreId) return;
     selectedGenreId.value = genreId;
-    await fetchLibraryMovies(isRefresh: true);
+    await fetchLibraryMovies(page: 1);
   }
 
-  Future<void> fetchLibraryMovies({bool isRefresh = false}) async {
-    if (isRefresh) {
-      libraryPage.value = 1;
-      libraryHasMore.value = true;
-    }
+  Future<void> fetchLibraryMovies({int page = 1, bool isRefresh = false}) async {
+    final targetPage = isRefresh ? 1 : page;
+    libraryPage.value = targetPage;
     isLibraryLoading.value = true;
     _libraryCancelToken?.cancel();
     _libraryCancelToken = CancelToken();
@@ -245,20 +243,16 @@ class JavController extends GetxController {
         category: libraryCategory.value,
         genre: genreTag,
         page: libraryPage.value,
+        limit: 30,
         cancelToken: _libraryCancelToken,
       );
 
       if (items.isEmpty) {
         libraryHasMore.value = false;
-        if (isRefresh) libraryMovies.clear();
+        libraryMovies.clear();
       } else {
-        if (isRefresh) {
-          libraryMovies.assignAll(items);
-        } else {
-          final existing = libraryMovies.map((e) => e.code).toSet();
-          final newItems = items.where((e) => !existing.contains(e.code)).toList();
-          libraryMovies.addAll(newItems);
-        }
+        libraryMovies.assignAll(items);
+        libraryHasMore.value = items.length >= 30;
       }
     } catch (e) {
       debugPrint('fetchLibraryMovies error: $e');
@@ -268,35 +262,8 @@ class JavController extends GetxController {
   }
 
   Future<void> loadMoreLibraryMovies() async {
-    if (isLibraryLoading.value || isLibraryLoadingMore.value || !libraryHasMore.value) return;
-    isLibraryLoadingMore.value = true;
-    libraryPage.value++;
-
-    try {
-      final genreObj = libraryGenres.firstWhereOrNull((g) => g.id == selectedGenreId.value);
-      final genreTag = genreObj?.tag ?? (selectedGenreId.value == 'all' ? '' : selectedGenreId.value);
-
-      final items = await api.fetchCategoryExplore(
-        category: libraryCategory.value,
-        genre: genreTag,
-        page: libraryPage.value,
-      );
-
-      if (items.isEmpty) {
-        libraryHasMore.value = false;
-      } else {
-        final existing = libraryMovies.map((e) => e.code).toSet();
-        final newItems = items.where((e) => !existing.contains(e.code)).toList();
-        libraryMovies.addAll(newItems);
-        if (items.length < 30) {
-          libraryHasMore.value = false;
-        }
-      }
-    } catch (e) {
-      debugPrint('loadMoreLibraryMovies error: $e');
-    } finally {
-      isLibraryLoadingMore.value = false;
-    }
+    if (isLibraryLoading.value || !libraryHasMore.value) return;
+    await fetchLibraryMovies(page: libraryPage.value + 1);
   }
 
   void navigateToCategory({required String title, required String categoryType, String genre = ''}) {

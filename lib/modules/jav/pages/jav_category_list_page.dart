@@ -6,6 +6,7 @@ import 'package:moviepilot_mobile/modules/jav/models/jav_models.dart';
 import 'package:moviepilot_mobile/modules/jav/services/jav_api_service.dart';
 import 'package:moviepilot_mobile/modules/jav/services/jav_safe_service.dart';
 import 'package:moviepilot_mobile/modules/jav/widgets/jav_now_playing_card.dart';
+import 'package:moviepilot_mobile/modules/jav/widgets/jav_paginator.dart';
 
 class JavCategoryListPage extends StatefulWidget {
   const JavCategoryListPage({super.key});
@@ -25,7 +26,6 @@ class _JavCategoryListPageState extends State<JavCategoryListPage> {
 
   final List<JavItem> _movies = [];
   bool _isLoading = true;
-  bool _isLoadingMore = false;
   bool _hasMore = true;
   int _page = 1;
   String _activeFilter = 'all'; // all, sub, hd
@@ -42,8 +42,7 @@ class _JavCategoryListPageState extends State<JavCategoryListPage> {
     _categoryType = args['categoryType']?.toString() ?? 'censored';
     _genre = args['genre']?.toString() ?? '';
 
-    _scrollController.addListener(_onScroll);
-    _fetchPage(isRefresh: true);
+    _fetchPage(page: 1);
   }
 
   @override
@@ -53,22 +52,9 @@ class _JavCategoryListPageState extends State<JavCategoryListPage> {
     super.dispose();
   }
 
-  void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 400) {
-      if (!_isLoading && !_isLoadingMore && _hasMore) {
-        _fetchPage(isRefresh: false);
-      }
-    }
-  }
-
-  Future<void> _fetchPage({required bool isRefresh}) async {
-    if (isRefresh) {
-      _page = 1;
-      _hasMore = true;
-      setState(() => _isLoading = true);
-    } else {
-      setState(() => _isLoadingMore = true);
-    }
+  Future<void> _fetchPage({int page = 1}) async {
+    _page = page;
+    setState(() => _isLoading = true);
 
     _cancelToken?.cancel();
     _cancelToken = CancelToken();
@@ -95,30 +81,23 @@ class _JavCategoryListPageState extends State<JavCategoryListPage> {
 
       if (mounted) {
         setState(() {
-          if (isRefresh) {
-            _movies.clear();
-          }
-          if (items.isEmpty) {
-            _hasMore = false;
-          } else {
-            final existing = _movies.map((e) => e.code).toSet();
-            final newItems = items.where((e) => !existing.contains(e.code)).toList();
-            _movies.addAll(newItems);
-            if (items.length < 30) {
-              _hasMore = false;
-            } else {
-              _page++;
-            }
-          }
+          _movies.clear();
+          _movies.addAll(items);
+          _hasMore = items.length >= 30;
           _isLoading = false;
-          _isLoadingMore = false;
         });
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOut,
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _isLoadingMore = false;
         });
       }
     }
@@ -176,7 +155,7 @@ class _JavCategoryListPageState extends State<JavCategoryListPage> {
                     physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                     slivers: [
                       CupertinoSliverRefreshControl(
-                        onRefresh: () => _fetchPage(isRefresh: true),
+                        onRefresh: () => _fetchPage(page: _page),
                       ),
                       if (_filteredMovies.isEmpty && !_isLoading)
                         const SliverFillRemaining(
@@ -212,27 +191,18 @@ class _JavCategoryListPageState extends State<JavCategoryListPage> {
                             ),
                           ),
                         ),
-                      if (_isLoadingMore)
-                        const SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 20),
-                            child: Center(
-                              child: CupertinoActivityIndicator(color: Colors.cyanAccent, radius: 12),
-                            ),
-                          ),
-                        )
-                      else if (!_hasMore && _movies.isNotEmpty)
-                        const SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
-                            child: Center(
-                              child: Text(
-                                '已加载全部母库作品',
-                                style: TextStyle(color: Colors.white24, fontSize: 12),
-                              ),
-                            ),
+                      if (_movies.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: JavPaginator(
+                            currentPage: _page,
+                            hasMore: _hasMore,
+                            isLoading: _isLoading,
+                            onPageChanged: (newPage) => _fetchPage(page: newPage),
                           ),
                         ),
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: 40),
+                      ),
                     ],
                   ),
           ),
