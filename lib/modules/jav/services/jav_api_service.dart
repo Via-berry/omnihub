@@ -84,12 +84,13 @@ class JavApiService {
   /// 获取探索流作品 (带分页与分类)
   Future<List<JavItem>> fetchExplore({
     int page = 1,
+    int limit = 30,
     String? type,
     String? magnetType,
     CancelToken? cancelToken,
   }) async {
     try {
-      final queryParams = <String, dynamic>{'page': page};
+      final queryParams = <String, dynamic>{'page': page, 'limit': limit};
       if (type != null && type.isNotEmpty && type != 'all') {
         queryParams['type'] = type;
       }
@@ -162,10 +163,18 @@ class JavApiService {
     }
   }
 
-  /// 获取热门女优列表
-  Future<List<JavActress>> fetchActresses({CancelToken? cancelToken}) async {
+  /// 获取女优列表 (支持分页与每页数量)
+  Future<List<JavActress>> fetchActresses({
+    int page = 1,
+    int limit = 30,
+    CancelToken? cancelToken,
+  }) async {
     try {
-      final res = await _dio.get('/api/jav/actresses', cancelToken: cancelToken);
+      final res = await _dio.get(
+        '/api/jav/actresses',
+        queryParameters: {'page': page, 'limit': limit},
+        cancelToken: cancelToken,
+      );
       var data = res.data;
       if (data is String) {
         try {
@@ -232,6 +241,7 @@ class JavApiService {
     String category = 'censored',
     String genre = '',
     int page = 1,
+    int limit = 30,
     CancelToken? cancelToken,
   }) async {
     try {
@@ -241,6 +251,7 @@ class JavApiService {
           'category': category,
           'genre': genre,
           'page': page,
+          'limit': limit,
         },
         cancelToken: cancelToken,
       );
@@ -313,6 +324,7 @@ class JavApiService {
     String keyword, {
     String category = 'all',
     int page = 1,
+    int limit = 30,
     CancelToken? cancelToken,
   }) async {
     try {
@@ -322,6 +334,7 @@ class JavApiService {
           'query': keyword.trim(),
           'category': category,
           'page': page,
+          'limit': limit,
         },
         cancelToken: cancelToken,
       );

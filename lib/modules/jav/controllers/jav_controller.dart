@@ -288,6 +288,9 @@ class JavController extends GetxController {
         final existing = libraryMovies.map((e) => e.code).toSet();
         final newItems = items.where((e) => !existing.contains(e.code)).toList();
         libraryMovies.addAll(newItems);
+        if (items.length < 30) {
+          libraryHasMore.value = false;
+        }
       }
     } catch (e) {
       debugPrint('loadMoreLibraryMovies error: $e');

@@ -92,68 +92,50 @@ class JavDetailPage extends GetView<JavDetailController> {
       ),
       actions: [
         // 避人脱敏模式切换
+        // 脱敏切换
         Obx(() {
           final isSafe = JavSafeService.to.isSafeMode.value;
-          return CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            onPressed: JavSafeService.to.toggleSafeMode,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
+          return Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isSafe
+                  ? Colors.cyanAccent.withValues(alpha: 0.25)
+                  : Colors.black.withValues(alpha: 0.45),
+              shape: BoxShape.circle,
+              border: Border.all(
                 color: isSafe
-                    ? Colors.cyanAccent.withValues(alpha: 0.20)
-                    : Colors.white.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSafe
-                      ? Colors.cyanAccent.withValues(alpha: 0.60)
-                      : Colors.white.withValues(alpha: 0.20),
-                ),
+                    ? Colors.cyanAccent.withValues(alpha: 0.6)
+                    : Colors.white.withValues(alpha: 0.15),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isSafe ? CupertinoIcons.eye_slash_fill : CupertinoIcons.eye_fill,
-                    color: isSafe ? Colors.cyanAccent : Colors.white70,
-                    size: 13,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    isSafe ? '脱敏中' : '明文',
-                    style: TextStyle(
-                      color: isSafe ? Colors.cyanAccent : Colors.white70,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+            ),
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: JavSafeService.to.toggleSafeMode,
+              child: Icon(
+                isSafe ? CupertinoIcons.eye_slash_fill : CupertinoIcons.eye_fill,
+                color: isSafe ? Colors.cyanAccent : Colors.white70,
+                size: 16,
               ),
             ),
           );
         }),
+        const SizedBox(width: 8),
         // 一键速退
         Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            color: Colors.redAccent.withValues(alpha: 0.25),
-            borderRadius: BorderRadius.circular(20),
-            onPressed: controller.exitJav,
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.shield_outlined, color: Colors.redAccent, size: 14),
-                SizedBox(width: 4),
-                Text(
-                  '一键速退',
-                  style: TextStyle(
-                    color: Colors.redAccent,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+          padding: const EdgeInsets.only(right: 16),
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.redAccent.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+            ),
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: controller.exitJav,
+              child: const Icon(CupertinoIcons.shield_fill, color: Colors.redAccent, size: 16),
             ),
           ),
         ),
@@ -208,7 +190,7 @@ class JavDetailPage extends GetView<JavDetailController> {
                 Obx(() {
                   final isSafe = JavSafeService.to.isSafeMode.value;
                   final displayTitle = isSafe
-                      ? '${detail.code} ${detail.actresses.isNotEmpty ? '· ${detail.actresses.join(' ')}' : ''}'
+                      ? '${detail.code}${detail.actresses.isNotEmpty ? ' · ${detail.actresses.map((a) => a.name).join(' ')}' : ''}'
                       : detail.title;
                   return Text(
                     displayTitle,
@@ -468,46 +450,55 @@ class JavDetailPage extends GetView<JavDetailController> {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final a = actresses[index];
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Get.toNamed(
+              '/jav/category',
+              arguments: {'title': '${a.name} 的作品', 'actress': a.name},
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(colors: [Colors.pinkAccent, Colors.purpleAccent]),
-                  ),
-                  child: Center(
-                    child: Text(
-                      a.name.isNotEmpty ? a.name.characters.first : '女',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(colors: [Colors.pinkAccent, Colors.purpleAccent]),
+                    ),
+                    child: Center(
+                      child: Text(
+                        a.name.isNotEmpty ? a.name.characters.first : '女',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      a.name,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                    const Text(
-                      '专属演员',
-                      style: TextStyle(color: Colors.white54, fontSize: 10),
-                    ),
-                  ],
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        a.name,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                      const Text(
+                        '专属演员 · 查看作品',
+                        style: TextStyle(color: Colors.cyanAccent, fontSize: 10),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(CupertinoIcons.chevron_right, color: Colors.white30, size: 12),
+                ],
+              ),
             ),
           );
         },

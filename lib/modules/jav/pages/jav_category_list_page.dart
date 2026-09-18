@@ -1,4 +1,4 @@
-﻿import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -21,6 +21,7 @@ class _JavCategoryListPageState extends State<JavCategoryListPage> {
   late final String _title;
   late final String _categoryType;
   late final String _genre;
+  late final String? _actress;
 
   final List<JavItem> _movies = [];
   bool _isLoading = true;
@@ -36,7 +37,8 @@ class _JavCategoryListPageState extends State<JavCategoryListPage> {
   void initState() {
     super.initState();
     final args = Get.arguments as Map<String, dynamic>? ?? {};
-    _title = args['title']?.toString() ?? '专区作品';
+    _actress = args['actress']?.toString();
+    _title = args['title']?.toString() ?? (_actress != null ? '$_actress 的作品' : '专区作品');
     _categoryType = args['categoryType']?.toString() ?? 'censored';
     _genre = args['genre']?.toString() ?? '';
 
@@ -72,12 +74,24 @@ class _JavCategoryListPageState extends State<JavCategoryListPage> {
     _cancelToken = CancelToken();
 
     try {
-      final items = await _api.fetchCategoryExplore(
-        category: _categoryType,
-        genre: _genre,
-        page: _page,
-        cancelToken: _cancelToken,
-      );
+      List<JavItem> items;
+      if (_actress != null && _actress.isNotEmpty) {
+        final searchRes = await _api.search(
+          _actress,
+          page: _page,
+          limit: 30,
+          cancelToken: _cancelToken,
+        );
+        items = searchRes.results;
+      } else {
+        items = await _api.fetchCategoryExplore(
+          category: _categoryType,
+          genre: _genre,
+          page: _page,
+          limit: 30,
+          cancelToken: _cancelToken,
+        );
+      }
 
       if (mounted) {
         setState(() {
@@ -90,7 +104,11 @@ class _JavCategoryListPageState extends State<JavCategoryListPage> {
             final existing = _movies.map((e) => e.code).toSet();
             final newItems = items.where((e) => !existing.contains(e.code)).toList();
             _movies.addAll(newItems);
-            _page++;
+            if (items.length < 30) {
+              _hasMore = false;
+            } else {
+              _page++;
+            }
           }
           _isLoading = false;
           _isLoadingMore = false;

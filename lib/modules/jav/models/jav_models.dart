@@ -90,6 +90,9 @@ class JavActressRef {
     }
     return JavActressRef(name: json.toString());
   }
+
+  @override
+  String toString() => name;
 }
 
 class JavMagnet {
