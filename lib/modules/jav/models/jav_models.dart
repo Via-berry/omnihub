@@ -266,3 +266,20 @@ class JavActress {
     return '$baseUrl/api/img/proxy?url=$encoded';
   }
 }
+
+class JavGenre {
+  final String id;
+  final String name;
+  final String tag;
+
+  JavGenre({required this.id, required this.name, this.tag = ''});
+
+  factory JavGenre.fromJson(Map<String, dynamic> json) {
+    return JavGenre(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      tag: json['tag']?.toString() ?? '',
+    );
+  }
+}
+

@@ -227,16 +227,102 @@ class JavApiService {
     }
   }
 
+  /// 按分类与题材拉取影片流（有码 censored、无码 uncensored、人气 popular、中字 subtitled）
+  Future<List<JavItem>> fetchCategoryExplore({
+    String category = 'censored',
+    String genre = '',
+    int page = 1,
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      final res = await _dio.get(
+        '/api/jav/explore',
+        queryParameters: {
+          'category': category,
+          'genre': genre,
+          'page': page,
+        },
+        cancelToken: cancelToken,
+      );
+      var data = res.data;
+      if (data is String) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {}
+      }
+      if (res.statusCode == 200 && data != null) {
+        List rawList = [];
+        if (data is Map && data['results'] is List) {
+          rawList = data['results'] as List;
+        } else if (data is List) {
+          rawList = data;
+        }
+
+        return rawList
+            .whereType<Map>()
+            .map((e) => JavItem.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        return [];
+      }
+      debugPrint('JavApiService.fetchCategoryExplore error: $e');
+      rethrow;
+    }
+  }
+
+  /// 获取母库分类题材标签列表
+  Future<List<JavGenre>> fetchGenres({
+    String category = 'censored',
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      final res = await _dio.get(
+        '/api/jav/genres',
+        queryParameters: {'category': category},
+        cancelToken: cancelToken,
+      );
+      var data = res.data;
+      if (data is String) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {}
+      }
+      if (res.statusCode == 200 && data != null && data is Map) {
+        if (data['genres'] is List) {
+          return (data['genres'] as List)
+              .whereType<Map>()
+              .map((e) => JavGenre.fromJson(Map<String, dynamic>.from(e)))
+              .toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        return [];
+      }
+      debugPrint('JavApiService.fetchGenres error: $e');
+      return [];
+    }
+  }
+
   /// 搜索番号、演员或 AI 描述找片
   Future<JavSearchResult> search(
     String keyword, {
+    String category = 'all',
     int page = 1,
     CancelToken? cancelToken,
   }) async {
     try {
       final res = await _dio.get(
         '/api/jav/search',
-        queryParameters: {'query': keyword.trim(), 'page': page},
+        queryParameters: {
+          'query': keyword.trim(),
+          'category': category,
+          'page': page,
+        },
         cancelToken: cancelToken,
       );
       var data = res.data;

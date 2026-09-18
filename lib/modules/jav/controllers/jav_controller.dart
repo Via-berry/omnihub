@@ -10,6 +10,8 @@ class JavController extends GetxController {
   // 内存数据快照（跨页面与生命周期保活，零等待秒开）
   static final List<JavItem> _cachedNowPlaying = [];
   static final List<JavItem> _cachedHot = [];
+  static final List<JavItem> _cachedUncensored = [];
+  static final List<JavItem> _cachedPopular = [];
   static final List<JavItem> _cachedSubtitled = [];
   static final List<JavActress> _cachedActresses = [];
   static final List<JavTagPrompt> _cachedTags = [];
@@ -18,16 +20,31 @@ class JavController extends GetxController {
   final RxBool isRefreshing = false.obs;
   final RxString errorMsg = ''.obs;
 
+  // 主视图 Tab 索引：0 为精选推荐，1 为全量影库
+  final RxInt currentMainTab = 0.obs;
+
   // 顶部 Banner 数据
   final RxList<JavItem> bannerItems = <JavItem>[].obs;
   final RxInt bannerPageIndex = 0.obs;
   late final PageController bannerPageController;
 
-  // 分组数据
+  // 精选专区数据
   final RxList<JavItem> nowPlayingItems = <JavItem>[].obs;
   final RxList<JavItem> hotItems = <JavItem>[].obs;
+  final RxList<JavItem> uncensoredItems = <JavItem>[].obs;
+  final RxList<JavItem> popularItems = <JavItem>[].obs;
   final RxList<JavItem> subtitledItems = <JavItem>[].obs;
   final RxList<JavActress> actresses = <JavActress>[].obs;
+
+  // 全量影库 Tab 专属状态
+  final RxString libraryCategory = 'censored'.obs; // censored (有码) 或 uncensored (无码)
+  final RxList<JavGenre> libraryGenres = <JavGenre>[].obs;
+  final RxString selectedGenreId = 'all'.obs;
+  final RxList<JavItem> libraryMovies = <JavItem>[].obs;
+  final RxBool isLibraryLoading = false.obs;
+  final RxBool isLibraryLoadingMore = false.obs;
+  final RxBool libraryHasMore = true.obs;
+  final RxInt libraryPage = 1.obs;
 
   // 推荐题材/找片标签
   final RxList<JavTagPrompt> recommendationTags = <JavTagPrompt>[].obs;
@@ -48,6 +65,7 @@ class JavController extends GetxController {
   // 请求取消令牌
   CancelToken? _searchCancelToken;
   CancelToken? _fetchCancelToken;
+  CancelToken? _libraryCancelToken;
 
   @override
   void onInit() {
@@ -59,6 +77,8 @@ class JavController extends GetxController {
       nowPlayingItems.assignAll(_cachedNowPlaying);
       bannerItems.assignAll(_cachedNowPlaying.take(5));
       if (_cachedHot.isNotEmpty) hotItems.assignAll(_cachedHot);
+      if (_cachedUncensored.isNotEmpty) uncensoredItems.assignAll(_cachedUncensored);
+      if (_cachedPopular.isNotEmpty) popularItems.assignAll(_cachedPopular);
       if (_cachedSubtitled.isNotEmpty) subtitledItems.assignAll(_cachedSubtitled);
       if (_cachedActresses.isNotEmpty) actresses.assignAll(_cachedActresses);
       if (_cachedTags.isNotEmpty) recommendationTags.assignAll(_cachedTags);
@@ -142,28 +162,160 @@ class JavController extends GetxController {
 
   Future<void> _fetchBackgroundCurations() async {
     try {
-      // 后台静默拉取第二页作为精选和中字推荐填充
-      final p2Items = await api.fetchExplore(page: 2, cancelToken: _fetchCancelToken);
-      if (p2Items.isNotEmpty) {
-        if (hotItems.isEmpty) {
-          hotItems.assignAll(p2Items);
-          _cachedHot.assignAll(p2Items);
+      // 后台静默并行拉取无码专区、人气排行与中字推荐
+      final results = await Future.wait([
+        api.fetchCategoryExplore(category: 'uncensored', page: 1, cancelToken: _fetchCancelToken),
+        api.fetchCategoryExplore(category: 'popular', page: 1, cancelToken: _fetchCancelToken),
+        api.fetchCategoryExplore(category: 'subtitled', page: 1, cancelToken: _fetchCancelToken),
+        api.fetchCategoryExplore(category: 'censored', page: 2, cancelToken: _fetchCancelToken),
+      ]);
+
+      final uncen = results[0];
+      final pop = results[1];
+      final zh = results[2];
+      final p2 = results[3];
+
+      if (uncen.isNotEmpty) {
+        uncensoredItems.assignAll(uncen);
+        _cachedUncensored.assignAll(uncen);
+      }
+      if (pop.isNotEmpty) {
+        popularItems.assignAll(pop);
+        _cachedPopular.assignAll(pop);
+      }
+      if (zh.isNotEmpty) {
+        subtitledItems.assignAll(zh);
+        _cachedSubtitled.assignAll(zh);
+      } else if (p2.isNotEmpty) {
+        final zhP2 = p2.where((e) => e.hasSubtitles).toList();
+        if (zhP2.isNotEmpty) {
+          subtitledItems.assignAll(zhP2);
+          _cachedSubtitled.assignAll(zhP2);
         }
-        final zh = p2Items.where((e) => e.hasSubtitles).toList();
-        if (zh.isNotEmpty && subtitledItems.isEmpty) {
-          subtitledItems.assignAll(zh);
-          _cachedSubtitled.assignAll(zh);
-        }
+      }
+      if (hotItems.isEmpty && p2.isNotEmpty) {
+        hotItems.assignAll(p2);
+        _cachedHot.assignAll(p2);
       }
     } catch (_) {}
   }
 
+  void switchMainTab(int index) {
+    currentMainTab.value = index;
+    if (index == 1 && libraryMovies.isEmpty) {
+      fetchLibraryMovies();
+    }
+  }
+
+  Future<void> switchLibraryCategory(String cat) async {
+    if (libraryCategory.value == cat && libraryMovies.isNotEmpty) return;
+    libraryCategory.value = cat;
+    selectedGenreId.value = 'all';
+    libraryGenres.clear();
+    await fetchLibraryMovies(isRefresh: true);
+  }
+
+  Future<void> selectLibraryGenre(String genreId) async {
+    if (selectedGenreId.value == genreId) return;
+    selectedGenreId.value = genreId;
+    await fetchLibraryMovies(isRefresh: true);
+  }
+
+  Future<void> fetchLibraryMovies({bool isRefresh = false}) async {
+    if (isRefresh) {
+      libraryPage.value = 1;
+      libraryHasMore.value = true;
+    }
+    isLibraryLoading.value = true;
+    _libraryCancelToken?.cancel();
+    _libraryCancelToken = CancelToken();
+
+    try {
+      if (libraryGenres.isEmpty) {
+        final genres = await api.fetchGenres(category: libraryCategory.value, cancelToken: _libraryCancelToken);
+        if (genres.isNotEmpty) {
+          libraryGenres.assignAll(genres);
+        }
+      }
+
+      final genreObj = libraryGenres.firstWhereOrNull((g) => g.id == selectedGenreId.value);
+      final genreTag = genreObj?.tag ?? (selectedGenreId.value == 'all' ? '' : selectedGenreId.value);
+
+      final items = await api.fetchCategoryExplore(
+        category: libraryCategory.value,
+        genre: genreTag,
+        page: libraryPage.value,
+        cancelToken: _libraryCancelToken,
+      );
+
+      if (items.isEmpty) {
+        libraryHasMore.value = false;
+        if (isRefresh) libraryMovies.clear();
+      } else {
+        if (isRefresh) {
+          libraryMovies.assignAll(items);
+        } else {
+          final existing = libraryMovies.map((e) => e.code).toSet();
+          final newItems = items.where((e) => !existing.contains(e.code)).toList();
+          libraryMovies.addAll(newItems);
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchLibraryMovies error: $e');
+    } finally {
+      isLibraryLoading.value = false;
+    }
+  }
+
+  Future<void> loadMoreLibraryMovies() async {
+    if (isLibraryLoading.value || isLibraryLoadingMore.value || !libraryHasMore.value) return;
+    isLibraryLoadingMore.value = true;
+    libraryPage.value++;
+
+    try {
+      final genreObj = libraryGenres.firstWhereOrNull((g) => g.id == selectedGenreId.value);
+      final genreTag = genreObj?.tag ?? (selectedGenreId.value == 'all' ? '' : selectedGenreId.value);
+
+      final items = await api.fetchCategoryExplore(
+        category: libraryCategory.value,
+        genre: genreTag,
+        page: libraryPage.value,
+      );
+
+      if (items.isEmpty) {
+        libraryHasMore.value = false;
+      } else {
+        final existing = libraryMovies.map((e) => e.code).toSet();
+        final newItems = items.where((e) => !existing.contains(e.code)).toList();
+        libraryMovies.addAll(newItems);
+      }
+    } catch (e) {
+      debugPrint('loadMoreLibraryMovies error: $e');
+    } finally {
+      isLibraryLoadingMore.value = false;
+    }
+  }
+
+  void navigateToCategory({required String title, required String categoryType, String genre = ''}) {
+    Get.toNamed('/jav/category', arguments: {
+      'title': title,
+      'categoryType': categoryType,
+      'genre': genre,
+    });
+  }
+
   Future<void> executeSearch(String keyword) async {
-    final query = keyword.trim();
-    if (query.isEmpty) {
+    final raw = keyword.trim();
+    if (raw.isEmpty) {
       clearSearch();
       return;
     }
+
+    // 本地快速归一化番号 (如 ssis834 / ssis 834 -> SSIS-834)
+    final codeMatch = RegExp(r'^([A-Za-z]{2,5})[\s_\-]*(\d{2,5})$').firstMatch(raw);
+    final query = codeMatch != null
+        ? '${codeMatch.group(1)!.toUpperCase()}-${codeMatch.group(2)}'
+        : raw;
 
     // 取消上一轮未完成的搜索网络请求，防止堆积
     _searchCancelToken?.cancel();

@@ -9,11 +9,15 @@ class JavNowPlayingCard extends StatelessWidget {
     required this.item,
     required this.onTap,
     this.score = 9.6,
+    this.width,
+    this.height,
   });
 
   final JavItem item;
   final VoidCallback onTap;
   final double score;
+  final double? width;
+  final double? height;
 
   static const double cardWidth = 116;
   static const double cardHeight = 180;
@@ -24,8 +28,8 @@ class JavNowPlayingCard extends StatelessWidget {
     final proxyUrl = JavApiService().getProxyImageUrl(item.cover, code: item.code);
 
     return SizedBox(
-      width: cardWidth,
-      height: cardHeight,
+      width: width ?? cardWidth,
+      height: height ?? cardHeight,
       child: Material(
         color: Colors.transparent,
         child: InkWell(

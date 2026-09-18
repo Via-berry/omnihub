@@ -7,7 +7,6 @@ import 'package:moviepilot_mobile/modules/jav/services/jav_api_service.dart';
 import 'package:moviepilot_mobile/modules/jav/services/jav_safe_service.dart';
 import 'package:moviepilot_mobile/modules/jav/widgets/jav_safe_cover.dart';
 import 'package:moviepilot_mobile/modules/jav/widgets/jav_stills_gallery.dart';
-import 'package:moviepilot_mobile/widgets/cached_image.dart';
 
 class JavDetailPage extends GetView<JavDetailController> {
   const JavDetailPage({super.key});

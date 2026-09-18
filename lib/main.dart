@@ -49,6 +49,7 @@ import 'modules/jav/controllers/jav_detail_controller.dart';
 import 'modules/jav/pages/jav_main_page.dart';
 import 'modules/jav/pages/jav_detail_page.dart';
 import 'modules/jav/pages/jav_player_page.dart';
+import 'modules/jav/pages/jav_category_list_page.dart';
 import 'modules/login/pages/login_page.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_scaffold_background.dart';
@@ -989,6 +990,10 @@ class MyApp extends StatelessWidget {
           GetPage(
             name: '/jav/player',
             page: () => const JavPlayerPage(),
+          ),
+          GetPage(
+            name: '/jav/category',
+            page: () => const JavCategoryListPage(),
           ),
         ],
         // 配置错误处理
