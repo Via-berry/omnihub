@@ -54,14 +54,23 @@ class PansouService extends GetxService {
     }
   }
 
+  static String normalizeHost(String raw) {
+    var cleaned = raw.trim();
+    if (cleaned.isEmpty) return defaultHost;
+    if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+      cleaned = 'http://$cleaned';
+    }
+    while (cleaned.endsWith('/')) {
+      cleaned = cleaned.substring(0, cleaned.length - 1);
+    }
+    return cleaned;
+  }
+
   Future<void> updateConfig({String? newHost, String? newToken}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (newHost != null && newHost.trim().isNotEmpty) {
-        var cleaned = newHost.trim();
-        if (cleaned.endsWith('/')) {
-          cleaned = cleaned.substring(0, cleaned.length - 1);
-        }
+        final cleaned = normalizeHost(newHost);
         host.value = cleaned;
         await prefs.setString(_hostPrefKey, cleaned);
       }
@@ -74,21 +83,22 @@ class PansouService extends GetxService {
     }
   }
 
-  /// 发起 PanSou 资源搜索，默认筛选 115、磁力与电驴
+  /// 发起 PanSou 资源搜索，默认全量检索各网盘与磁力/电驴资源
   Future<List<PansouItem>> search({
     required String keyword,
-    List<String> cloudTypes = const ['115', 'magnet', 'ed2k'],
+    List<String>? cloudTypes,
     bool refresh = false,
   }) async {
     final cleanKw = keyword.trim();
     if (cleanKw.isEmpty) return [];
 
-    final targetHost = host.value.isNotEmpty ? host.value : defaultHost;
+    final targetHost = normalizeHost(host.value);
     final url = '$targetHost/api/search';
 
     final queryParams = <String, dynamic>{
       'kw': cleanKw,
-      'cloud_types': cloudTypes.join(','),
+      if (cloudTypes != null && cloudTypes.isNotEmpty)
+        'cloud_types': cloudTypes.join(','),
       'res': 'merge',
       if (refresh) 'refresh': 'true',
     };
@@ -127,9 +137,21 @@ class PansouService extends GetxService {
       final results = <PansouItem>[];
       var index = 0;
 
-      // 优先提取 115，然后 magnet，然后 ed2k
-      final targetTypes = ['115', 'magnet', 'ed2k'];
-      for (final typeKey in targetTypes) {
+      // 常用网盘排序提取（115、夸克、阿里、百度等）
+      final priorityTypes = [
+        '115',
+        'quark',
+        'aliyun',
+        'baidu',
+        'xunlei',
+        'uc',
+        'tianyi',
+        '123pan',
+        'magnet',
+        'ed2k',
+      ];
+
+      for (final typeKey in priorityTypes) {
         final list = mergedByType[typeKey];
         if (list is List) {
           for (final item in list) {
@@ -146,9 +168,9 @@ class PansouService extends GetxService {
         }
       }
 
-      // 其他网盘如果有也可以兼容提取（若有 115 以外符合预期的）
+      // 其他未在预置列表中的全部网盘全量保留
       mergedByType.forEach((key, value) {
-        if (!targetTypes.contains(key) && value is List) {
+        if (!priorityTypes.contains(key) && value is List) {
           for (final item in value) {
             if (item is Map<String, dynamic>) {
               results.add(
@@ -172,7 +194,7 @@ class PansouService extends GetxService {
 
   /// 健康检查
   Future<bool> checkHealth() async {
-    final targetHost = host.value.isNotEmpty ? host.value : defaultHost;
+    final targetHost = normalizeHost(host.value);
     final url = '$targetHost/api/health';
     try {
       final resp = await _dio.get(

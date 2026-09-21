@@ -6,6 +6,7 @@ import 'package:moviepilot_mobile/modules/pansou/controllers/pansou_share_contro
 import 'package:moviepilot_mobile/modules/pansou/models/pansou_models.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
 import 'package:moviepilot_mobile/widgets/cached_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PansouShareCard extends StatefulWidget {
   const PansouShareCard({
@@ -27,6 +28,24 @@ class _PansouShareCardState extends State<PansouShareCard> {
   void _copyToClipboard(String text, String tip) {
     Clipboard.setData(ClipboardData(text: text));
     ToastUtil.success(tip);
+  }
+
+  Future<void> _openExternalLink(PansouItem item) async {
+    if (item.password.isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: item.password));
+    }
+    final uri = Uri.tryParse(item.url);
+    if (uri != null) {
+      try {
+        final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (ok) {
+          ToastUtil.success(
+              item.password.isNotEmpty ? '已复制提取码并跳转网盘' : '已跳转网盘');
+          return;
+        }
+      } catch (_) {}
+    }
+    _copyFullShareInfo();
   }
 
   void _copyFullShareInfo() {
@@ -467,6 +486,43 @@ class _PansouShareCardState extends State<PansouShareCard> {
                       );
                     }
 
+                    if (item.isThirdPartyCloud) {
+                      Color btnColor = const Color(0xFF0EA5E9);
+                      if (item.isQuark) {
+                        btnColor = const Color(0xFFFF3366);
+                      } else if (item.isAliyun) {
+                        btnColor = const Color(0xFFFF8800);
+                      } else if (item.isBaidu) {
+                        btnColor = const Color(0xFF3B82F6);
+                      }
+                      return CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        minimumSize: const Size(0, 32),
+                        color: btnColor.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(999),
+                        onPressed: () => _openExternalLink(item),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              CupertinoIcons.arrow_up_right_square_fill,
+                              size: 13,
+                              color: btnColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '打开网盘',
+                              style: TextStyle(
+                                color: btnColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
                     return CupertinoButton(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       minimumSize: const Size(0, 32),
@@ -528,6 +584,34 @@ class _PansouShareCardState extends State<PansouShareCard> {
       case PansouItemType.pan115:
         color = const Color(0xFF00E5FF);
         icon = CupertinoIcons.cloud_fill;
+        break;
+      case PansouItemType.quark:
+        color = const Color(0xFFFF3366);
+        icon = CupertinoIcons.flame_fill;
+        break;
+      case PansouItemType.aliyun:
+        color = const Color(0xFFFF8800);
+        icon = CupertinoIcons.cloud_upload_fill;
+        break;
+      case PansouItemType.baidu:
+        color = const Color(0xFF3B82F6);
+        icon = CupertinoIcons.cloud_fill;
+        break;
+      case PansouItemType.xunlei:
+        color = const Color(0xFF0EA5E9);
+        icon = CupertinoIcons.bolt_fill;
+        break;
+      case PansouItemType.uc:
+        color = const Color(0xFFF97316);
+        icon = CupertinoIcons.globe;
+        break;
+      case PansouItemType.tianyi:
+        color = const Color(0xFF06B6D4);
+        icon = CupertinoIcons.cloud_sun_fill;
+        break;
+      case PansouItemType.pan123:
+        color = const Color(0xFF10B981);
+        icon = CupertinoIcons.folder_fill;
         break;
       case PansouItemType.magnet:
         color = const Color(0xFFA855F7);

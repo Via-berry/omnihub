@@ -294,8 +294,12 @@ class _PansouShareSheetState extends State<PansouShareSheet> {
       final activeFilter = controller.selectedFilter.value;
       final total = controller.items.length;
       final count115 = controller.count115;
+      final countQuark = controller.countQuark;
+      final countAliyun = controller.countAliyun;
+      final countBaidu = controller.countBaidu;
       final countMagnet = controller.countMagnet;
       final count4k = controller.count4k;
+      final countOther = controller.countOther;
 
       return Container(
         height: 40,
@@ -307,9 +311,21 @@ class _PansouShareSheetState extends State<PansouShareSheet> {
             const SizedBox(width: 8),
             _buildFilterPill('115 网盘', '115', count115, activeFilter == '115'),
             const SizedBox(width: 8),
+            _buildFilterPill('夸克网盘', 'quark', countQuark, activeFilter == 'quark'),
+            const SizedBox(width: 8),
+            _buildFilterPill('阿里云盘', 'aliyun', countAliyun, activeFilter == 'aliyun'),
+            if (countBaidu > 0) ...[
+              const SizedBox(width: 8),
+              _buildFilterPill('百度网盘', 'baidu', countBaidu, activeFilter == 'baidu'),
+            ],
+            const SizedBox(width: 8),
             _buildFilterPill('磁力/电驴', 'magnet', countMagnet, activeFilter == 'magnet'),
             const SizedBox(width: 8),
             _buildFilterPill('4K 专区', '4k', count4k, activeFilter == '4k'),
+            if (countOther > 0) ...[
+              const SizedBox(width: 8),
+              _buildFilterPill('其他网盘', 'other', countOther, activeFilter == 'other'),
+            ],
           ],
         ),
       );
@@ -389,28 +405,60 @@ class _PansouShareSheetState extends State<PansouShareSheet> {
       }
 
       if (controller.errorMessage.value.isNotEmpty && controller.items.isEmpty) {
+        final isNotFound = controller.errorMessage.value.contains('未找到');
         return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(CupertinoIcons.search, size: 48, color: Colors.white24),
-              const SizedBox(height: 12),
-              Text(
-                controller.errorMessage.value,
-                style: const TextStyle(color: Colors.white54, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-                onPressed: () => controller.fetchResults(refresh: true),
-                child: const Text(
-                  '重试搜索',
-                  style: TextStyle(color: Colors.white, fontSize: 12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isNotFound ? CupertinoIcons.search : CupertinoIcons.exclamationmark_triangle,
+                  size: 44,
+                  color: isNotFound ? Colors.white24 : const Color(0xFFF59E0B).withValues(alpha: 0.7),
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+                Text(
+                  controller.errorMessage.value,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white60, fontSize: 13, height: 1.5),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CupertinoButton(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      onPressed: () => controller.fetchResults(refresh: true),
+                      child: const Text(
+                        '重试搜索',
+                        style: TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ),
+                    if (!isNotFound) ...[
+                      const SizedBox(width: 12),
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        onPressed: () async {
+                          final changed = await PansouSettingsSheet.show(context);
+                          if (changed == true) {
+                            controller.fetchResults(refresh: true);
+                          }
+                        },
+                        child: const Text(
+                          '设置服务地址',
+                          style: TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       }

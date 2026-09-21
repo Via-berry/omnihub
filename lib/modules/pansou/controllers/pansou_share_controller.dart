@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
@@ -61,18 +62,44 @@ class PansouShareController extends GetxController {
     switch (selectedFilter.value) {
       case '115':
         return items.where((e) => e.is115).toList();
+      case 'quark':
+        return items.where((e) => e.isQuark).toList();
+      case 'aliyun':
+        return items.where((e) => e.isAliyun).toList();
+      case 'baidu':
+        return items.where((e) => e.isBaidu).toList();
       case 'magnet':
         return items.where((e) => e.isOfflineDownload).toList();
       case '4k':
         return items.where((e) => e.resolution == '4K').toList();
+      case 'other':
+        return items
+            .where((e) =>
+                !e.is115 &&
+                !e.isQuark &&
+                !e.isAliyun &&
+                !e.isBaidu &&
+                !e.isOfflineDownload)
+            .toList();
       default:
         return items.toList();
     }
   }
 
   int get count115 => items.where((e) => e.is115).length;
+  int get countQuark => items.where((e) => e.isQuark).length;
+  int get countAliyun => items.where((e) => e.isAliyun).length;
+  int get countBaidu => items.where((e) => e.isBaidu).length;
   int get countMagnet => items.where((e) => e.isOfflineDownload).length;
   int get count4k => items.where((e) => e.resolution == '4K').length;
+  int get countOther => items
+      .where((e) =>
+          !e.is115 &&
+          !e.isQuark &&
+          !e.isAliyun &&
+          !e.isBaidu &&
+          !e.isOfflineDownload)
+      .length;
 
   Future<void> fetchResults({bool refresh = false}) async {
     final kw = searchKeyword.value.trim();
@@ -96,8 +123,21 @@ class PansouShareController extends GetxController {
         // 后台静默并发探测 115 真实容量与链接有效性
         _autoProbe115Resources(results);
       }
+    } on DioException catch (e) {
+      final host = PansouService.to.host.value;
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        errorMessage.value = '连接超时，无法连接到 PanSou 服务 ($host)\n请检查手机网络或确认服务是否响应过慢';
+      } else if (e.type == DioExceptionType.connectionError) {
+        errorMessage.value = '无法连接到 $host\n若在 5G 网络下请确认内网 VPN 已开启；\n若在 Wi-Fi 下请检查 iOS 设置中 OmniHub 的「本地网络」权限。';
+      } else if (e.response != null) {
+        errorMessage.value = 'PanSou 服务响应异常 (HTTP ${e.response?.statusCode})';
+      } else {
+        errorMessage.value = 'PanSou 网络请求异常: ${e.message ?? e.toString()}';
+      }
     } catch (e) {
-      errorMessage.value = '搜索失败，请检查 PanSou 服务地址是否可用';
+      errorMessage.value = '搜索异常: $e';
     } finally {
       isLoading.value = false;
     }

@@ -2,6 +2,13 @@ import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
 
 enum PansouItemType {
   pan115,
+  quark,
+  aliyun,
+  baidu,
+  xunlei,
+  uc,
+  tianyi,
+  pan123,
   magnet,
   ed2k,
   other;
@@ -14,6 +21,35 @@ enum PansouItemType {
         lowerUrl.contains('115cdn.com') ||
         lowerUrl.contains('anxia.com')) {
       return PansouItemType.pan115;
+    }
+    if (lowerRaw == 'quark' ||
+        lowerUrl.contains('quark.cn') ||
+        lowerUrl.contains('pan.quark.cn')) {
+      return PansouItemType.quark;
+    }
+    if (lowerRaw == 'aliyun' ||
+        lowerUrl.contains('alipan.com') ||
+        lowerUrl.contains('aliyundrive.com')) {
+      return PansouItemType.aliyun;
+    }
+    if (lowerRaw == 'baidu' ||
+        lowerUrl.contains('pan.baidu.com') ||
+        lowerUrl.contains('baidu.com')) {
+      return PansouItemType.baidu;
+    }
+    if (lowerRaw == 'xunlei' ||
+        lowerUrl.contains('pan.xunlei.com') ||
+        lowerUrl.contains('xunlei.com')) {
+      return PansouItemType.xunlei;
+    }
+    if (lowerRaw == 'uc' || lowerUrl.contains('drive.uc.cn')) {
+      return PansouItemType.uc;
+    }
+    if (lowerRaw == 'tianyi' || lowerUrl.contains('189.cn')) {
+      return PansouItemType.tianyi;
+    }
+    if (lowerRaw == '123pan' || lowerUrl.contains('123pan.com')) {
+      return PansouItemType.pan123;
     }
     if (lowerRaw == 'magnet' || lowerUrl.startsWith('magnet:?')) {
       return PansouItemType.magnet;
@@ -28,6 +64,20 @@ enum PansouItemType {
     switch (this) {
       case PansouItemType.pan115:
         return '115 网盘';
+      case PansouItemType.quark:
+        return '夸克网盘';
+      case PansouItemType.aliyun:
+        return '阿里云盘';
+      case PansouItemType.baidu:
+        return '百度网盘';
+      case PansouItemType.xunlei:
+        return '迅雷云盘';
+      case PansouItemType.uc:
+        return 'UC 网盘';
+      case PansouItemType.tianyi:
+        return '天翼云盘';
+      case PansouItemType.pan123:
+        return '123 网盘';
       case PansouItemType.magnet:
         return '磁力链接';
       case PansouItemType.ed2k:
@@ -82,9 +132,17 @@ class PansouItem {
   });
 
   bool get is115 => type == PansouItemType.pan115;
+  bool get isQuark => type == PansouItemType.quark;
+  bool get isAliyun => type == PansouItemType.aliyun;
+  bool get isBaidu => type == PansouItemType.baidu;
+  bool get isXunlei => type == PansouItemType.xunlei;
+  bool get isUc => type == PansouItemType.uc;
+  bool get isTianyi => type == PansouItemType.tianyi;
+  bool get isPan123 => type == PansouItemType.pan123;
   bool get isMagnet => type == PansouItemType.magnet;
   bool get isEd2k => type == PansouItemType.ed2k;
   bool get isOfflineDownload => isMagnet || isEd2k;
+  bool get isThirdPartyCloud => !is115 && !isOfflineDownload;
   bool get hasMultipleUrls => urls.length > 1;
   int get offlineUrlCount => urls.isNotEmpty ? urls.length : (url.isNotEmpty ? 1 : 0);
 
