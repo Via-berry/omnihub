@@ -141,36 +141,42 @@ class SearchMediaController extends GetxController {
     final resolutions = selectedResolutions.value.toSet();
     final teams = selectedTeams.value.toSet();
 
-    // 合并为单轮过滤：原实现串联 7 个 where，每轮都要完整遍历一次并分配
-    // 一个中间 List。合并后只遍历一次、只分配一个结果 List。
-    // 注意：条件顺序与原有语义保持一致（短路行为不变）。
-    final results = <SearchResultItem>[];
-    for (final item in items) {
-      if (key.isNotEmpty && !_matchKeyword(item, key)) continue;
-      if (sites.isNotEmpty && !sites.contains(_siteName(item))) continue;
+    var results = items.toList();
+    if (key.isNotEmpty) {
+      results = results.where((item) => _matchKeyword(item, key)).toList();
+    }
+    results = results.where((item) {
+      if (sites.isNotEmpty && !sites.contains(_siteName(item))) {
+        return false;
+      }
       if (seasons.isNotEmpty) {
         final season = _seasonLabel(item);
-        if (season == null || !seasons.contains(season)) continue;
+        if (season == null || !seasons.contains(season)) return false;
       }
       if (promotions.isNotEmpty) {
         final promotion = _promotionLabel(item);
-        if (promotion == null || !promotions.contains(promotion)) continue;
+        if (promotion == null || !promotions.contains(promotion)) {
+          return false;
+        }
       }
       if (encodes.isNotEmpty) {
-        if (!encodes.contains(item.meta_info?.video_encode ?? '')) continue;
+        final encode = item.meta_info?.video_encode ?? '';
+        if (!encodes.contains(encode)) return false;
       }
       if (qualities.isNotEmpty) {
         final quality = _qualityLabel(item);
-        if (quality == null || !qualities.contains(quality)) continue;
+        if (quality == null || !qualities.contains(quality)) return false;
       }
       if (resolutions.isNotEmpty) {
-        if (!resolutions.contains(item.meta_info?.resource_pix ?? '')) continue;
+        final resolution = item.meta_info?.resource_pix ?? '';
+        if (!resolutions.contains(resolution)) return false;
       }
       if (teams.isNotEmpty) {
-        if (!teams.contains(item.meta_info?.resource_team ?? '')) continue;
+        final team = item.meta_info?.resource_team ?? '';
+        if (!teams.contains(team)) return false;
       }
-      results.add(item);
-    }
+      return true;
+    }).toList();
 
     return _sortResults(results);
   }
@@ -778,40 +784,28 @@ class SearchMediaController extends GetxController {
     if (key == SearchResultSortKey.defaultSort) {
       return list;
     }
-    final ascending = sortDirection.value == SortDirection.asc;
-    switch (key) {
-      case SearchResultSortKey.site:
-        return _sortBy(list, (e) => _siteName(e), ascending);
-      case SearchResultSortKey.size:
-        return _sortBy(list, (e) => _size(e), ascending);
-      case SearchResultSortKey.seeders:
-        return _sortBy(list, (e) => _seeders(e), ascending);
-      case SearchResultSortKey.pubdate:
-        return _sortBy(list, (e) => _pubdate(e), ascending);
-      case SearchResultSortKey.defaultSort:
-        return list;
-    }
-  }
-
-  /// 先算好排序键、再排序（Schwartzian transform）。
-  ///
-  /// 原实现把取值写在比较函数内部，导致键计算被重复执行 O(n log n) 次。
-  /// 其中 `_pubdate` 每次都要跑 `DateFormat.parse`（含双层 try/catch），
-  /// 实测 1000 条需 21ms —— 已超过一帧 16.7ms 的预算，滚动与筛选时必然掉帧。
-  /// 改为每项只算一次（O(n)）后，同一场景降到 0.6ms 量级。
-  List<SearchResultItem> _sortBy<T extends Comparable<T>>(
-    List<SearchResultItem> list,
-    T Function(SearchResultItem item) keyOf,
-    bool ascending,
-  ) {
-    final decorated = <({SearchResultItem item, T key})>[
-      for (final item in list) (item: item, key: keyOf(item)),
-    ];
-    decorated.sort((a, b) {
-      final cmp = a.key.compareTo(b.key);
-      return ascending ? cmp : -cmp;
+    list.sort((a, b) {
+      int result;
+      switch (key) {
+        case SearchResultSortKey.site:
+          result = _siteName(a).compareTo(_siteName(b));
+          break;
+        case SearchResultSortKey.size:
+          result = (_size(a)).compareTo(_size(b));
+          break;
+        case SearchResultSortKey.seeders:
+          result = (_seeders(a)).compareTo(_seeders(b));
+          break;
+        case SearchResultSortKey.pubdate:
+          result = (_pubdate(a)).compareTo(_pubdate(b));
+          break;
+        case SearchResultSortKey.defaultSort:
+          result = 0;
+          break;
+      }
+      return sortDirection.value == SortDirection.asc ? result : -result;
     });
-    return [for (final entry in decorated) entry.item];
+    return list;
   }
 
   bool _matchKeyword(SearchResultItem item, String keywordLower) {

@@ -608,32 +608,15 @@ class ApiClient extends g.GetxController {
         if (skipV3EnvelopeUnwrap) _skipV3EnvelopeUnwrapKey: true,
       },
     );
-    final stopwatch = Stopwatch()..start();
-    try {
-      final response = await _dio.get<T>(
-        path,
-        queryParameters: queryParameters,
-        options: options,
-      );
-      if (!skipUnauthorizedHandling) {
-        _handleUnauthorized(response.statusCode);
-      }
-      return response;
-    } finally {
-      stopwatch.stop();
-      _logIfSlow(path, stopwatch.elapsedMilliseconds);
-    }
-  }
-
-  /// 单次请求耗时超过该阈值即记录一条警告，便于在「App日志」页定位瓶颈。
-  static const int _slowRequestThresholdMs = 3000;
-
-  void _logIfSlow(String path, int elapsedMs) {
-    if (elapsedMs < _slowRequestThresholdMs) return;
-    _log.warning(
-      '慢请求 ${elapsedMs}ms: $path'
-      '${elapsedMs >= 10000 ? '（已超过 10 秒，请检查后端/NAS 响应）' : ''}',
+    final response = await _dio.get<T>(
+      path,
+      queryParameters: queryParameters,
+      options: options,
     );
+    if (!skipUnauthorizedHandling) {
+      _handleUnauthorized(response.statusCode);
+    }
+    return response;
   }
 
   Future<Response<T>> delete<T>(

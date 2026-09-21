@@ -26,11 +26,6 @@ class ServerApiVersionService extends GetxService {
       final response = await _apiClient.get<dynamic>(
         '/api/v1/media/source',
         skipV3EnvelopeUnwrap: true,
-        // 显式收紧超时：这是一次能力探测，不是业务数据请求。
-        // 不设的话会继承 ApiClient 的默认 120s，而 media_detail 的
-        // fetchDetail() 第一步就 await isV3()，探测一旦挂起，
-        // 详情页会一直 loading、按钮一直置灰直到 120s 超时。
-        timeout: 8,
       );
       final data = response.data;
       final hasSourceList =
