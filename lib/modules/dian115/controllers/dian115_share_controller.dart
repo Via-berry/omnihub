@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -107,7 +108,19 @@ class Dian115ShareController extends GetxController {
       sharesResponse.value = resp;
       allShares.assignAll(resp.shares);
     } catch (e) {
-      errorMsg.value = '获取网盘资源失败：$e';
+      if (e is DioException) {
+        if (e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.connectionTimeout) {
+          errorMsg.value = '连接网关超时，上游癫影服务响应缓慢，请稍后重试';
+        } else if (e.type == DioExceptionType.connectionError) {
+          errorMsg.value = '无法连接到癫影中转网关，请检查 NAS 容器与内网连接';
+        } else {
+          errorMsg.value = '获取网盘资源失败 (${e.response?.statusCode ?? e.message})';
+        }
+      } else {
+        errorMsg.value = '获取网盘资源失败：$e';
+      }
     } finally {
       isLoading.value = false;
     }

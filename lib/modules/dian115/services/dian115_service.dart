@@ -43,8 +43,8 @@ class Dian115Service extends GetxService {
     super.onInit();
     _dio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 25),
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 45),
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'OmnihubMobile/1.0',
