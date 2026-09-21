@@ -16,12 +16,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache Flutter SDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/flutter
+          key: ${{ runner.os }}-flutter-3.38.2-${{ hashFiles('.github/workflows/shorebird-release.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-3.38.2-
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.38.2"
           channel: "stable"
           cache: true
+          cache-key: flutter-3.38.2-${{ hashFiles('pubspec.lock') }}
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
 
       - name: Setup Shorebird
         uses: shorebirdtech/setup-shorebird@v1
@@ -48,9 +75,22 @@ jobs:
           flutter pub get
 
       - name: Install CocoaPods
+        env:
+          TYPHOEUS_HTTP_VERSION: CURL_HTTP_VERSION_1_1
         run: |
           cd ios
           pod install
+
+      - name: Cache Xcode derived data
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData
+            build
+          key: ${{ runner.os }}-xcode-${{ hashFiles('ios/Podfile.lock') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-${{ hashFiles('ios/Podfile.lock') }}-
+            ${{ runner.os }}-xcode-
 
       - name: Shorebird Release iOS
         run: |

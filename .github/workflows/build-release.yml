@@ -170,12 +170,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache Flutter SDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/flutter
+          key: ${{ runner.os }}-flutter-3.38.2-${{ hashFiles('.github/workflows/build-release.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-3.38.2-
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.38.2"
           channel: "stable"
           cache: true
+          cache-key: flutter-3.38.2-${{ hashFiles('pubspec.lock') }}
 
       - name: Cache Flutter pub
         uses: actions/cache@v4
@@ -184,9 +193,6 @@ jobs:
           key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: |
             ${{ runner.os }}-pub-
-
-      - name: Refresh altman_downloader_control
-        run: flutter pub upgrade altman_downloader_control
 
       - name: Install dependencies
         run: flutter pub get
@@ -207,6 +213,17 @@ jobs:
         run: |
           cd ios
           pod install
+
+      - name: Cache Xcode derived data
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData
+            build
+          key: ${{ runner.os }}-xcode-${{ hashFiles('ios/Podfile.lock') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-${{ hashFiles('ios/Podfile.lock') }}-
+            ${{ runner.os }}-xcode-
 
       - name: Build unsigned iOS app
         shell: bash

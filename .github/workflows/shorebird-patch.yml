@@ -11,20 +11,41 @@ on:
       - 'docs/**'
       - '.github/workflows/upstream-sync.yml'
       - 'upstream_baseline.json'
+      - '.env.example'
+      - 'scripts/**'
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: shorebird-patch-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   patch-ios:
     runs-on: macos-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN || secrets.SHOREBIRD_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 只需要最新提交，避免拉取完整历史（本仓库 .git 约 53MB）
+          fetch-depth: 1
+
+      # ── 缓存层 ──────────────────────────────────────────────
+      # 说明：subosito/flutter-action 的 cache: true 只缓存 pub 全局缓存，
+      # 不缓存 Flutter SDK 本身。额外用 actions/cache 命中 SDK 目录，
+      # 可省去每次 5-10 分钟的 SDK 下载解压。
+      - name: Cache Flutter SDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/flutter
+          key: ${{ runner.os }}-flutter-3.38.2-${{ hashFiles('.github/workflows/shorebird-patch.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-3.38.2-
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -32,6 +53,37 @@ jobs:
           flutter-version: "3.38.2"
           channel: "stable"
           cache: true
+          cache-key: flutter-3.38.2-${{ hashFiles('pubspec.lock') }}
+
+      # pub 全局缓存与 Pod 缓存分开 key，任一变动不会互相失效
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Cache Xcode derived data
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData
+            build
+          key: ${{ runner.os }}-xcode-${{ hashFiles('ios/Podfile.lock') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-${{ hashFiles('ios/Podfile.lock') }}-
+            ${{ runner.os }}-xcode-
 
       - name: Setup Shorebird
         uses: shorebirdtech/setup-shorebird@v1
@@ -43,12 +95,16 @@ jobs:
             exit 1
           fi
 
+      # 原写法 `flutter pub upgrade altman_downloader_control || true` 每次都会
+      # 重解析该包（甚至改动 pubspec.lock），导致 pub / Pods 缓存全部失效，
+      # 并把失败静默吞掉。改为锁定 pubspec.lock 的 pub get。
+      # 如需升级该包，用下方 Upgrade 手动触发 Env 或本地升级后提交 lock 文件。
       - name: Install dependencies
-        run: |
-          flutter pub upgrade altman_downloader_control || true
-          flutter pub get
+        run: flutter pub get
 
       - name: Install CocoaPods
+        env:
+          TYPHOEUS_HTTP_VERSION: CURL_HTTP_VERSION_1_1
         run: |
           cd ios
           pod install
