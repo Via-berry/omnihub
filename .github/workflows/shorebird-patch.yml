@@ -2,9 +2,12 @@ name: Shorebird Patch (iOS 业务热更新)
 
 on:
   push:
+    # 只监听 master（omnihub 二开主线）。
+    # 不要加 main：main 停在上游原始代码，而 patch 使用
+    # --release-version=latest 永远针对最新 release 打包，
+    # 若 main 触发会给设备上的底包打上代码不匹配的补丁。
     branches:
       - master
-      - main
     paths-ignore:
       - '**.md'
       - '.gitignore'
