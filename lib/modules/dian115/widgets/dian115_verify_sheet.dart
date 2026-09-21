@@ -73,11 +73,19 @@ class _Dian115VerifySheetState extends State<Dian115VerifySheet> {
   bool _isLoading = true;
   bool _isUnlockedCaptured = false;
   String _statusText = '正在加载安全验证环境...';
+  Timer? _loadingTimeoutTimer;
 
   @override
   void initState() {
     super.initState();
     _initWebViewController();
+  }
+
+  @override
+  void dispose() {
+    _loadingTimeoutTimer?.cancel();
+    _loadingTimeoutTimer = null;
+    super.dispose();
   }
 
   Future<void> _initWebViewController() async {
@@ -96,6 +104,9 @@ class _Dian115VerifySheetState extends State<Dian115VerifySheet> {
     controller
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF11151F))
+      ..setUserAgent(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1',
+      )
       ..addJavaScriptChannel(
         'DianUnlockBridge',
         onMessageReceived: (JavaScriptMessage message) {
@@ -111,8 +122,18 @@ class _Dian115VerifySheetState extends State<Dian115VerifySheet> {
                 _statusText = '正在连接片源页面...';
               });
             }
+            _loadingTimeoutTimer?.cancel();
+            _loadingTimeoutTimer = Timer(const Duration(seconds: 8), () {
+              if (mounted && _isLoading) {
+                setState(() {
+                  _isLoading = false;
+                  _statusText = '请轻触下方复选框完成人机验证';
+                });
+              }
+            });
           },
           onPageFinished: (url) async {
+            _loadingTimeoutTimer?.cancel();
             if (mounted) {
               setState(() {
                 _isLoading = false;
@@ -123,6 +144,13 @@ class _Dian115VerifySheetState extends State<Dian115VerifySheet> {
           },
           onWebResourceError: (error) {
             debugPrint('Dian115 WebView resource error: ${error.description}');
+            _loadingTimeoutTimer?.cancel();
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _statusText = '网页加载异常 (${error.description})';
+              });
+            }
           },
         ),
       );
@@ -475,25 +503,42 @@ class _Dian115VerifySheetState extends State<Dian115VerifySheet> {
               children: [
                 WebViewWidget(controller: _webController),
                 if (_isLoading)
-                  Container(
-                    color: const Color(0xFF11151F),
-                    child: const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CupertinoActivityIndicator(
-                            color: Colors.white,
-                            radius: 12,
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            '正在接入安全校验环境...',
-                            style: TextStyle(
-                              color: Colors.white60,
-                              fontSize: 11,
+                  Positioned.fill(
+                    child: Container(
+                      color: const Color(0xFF11151F).withValues(alpha: 0.88),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CupertinoActivityIndicator(
+                              color: Colors.white,
+                              radius: 12,
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 10),
+                            const Text(
+                              '正在接入安全校验环境...',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            CupertinoButton(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 5),
+                              color: Colors.white12,
+                              borderRadius: BorderRadius.circular(8),
+                              onPressed: () {
+                                setState(() {
+                                  _isLoading = false;
+                                });
+                              },
+                              child: const Text('直接查看验证码',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 11)),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
