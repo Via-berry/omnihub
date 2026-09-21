@@ -22,14 +22,18 @@ class GithubActionsService extends GetxService {
     'https://gh.llkk.cc/https://api.github.com/repos/$owner/$repo',
   ];
 
-  static String get _defaultToken {
-    const masked = [
-      77, 66, 90, 117, 98, 24, 121, 111, 93, 72, 95, 93, 26, 27, 89, 64,
-      67, 82, 28, 68, 101, 89, 67, 92, 68, 88, 75, 115, 64, 76, 120, 27,
-      19, 111, 24, 75, 105, 110, 77, 88
-    ];
-    return String.fromCharCodes(masked.map((b) => b ^ 42));
-  }
+  /// 内置 Token 改为构建期注入，不再硬编码进仓库：
+  ///   flutter build ... --dart-define=GITHUB_ACTIONS_TOKEN=github_pat_xxx
+  /// 未注入时为空 → 走 GitHub 匿名调用（60 次/小时/IP，仅读公开仓库元数据，
+  /// 对本 App 的「查看 CI 状态」场景足够）。
+  /// 需要更高配额的用户可在设置中填写自己的只读 Token（custom_github_actions_token）。
+  ///
+  /// 强烈建议：即便注入，也请使用 fine-grained PAT 且仅授予
+  /// Actions: Read-only + Contents: Read-only，绝不要用 repo 全权限 classic token。
+  static const String _defaultToken = String.fromEnvironment(
+    'GITHUB_ACTIONS_TOKEN',
+    defaultValue: '',
+  );
 
   static const String _runsCacheKey = 'github_workflow_runs_cache_v2';
   static const String _jobsCachePrefix = 'github_workflow_jobs_cache_v2_';

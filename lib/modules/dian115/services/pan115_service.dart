@@ -14,8 +14,17 @@ class Pan115Service extends GetxService {
     return Get.find<Pan115Service>();
   }
 
-  static const String defaultCookie =
-      'UID=17987361_I1_1788850088; CID=365f183bb2a51d857c9e7f4c4b73d12c; SEID=cec8916b37ca6aa68d2c9761af6b363a42af99ee6e26e05de75b24921b825d36ff82a6c4fd35d3006d6942220c5cb31d69eef522ec4f9990fd7c017c; KID=a36b541eebcf01a9a4ca1406eee18f25';
+  /// 默认 115 Cookie 通过在构建期注入，不写入仓库：
+  ///   flutter build ... --dart-define=PAN115_COOKIE="UID=...; CID=...; SEID=...; KID=..."
+  /// 未注入时为空字符串，用户可在「癫影 115」设置面板中填写自己的 Cookie
+  /// （见 dian115_share_sheet.dart 的 updateConfig 入口），并持久化到本机。
+  ///
+  /// 注意：dart-define 的值会被编译进产物，可被逆向提取。
+  /// 如需真正的秘密，请勿使用共享 Cookie，改用服务端代理。
+  static const String defaultCookie = String.fromEnvironment(
+    'PAN115_COOKIE',
+    defaultValue: '',
+  );
   static const String defaultMovieCid = '3374319270869599334';
   static const String defaultTvCid = '3374342216908539463';
 
