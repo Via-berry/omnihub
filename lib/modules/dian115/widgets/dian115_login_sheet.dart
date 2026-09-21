@@ -37,6 +37,7 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
   String? _syncErrorMessage;
   bool _hasAutoSyncTriggered = false;
   Timer? _authPoller;
+  Timer? _loadingTimeoutTimer;
 
   List<Map<String, dynamic>>? _cachedCookies;
   Map<String, dynamic>? _cachedUserData;
@@ -50,6 +51,8 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
 
   @override
   void dispose() {
+    _loadingTimeoutTimer?.cancel();
+    _loadingTimeoutTimer = null;
     _authPoller?.cancel();
     _authPoller = null;
     super.dispose();
@@ -86,8 +89,18 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
                 _statusText = '正在连接登录页面...';
               });
             }
+            _loadingTimeoutTimer?.cancel();
+            _loadingTimeoutTimer = Timer(const Duration(seconds: 8), () {
+              if (mounted && _isLoading) {
+                setState(() {
+                  _isLoading = false;
+                  _statusText = '请轻触完成人机验证，再点击下方一键提交登录';
+                });
+              }
+            });
           },
           onPageFinished: (url) async {
+            _loadingTimeoutTimer?.cancel();
             final uri = Uri.tryParse(url);
             final isLogin = uri != null &&
                 (uri.path == '/login' || uri.path.endsWith('/login'));
@@ -121,6 +134,13 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
           },
           onWebResourceError: (error) {
             debugPrint('Dian115 Login WebView error: ${error.description}');
+            _loadingTimeoutTimer?.cancel();
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _statusText = '网页连接缓慢或异常 (${error.description})，请检查代理';
+              });
+            }
           },
         ),
       );
@@ -639,6 +659,31 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
                     CupertinoButton(
                       padding: EdgeInsets.zero,
                       minSize: 26,
+                      onPressed: () {
+                        setState(() {
+                          _isLoading = true;
+                          _statusText = '正在刷新网页...';
+                        });
+                        _webController.reload();
+                      },
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          CupertinoIcons.arrow_clockwise,
+                          color: Colors.white70,
+                          size: 13,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minSize: 26,
                       onPressed: () => _showHostSettingsDialog(context),
                       child: Container(
                         width: 26,
@@ -851,20 +896,37 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
                   },
                 ),
                 if (_isLoading)
-                  Container(
-                    color: const Color(0xFF11151F),
-                    child: const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CupertinoActivityIndicator(radius: 12),
-                          SizedBox(height: 12),
-                          Text(
-                            '正在加载安全环境...',
-                            style:
-                                TextStyle(color: Colors.white54, fontSize: 12),
-                          ),
-                        ],
+                  Positioned.fill(
+                    child: Container(
+                      color: const Color(0xFF11151F).withValues(alpha: 0.88),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CupertinoActivityIndicator(radius: 12),
+                            const SizedBox(height: 12),
+                            const Text(
+                              '正在加载安全环境...',
+                              style:
+                                  TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                            const SizedBox(height: 16),
+                            CupertinoButton(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 6),
+                              color: Colors.white12,
+                              borderRadius: BorderRadius.circular(8),
+                              onPressed: () {
+                                setState(() {
+                                  _isLoading = false;
+                                });
+                              },
+                              child: const Text('直接查看页面',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 11)),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
