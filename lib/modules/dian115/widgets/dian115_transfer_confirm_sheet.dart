@@ -1,7 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
 import 'package:moviepilot_mobile/modules/dian115/services/pan115_service.dart';
+import 'package:moviepilot_mobile/utils/toast_util.dart';
 
 /// 115 转存确认与目标目录选择弹窗
 class Dian115TransferConfirmSheet extends StatefulWidget {
@@ -168,7 +170,125 @@ class _Dian115TransferConfirmSheetState
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
+
+          // 115 凭证状态与快捷配置条
+          Obx(() {
+            final hasCookie = pan115.hasConfiguredCookie;
+            final summary = pan115.cookieSummary;
+            final isCustom = pan115.isCustomCookie.value;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: hasCookie
+                    ? const Color(0xFF10B981).withValues(alpha: 0.08)
+                    : const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: hasCookie
+                      ? const Color(0xFF10B981).withValues(alpha: 0.25)
+                      : const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    hasCookie
+                        ? CupertinoIcons.checkmark_shield_fill
+                        : CupertinoIcons.exclamationmark_shield_fill,
+                    size: 18,
+                    color: hasCookie
+                        ? const Color(0xFF34D399)
+                        : const Color(0xFFFBBF24),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              hasCookie ? '115 账号凭证已就绪' : '未检测到 115 网盘凭证',
+                              style: TextStyle(
+                                color: hasCookie
+                                    ? Colors.white
+                                    : const Color(0xFFFDE68A),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (hasCookie) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: (isCustom
+                                          ? const Color(0xFF6366F1)
+                                          : const Color(0xFF10B981))
+                                      .withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  isCustom ? '自定义' : 'Action默认',
+                                  style: TextStyle(
+                                    color: isCustom
+                                        ? const Color(0xFFA5B4FC)
+                                        : const Color(0xFF6EE7B7),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          hasCookie
+                              ? summary
+                              : '需配置 115 账号 Cookie 才能保存至个人网盘',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: hasCookie
+                                ? Colors.white.withValues(alpha: 0.5)
+                                : const Color(0xFFFCD34D),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _showQuickCookieDialog(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: hasCookie
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : const Color(0xFFF59E0B),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        hasCookie ? '更换' : '立即配置',
+                        style: TextStyle(
+                          color: hasCookie ? Colors.white : Colors.black,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
 
           // 目录选择提示
           Row(
@@ -333,6 +453,11 @@ class _Dian115TransferConfirmSheetState
                   color: const Color(0xFF10B981),
                   borderRadius: BorderRadius.circular(12),
                   onPressed: () {
+                    if (!pan115.hasConfiguredCookie) {
+                      ToastUtil.info('请先配置 115 网盘凭证');
+                      _showQuickCookieDialog(context);
+                      return;
+                    }
                     Navigator.of(context).pop((
                       cid: _selectedCid,
                       folderName: _selectedFolderName,
@@ -450,6 +575,79 @@ class _Dian115TransferConfirmSheetState
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showQuickCookieDialog(BuildContext context) {
+    final pan115 = Pan115Service.to;
+    final textController = TextEditingController(text: pan115.cookie.value);
+
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text(
+          '配置 115 网盘凭证',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+        ),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '请粘贴 115.com 网页端或抓包获取的完整 Cookie（包含 UID、CID、SEID 等）：',
+                style: TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+              ),
+              const SizedBox(height: 8),
+              CupertinoTextField(
+                controller: textController,
+                maxLines: 4,
+                placeholder: 'UID=...; CID=...; SEID=...',
+                style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+              ),
+              if (pan115.hasDefaultCookie && pan115.isCustomCookie.value) ...[
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: () async {
+                    await pan115.updateConfig(resetCookieToDefault: true);
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                    ToastUtil.success('已恢复 Action 构建注入的默认 Cookie');
+                  },
+                  child: const Text(
+                    '恢复 Action 构建注入的默认 Cookie',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF38BDF8),
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () async {
+              final newCookie = textController.text.trim();
+              if (newCookie.isNotEmpty) {
+                await pan115.updateConfig(newCookie: newCookie);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                ToastUtil.success('115 凭证已更新并生效');
+              } else {
+                ToastUtil.error('请输入有效的 Cookie 内容');
+              }
+            },
+            child: const Text('保存'),
+          ),
+        ],
       ),
     );
   }

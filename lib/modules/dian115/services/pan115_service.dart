@@ -35,6 +35,7 @@ class Pan115Service extends GetxService {
   final RxString cookie = defaultCookie.obs;
   final RxString movieCid = defaultMovieCid.obs;
   final RxString tvCid = defaultTvCid.obs;
+  final RxBool isCustomCookie = false.obs;
 
   late final Dio _dio;
 
@@ -60,6 +61,10 @@ class Pan115Service extends GetxService {
       final savedCookie = prefs.getString(_prefCookieKey);
       if (savedCookie != null && savedCookie.trim().isNotEmpty) {
         cookie.value = savedCookie.trim();
+        isCustomCookie.value = true;
+      } else {
+        cookie.value = defaultCookie;
+        isCustomCookie.value = false;
       }
 
       final savedMovieCid = prefs.getString(_prefMovieCidKey);
@@ -80,12 +85,21 @@ class Pan115Service extends GetxService {
     String? newCookie,
     String? newMovieCid,
     String? newTvCid,
+    bool resetCookieToDefault = false,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (newCookie != null && newCookie.trim().isNotEmpty) {
-        cookie.value = newCookie.trim();
-        await prefs.setString(_prefCookieKey, newCookie.trim());
+      if (resetCookieToDefault) {
+        cookie.value = defaultCookie;
+        isCustomCookie.value = false;
+        await prefs.remove(_prefCookieKey);
+      } else if (newCookie != null) {
+        final trimmed = newCookie.trim();
+        if (trimmed.isNotEmpty) {
+          cookie.value = trimmed;
+          isCustomCookie.value = true;
+          await prefs.setString(_prefCookieKey, trimmed);
+        }
       }
       if (newMovieCid != null && newMovieCid.trim().isNotEmpty) {
         movieCid.value = newMovieCid.trim();
@@ -98,6 +112,25 @@ class Pan115Service extends GetxService {
     } catch (e) {
       debugPrint('保存 115 配置异常: $e');
     }
+  }
+
+  bool get hasConfiguredCookie => cookie.value.trim().isNotEmpty;
+  bool get hasDefaultCookie => defaultCookie.trim().isNotEmpty;
+
+  String get cookieSummary {
+    final raw = cookie.value.trim();
+    if (raw.isEmpty) return '未配置';
+    final isCustom = isCustomCookie.value;
+    final source = isCustom ? '自定义' : '内置注入';
+
+    // 尝试提取 UID 简要显示
+    final match = RegExp(r'UID=([^;]+)', caseSensitive: false).firstMatch(raw);
+    if (match != null) {
+      final uid = match.group(1)?.trim() ?? '';
+      final maskedUid = uid.length > 5 ? '${uid.substring(0, 3)}***' : uid;
+      return '$source (UID: $maskedUid)';
+    }
+    return '$source (已配置)';
   }
 
   static bool isMovieType({String? mediaType, Dian115ShareItem? item}) {
@@ -161,6 +194,16 @@ class Pan115Service extends GetxService {
                 ? '电视剧目录'
                 : getTargetFolderName(mediaType, item)));
 
+    if (!hasConfiguredCookie) {
+      return {
+        'success': false,
+        'target_folder': targetFolder,
+        'cid': effectiveCid,
+        'msg': '尚未配置 115 网盘凭证，请先在弹窗中配置您的 115 Cookie',
+        'need_cookie': true,
+      };
+    }
+
     // 汇总收集所有有效的离线下载链接 (支持 ed2k、magnet 等多链接批量)
     final effectiveOfflineUrls = <String>[];
     final seen = <String>{};
@@ -223,13 +266,55 @@ class Pan115Service extends GetxService {
 
       if (resp.data is Map<String, dynamic>) {
         final data = resp.data as Map<String, dynamic>;
+        final isSuccess = data['state'] == true || data['success'] == true;
+        if (isSuccess) {
+          return {
+            'success': true,
+            'target_folder': targetFolder,
+            'cid': effectiveCid,
+            'total_count': data['total_count'],
+            'success_count': data['success_count'],
+            'msg': data['msg'] ?? data['message'] ?? '转存完成',
+            'raw': data,
+          };
+        }
+
+        // 网关返回失败时，深入解析 115 错误码
+        final raw = data['raw'] is Map ? data['raw'] as Map : null;
+        final errno = raw?['errno'] ?? data['errno'];
+        final rawErr = raw?['error'] ?? raw?['error_msg'] ?? data['msg'] ?? data['message'];
+        var errorMsg = rawErr?.toString() ?? '转存失败';
+        if (errno == 990002 ||
+            errno == 4100026 ||
+            errno == 911 ||
+            errorMsg.contains('未登录') ||
+            errorMsg.contains('验证账号') ||
+            errorMsg.contains('登录已超时')) {
+          errorMsg = '115 网盘凭证已失效（登录过期），请在转存弹窗中更新 115 Cookie';
+        }
+
+        // 若不是 Cookie 失效导致的网关失败，尝试客户端直连兜底
+        if (errno != 990002 && errno != 4100026 && errno != 911) {
+          debugPrint('网关响应失败，尝试客户端直连兜底: $errorMsg');
+          final directRes = await _transferDirect(
+            mediaType: mediaType,
+            effectiveCid: effectiveCid,
+            targetFolder: targetFolder,
+            shareUrl: shareUrl,
+            receiveCode: receiveCode,
+            effectiveOfflineUrls: effectiveOfflineUrls,
+            singleMagnetUrl: magnetUrl,
+          );
+          if (directRes['success'] == true) {
+            return directRes;
+          }
+        }
+
         return {
-          'success': data['state'] == true || data['success'] == true,
+          'success': false,
           'target_folder': targetFolder,
           'cid': effectiveCid,
-          'total_count': data['total_count'],
-          'success_count': data['success_count'],
-          'msg': data['msg'] ?? data['message'] ?? '转存完成',
+          'msg': errorMsg,
           'raw': data,
         };
       }
@@ -301,12 +386,15 @@ class Pan115Service extends GetxService {
           final resData = resp.data is String ? jsonDecode(resp.data) : resp.data;
           final state = resData is Map ? resData['state'] == true : false;
           final errcode = resData is Map ? resData['errcode'] : null;
+          final errno = resData is Map ? resData['errno'] : null;
 
           if (state) {
             successCount++;
           } else if (errcode == 10008) {
             duplicateCount++;
             successCount++;
+          } else if (errno == 911 || errno == 990002) {
+            errorMsgs.add('115 账号凭证失效，请更新 Cookie');
           } else {
             errorMsgs.add(resData?['error_msg']?.toString() ?? '第${i + 1}个链接添加失败');
           }
@@ -365,10 +453,39 @@ class Pan115Service extends GetxService {
           },
         );
         final snapData = snapResp.data is String ? jsonDecode(snapResp.data) : snapResp.data;
+        if (snapData is Map && snapData['state'] != true) {
+          final snapErrno = snapData['errno'];
+          final snapMsg = snapData['error'] ?? snapData['error_msg'] ?? snapData['msg'] ?? '获取分享快照失败';
+          var friendlyMsg = '115 分享快照获取失败: $snapMsg';
+          if (snapErrno == 990002 || snapErrno == 911 || snapMsg.toString().contains('登录')) {
+            friendlyMsg = '115 网盘凭证已失效（登录过期），请在转存弹窗中更新 115 Cookie';
+          }
+          return {
+            'success': false,
+            'target_folder': targetFolder,
+            'cid': effectiveCid,
+            'msg': friendlyMsg,
+            'raw': snapData,
+          };
+        }
+
         var fileIds = '';
         if (snapData is Map && snapData['data'] is Map && snapData['data']['list'] is List) {
           final list = snapData['data']['list'] as List;
-          fileIds = list.map((e) => e['file_id']?.toString() ?? '').where((id) => id.isNotEmpty).join(',');
+          fileIds = list
+              .map((e) => (e['file_id'] ?? e['fid'] ?? e['cid'])?.toString() ?? '')
+              .where((id) => id.isNotEmpty)
+              .join(',');
+        }
+
+        if (fileIds.isEmpty) {
+          return {
+            'success': false,
+            'target_folder': targetFolder,
+            'cid': effectiveCid,
+            'msg': '未能从该 115 分享中提取出有效文件 ID',
+            'raw': snapData,
+          };
         }
 
         final recResp = await directDio.post(
@@ -389,11 +506,17 @@ class Pan115Service extends GetxService {
 
         final recData = recResp.data is String ? jsonDecode(recResp.data) : recResp.data;
         final state = recData is Map ? recData['state'] == true : false;
+        final recErrno = recData is Map ? recData['errno'] : null;
+        var recMsg = recData?['error_msg'] ?? recData?['msg'] ?? (state ? '成功转存至 115 $targetFolder' : '转存失败');
+        if (recErrno == 990002 || recErrno == 911 || recMsg.toString().contains('登录')) {
+          recMsg = '115 网盘凭证已失效（登录过期），请在转存弹窗中更新 115 Cookie';
+        }
+
         return {
           'success': state,
           'target_folder': targetFolder,
           'cid': effectiveCid,
-          'msg': state ? '成功转存至 115 $targetFolder' : (recData?['error_msg'] ?? recData?['msg'] ?? '转存失败'),
+          'msg': recMsg,
           'raw': recData,
         };
       } catch (e) {
