@@ -39,44 +39,46 @@ class CpuWidget extends StatelessWidget {
               height: 132,
               child: chartData.isEmpty
                   ? const Center(child: CupertinoActivityIndicator())
-                  : SfCartesianChart(
-                      margin: EdgeInsets.zero,
-                      plotAreaBorderWidth: 0,
-                      backgroundColor: Colors.transparent,
-                      primaryXAxis: NumericAxis(
-                        isVisible: false,
-                        majorGridLines: const MajorGridLines(width: 0),
-                        axisLine: const AxisLine(width: 0),
-                      ),
-                      primaryYAxis: NumericAxis(
-                        minimum: 0,
-                        maximum: 100,
-                        isVisible: false,
-                        majorGridLines: MajorGridLines(
-                          width: 0.6,
-                          color: palette.divider,
+                  : RepaintBoundary(
+                      child: SfCartesianChart(
+                        margin: EdgeInsets.zero,
+                        plotAreaBorderWidth: 0,
+                        backgroundColor: Colors.transparent,
+                        primaryXAxis: NumericAxis(
+                          isVisible: false,
+                          majorGridLines: const MajorGridLines(width: 0),
+                          axisLine: const AxisLine(width: 0),
                         ),
-                        axisLine: const AxisLine(width: 0),
-                      ),
-                      series: <CartesianSeries<ChartDataPoint, int>>[
-                        AreaSeries<ChartDataPoint, int>(
-                          dataSource: chartData,
-                          xValueMapper: (ChartDataPoint data, _) => data.index,
-                          yValueMapper: (ChartDataPoint data, _) => data.value,
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              palette.primary.withValues(alpha: 0.28),
-                              palette.primary.withValues(alpha: 0.02),
-                            ],
+                        primaryYAxis: NumericAxis(
+                          minimum: 0,
+                          maximum: 100,
+                          isVisible: false,
+                          majorGridLines: MajorGridLines(
+                            width: 0.6,
+                            color: palette.divider,
                           ),
-                          borderColor: palette.primary,
-                          borderWidth: 2.2,
-                          animationDuration: 250,
+                          axisLine: const AxisLine(width: 0),
                         ),
-                      ],
-                      tooltipBehavior: TooltipBehavior(enable: true),
+                        series: <CartesianSeries<ChartDataPoint, int>>[
+                          AreaSeries<ChartDataPoint, int>(
+                            dataSource: chartData,
+                            xValueMapper: (ChartDataPoint data, _) => data.index,
+                            yValueMapper: (ChartDataPoint data, _) => data.value,
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                palette.primary.withValues(alpha: 0.28),
+                                palette.primary.withValues(alpha: 0.02),
+                              ],
+                            ),
+                            borderColor: palette.primary,
+                            borderWidth: 2.2,
+                            animationDuration: 0,
+                          ),
+                        ],
+                        tooltipBehavior: TooltipBehavior(enable: true),
+                      ),
                     ),
             ),
           ],
@@ -148,31 +150,34 @@ class CpuWidget extends StatelessWidget {
 
     return SizedBox(
       height: 40,
-      child: SfCartesianChart(
-        margin: EdgeInsets.zero,
-        plotAreaBorderWidth: 0,
-        backgroundColor: Colors.transparent,
-        primaryXAxis: NumericAxis(
-          isVisible: false,
-          majorGridLines: const MajorGridLines(width: 0),
-          axisLine: const AxisLine(width: 0),
-        ),
-        primaryYAxis: NumericAxis(
-          isVisible: true,
-          minimum: 0,
-          maximum: 100,
-          majorGridLines: MajorGridLines(width: 0.5, color: dividerColor),
-          axisLine: const AxisLine(width: 0),
-        ),
-        series: <CartesianSeries<ChartDataPoint, int>>[
-          SplineSeries<ChartDataPoint, int>(
-            dataSource: trendData,
-            xValueMapper: (ChartDataPoint data, _) => data.index,
-            yValueMapper: (ChartDataPoint data, _) => data.value,
-            color: color.withValues(alpha: chartData.isEmpty ? 0.45 : 1),
-            width: 2,
+      child: RepaintBoundary(
+        child: SfCartesianChart(
+          margin: EdgeInsets.zero,
+          plotAreaBorderWidth: 0,
+          backgroundColor: Colors.transparent,
+          primaryXAxis: NumericAxis(
+            isVisible: false,
+            majorGridLines: const MajorGridLines(width: 0),
+            axisLine: const AxisLine(width: 0),
           ),
-        ],
+          primaryYAxis: NumericAxis(
+            isVisible: true,
+            minimum: 0,
+            maximum: 100,
+            majorGridLines: MajorGridLines(width: 0.5, color: dividerColor),
+            axisLine: const AxisLine(width: 0),
+          ),
+          series: <CartesianSeries<ChartDataPoint, int>>[
+            SplineSeries<ChartDataPoint, int>(
+              dataSource: trendData,
+              xValueMapper: (ChartDataPoint data, _) => data.index,
+              yValueMapper: (ChartDataPoint data, _) => data.value,
+              color: color.withValues(alpha: chartData.isEmpty ? 0.45 : 1),
+              width: 2,
+              animationDuration: 0,
+            ),
+          ],
+        ),
       ),
     );
   }

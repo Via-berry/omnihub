@@ -55,6 +55,9 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
     _loadingTimeoutTimer = null;
     _authPoller?.cancel();
     _authPoller = null;
+    try {
+      _webController.loadRequest(Uri.parse('about:blank'));
+    } catch (_) {}
     super.dispose();
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:altman_downloader_control/controller/downloader_config.dart';
 import 'package:altman_downloader_control/page/downloader_shell_page.dart';
 import 'package:moviepilot_mobile/utils/downloader_controller_adaptor.dart';
@@ -164,18 +166,20 @@ Future<void> main() async {
   AppImageCacheManager.configureGlobalDecodedCache();
   try {
     Get.put(AppLog());
-    await Get.putAsync(() => HiveService().init(), permanent: true);
-    await Get.putAsync(
-      () => IosWidgetNavigationService().init(),
-      permanent: true,
-    );
-    await Get.putAsync(() => JPushService().init(), permanent: true);
+    await Future.wait([
+      Get.putAsync(() => HiveService().init(), permanent: true),
+      Get.putAsync(
+        () => IosWidgetNavigationService().init(),
+        permanent: true,
+      ),
+      Get.putAsync(() => JPushService().init(), permanent: true),
+    ]);
     Get.put(IosSharedSessionService(), permanent: true);
     Get.put(AppService());
     Get.put(ApiClient());
     final updateService = Get.put(AppUpdateService(), permanent: true);
-    await updateService.initShorebird();
-    await updateService.cleanupExpiredApkCache(maxAge: Duration.zero);
+    unawaited(updateService.initShorebird());
+    unawaited(updateService.cleanupExpiredApkCache(maxAge: Duration.zero));
     Get.put(MediaDetailService());
     Get.put(ImageUtil());
     // 注册 vue 模式插件适配器
@@ -642,7 +646,7 @@ class MyApp extends StatelessWidget {
             name: '/media-detail',
             page: () => const MediaDetailPage(),
             binding: BindingsBuilder(() {
-              Get.create(() => MediaDetailController());
+              Get.lazyPut(() => MediaDetailController());
             }),
           ),
           GetPage(

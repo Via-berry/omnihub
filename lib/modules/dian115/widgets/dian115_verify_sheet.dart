@@ -85,6 +85,9 @@ class _Dian115VerifySheetState extends State<Dian115VerifySheet> {
   void dispose() {
     _loadingTimeoutTimer?.cancel();
     _loadingTimeoutTimer = null;
+    try {
+      _webController.loadRequest(Uri.parse('about:blank'));
+    } catch (_) {}
     super.dispose();
   }
 

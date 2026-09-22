@@ -763,7 +763,8 @@ class _SpecifiedPluginInstallSheetState
       ),
     );
 
-    final repoMetaResponse = await dio.get<dynamic>(repo.apiUrl);
+    try {
+      final repoMetaResponse = await dio.get<dynamic>(repo.apiUrl);
     final repoMetaStatus = repoMetaResponse.statusCode ?? 0;
     if (repoMetaStatus >= 400 || repoMetaResponse.data is! Map) {
       throw Exception('仓库不存在或无法访问');
@@ -814,7 +815,10 @@ class _SpecifiedPluginInstallSheetState
       (a, b) =>
           a.pluginName.toLowerCase().compareTo(b.pluginName.toLowerCase()),
     );
-    return _RepoPluginLoadResult(repoUrl: resolvedRepo.htmlUrl, items: items);
+      return _RepoPluginLoadResult(repoUrl: resolvedRepo.htmlUrl, items: items);
+    } finally {
+      dio.close();
+    }
   }
 
   Future<Map<String, dynamic>?> _fetchPackageMap(

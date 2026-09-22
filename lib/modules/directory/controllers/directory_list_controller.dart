@@ -65,11 +65,9 @@ class DirectoryListController extends GetxController {
     if (index < 0 || index >= directories.length) return false;
     final previous = directories[index];
     directories[index] = updated;
-    directories.refresh();
     final ok = await saveDirectories();
     if (!ok) {
       directories[index] = previous;
-      directories.refresh();
     }
     return ok;
   }

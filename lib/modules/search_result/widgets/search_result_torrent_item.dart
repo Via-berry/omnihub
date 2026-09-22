@@ -550,69 +550,67 @@ class SearchResultTorrentItem extends StatelessWidget {
     final theme = Theme.of(context);
     final controller = Get.isRegistered<SiteController>()
         ? Get.find<SiteController>()
-        : Get.put(SiteController());
+        : null;
 
-    return Obx(() {
-      SiteItem? siteItem;
-      if (siteId != null) {
-        for (final value in controller.items) {
-          if (value.site.id == siteId) {
-            siteItem = value;
-            break;
-          }
+    SiteItem? siteItem;
+    if (controller != null && siteId != null) {
+      for (final value in controller.items) {
+        if (value.site.id == siteId) {
+          siteItem = value;
+          break;
         }
       }
+    }
 
-      final icon = _buildSiteIcon(context, controller, siteItem);
-      return Container(
-        constraints: const BoxConstraints(maxWidth: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        decoration: BoxDecoration(
+    final icon = _buildSiteIcon(context, controller, siteItem);
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 180),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: _isInverted()
+            ? Colors.white.withValues(alpha: 0.06)
+            : theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.72,
+              ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
           color: _isInverted()
               ? Colors.white.withValues(alpha: 0.06)
-              : theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.72,
-                ),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: _isInverted()
-                ? Colors.white.withValues(alpha: 0.06)
-                : theme.colorScheme.outlineVariant,
-          ),
+              : theme.colorScheme.outlineVariant,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            icon,
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                siteName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: primaryTextColor(context),
-                ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          icon,
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              siteName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: primaryTextColor(context),
               ),
             ),
-          ],
-        ),
-      );
-    });
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSiteIcon(
     BuildContext context,
-    SiteController controller,
+    SiteController? controller,
     SiteItem? siteItem,
   ) {
     final bytes = siteItem?.iconBytes;
     if (bytes != null && bytes.isNotEmpty) {
       return _imageFromBytes(bytes);
     }
-    if (siteItem != null) {
+    if (siteItem != null && controller != null) {
       final future = _iconFutures.putIfAbsent(
         siteItem.site.id,
         () => controller.loadIcon(siteItem.site),
@@ -1183,13 +1181,14 @@ class SearchResultTorrentItem extends StatelessWidget {
     return '刚刚';
   }
 
+  static final _dateTimeFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+
   DateTime? _parseDate(String raw) {
-    final format = DateFormat('yyyy-MM-dd HH:mm:ss');
     try {
-      return format.parseUtc(raw).toLocal();
+      return _dateTimeFormat.parseUtc(raw).toLocal();
     } catch (_) {
       try {
-        return format.parse(raw);
+        return _dateTimeFormat.parse(raw);
       } catch (_) {
         return null;
       }

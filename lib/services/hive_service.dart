@@ -47,29 +47,34 @@ class HiveService extends GetxService {
       Hive.registerAdapter(AgentMessagesCacheEntryAdapter());
     }
 
-    // Open boxes
-    loginProfileBox = await Hive.openBox<LoginProfile>('loginProfiles');
-    mediaDetailCacheBox =
-        await Hive.openBox<MediaDetailCache>('mediaDetailCache');
-    pluginModelCacheBox =
-        await Hive.openBox<PluginModelCache>('pluginModelCache');
-    installedPluginModelCacheBox =
-        await Hive.openBox<InstalledPluginModelCache>(
-            'installedPluginModelCache');
-    pluginPaletteCacheBox =
-        await Hive.openBox<PluginPaletteCacheEntry>('pluginPaletteCache');
-    siteIconCacheBox = await Hive.openBox<SiteIconCache>('siteIconCache');
-    siteModelCacheBox = await Hive.openBox<SiteModelCache>('siteModelCache');
-    siteUserDataCacheBox =
-        await Hive.openBox<SiteUserDataCache>('siteUserDataCache');
-    searchHistoryBox =
-        await Hive.openBox<SearchHistoryEntry>('searchHistory');
-    agentSessionCacheBox =
-        await Hive.openBox<AgentSessionCache>('agentSessionCache');
-    agentMessagesCacheBox = await Hive.openBox<AgentMessagesCacheEntry>(
-      'agentMessagesCache',
-    );
-    agentMetaCacheBox = await Hive.openBox<String>('agentMetaCache');
+    // Open boxes concurrently
+    final boxes = await Future.wait([
+      Hive.openBox<LoginProfile>('loginProfiles'),
+      Hive.openBox<MediaDetailCache>('mediaDetailCache'),
+      Hive.openBox<PluginModelCache>('pluginModelCache'),
+      Hive.openBox<InstalledPluginModelCache>('installedPluginModelCache'),
+      Hive.openBox<PluginPaletteCacheEntry>('pluginPaletteCache'),
+      Hive.openBox<SiteIconCache>('siteIconCache'),
+      Hive.openBox<SiteModelCache>('siteModelCache'),
+      Hive.openBox<SiteUserDataCache>('siteUserDataCache'),
+      Hive.openBox<SearchHistoryEntry>('searchHistory'),
+      Hive.openBox<AgentSessionCache>('agentSessionCache'),
+      Hive.openBox<AgentMessagesCacheEntry>('agentMessagesCache'),
+      Hive.openBox<String>('agentMetaCache'),
+    ]);
+
+    loginProfileBox = boxes[0] as Box<LoginProfile>;
+    mediaDetailCacheBox = boxes[1] as Box<MediaDetailCache>;
+    pluginModelCacheBox = boxes[2] as Box<PluginModelCache>;
+    installedPluginModelCacheBox = boxes[3] as Box<InstalledPluginModelCache>;
+    pluginPaletteCacheBox = boxes[4] as Box<PluginPaletteCacheEntry>;
+    siteIconCacheBox = boxes[5] as Box<SiteIconCache>;
+    siteModelCacheBox = boxes[6] as Box<SiteModelCache>;
+    siteUserDataCacheBox = boxes[7] as Box<SiteUserDataCache>;
+    searchHistoryBox = boxes[8] as Box<SearchHistoryEntry>;
+    agentSessionCacheBox = boxes[9] as Box<AgentSessionCache>;
+    agentMessagesCacheBox = boxes[10] as Box<AgentMessagesCacheEntry>;
+    agentMetaCacheBox = boxes[11] as Box<String>;
 
     return this;
   }

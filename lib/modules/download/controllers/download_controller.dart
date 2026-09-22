@@ -224,7 +224,6 @@ class DownloadController extends GetxController {
     }
     if (!isClosed) {
       downloaderStats.assignAll(newStats);
-      downloaderStats.refresh();
     }
   }
 
@@ -989,7 +988,8 @@ class DownloadController extends GetxController {
       ),
     );
 
-    _log.info('发起第一跳 torrent 请求: ${request.describe()}');
+    try {
+      _log.info('发起第一跳 torrent 请求: ${request.describe()}');
     var response = await _sendTorrentRequest(
       dio: dio,
       request: request,
@@ -1054,10 +1054,13 @@ class DownloadController extends GetxController {
       'contentType=${finalContentType.isEmpty ? 'unknown' : finalContentType}, '
       'bytes=${fileData?.length ?? 0}',
     );
-    if (fileData == null || fileData.isEmpty) {
-      throw Exception('empty torrent file');
+      if (fileData == null || fileData.isEmpty) {
+        throw Exception('empty torrent file');
+      }
+      return fileData;
+    } finally {
+      dio.close();
     }
-    return fileData;
   }
 
   Future<Response<List<int>>> _sendTorrentRequest({

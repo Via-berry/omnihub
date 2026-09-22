@@ -44,7 +44,7 @@ class SearchResultController extends GetxController {
   final selectedResolutions = <String>{}.obs;
   final selectedTeams = <String>{}.obs;
 
-  final _dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+  static final _dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
 
   @override
   onReady() {
@@ -122,33 +122,33 @@ class SearchResultController extends GetxController {
   }
 
   void clearFilters() {
-    selectedSites.value = <String>{};
-    selectedSeasons.value = <String>{};
-    selectedPromotions.value = <String>{};
-    selectedVideoEncodes.value = <String>{};
-    selectedQualities.value = <String>{};
-    selectedResolutions.value = <String>{};
-    selectedTeams.value = <String>{};
+    selectedSites.clear();
+    selectedSeasons.clear();
+    selectedPromotions.clear();
+    selectedVideoEncodes.clear();
+    selectedQualities.clear();
+    selectedResolutions.clear();
+    selectedTeams.clear();
   }
 
   bool get hasActiveFilters =>
-      selectedSites.value.isNotEmpty ||
-      selectedSeasons.value.isNotEmpty ||
-      selectedPromotions.value.isNotEmpty ||
-      selectedVideoEncodes.value.isNotEmpty ||
-      selectedQualities.value.isNotEmpty ||
-      selectedResolutions.value.isNotEmpty ||
-      selectedTeams.value.isNotEmpty;
+      selectedSites.isNotEmpty ||
+      selectedSeasons.isNotEmpty ||
+      selectedPromotions.isNotEmpty ||
+      selectedVideoEncodes.isNotEmpty ||
+      selectedQualities.isNotEmpty ||
+      selectedResolutions.isNotEmpty ||
+      selectedTeams.isNotEmpty;
 
   List<SearchResultItem> get visibleItems {
     final key = keyword.value.trim().toLowerCase();
-    final sites = selectedSites.value.toSet();
-    final seasons = selectedSeasons.value.toSet();
-    final promotions = selectedPromotions.value.toSet();
-    final encodes = selectedVideoEncodes.value.toSet();
-    final qualities = selectedQualities.value.toSet();
-    final resolutions = selectedResolutions.value.toSet();
-    final teams = selectedTeams.value.toSet();
+    final sites = selectedSites.toSet();
+    final seasons = selectedSeasons.toSet();
+    final promotions = selectedPromotions.toSet();
+    final encodes = selectedVideoEncodes.toSet();
+    final qualities = selectedQualities.toSet();
+    final resolutions = selectedResolutions.toSet();
+    final teams = selectedTeams.toSet();
 
     var results = items.toList();
     if (key.isNotEmpty) {
@@ -341,44 +341,44 @@ class SearchResultController extends GetxController {
   Set<String> _filterSet(SearchResultFilterType type) {
     switch (type) {
       case SearchResultFilterType.site:
-        return selectedSites.value.toSet();
+        return selectedSites.toSet();
       case SearchResultFilterType.season:
-        return selectedSeasons.value.toSet();
+        return selectedSeasons.toSet();
       case SearchResultFilterType.promotion:
-        return selectedPromotions.value.toSet();
+        return selectedPromotions.toSet();
       case SearchResultFilterType.videoEncode:
-        return selectedVideoEncodes.value.toSet();
+        return selectedVideoEncodes.toSet();
       case SearchResultFilterType.quality:
-        return selectedQualities.value.toSet();
+        return selectedQualities.toSet();
       case SearchResultFilterType.resolution:
-        return selectedResolutions.value.toSet();
+        return selectedResolutions.toSet();
       case SearchResultFilterType.team:
-        return selectedTeams.value.toSet();
+        return selectedTeams.toSet();
     }
   }
 
   void _assignFilter(SearchResultFilterType type, Set<String> value) {
     switch (type) {
       case SearchResultFilterType.site:
-        selectedSites.value = value;
+        selectedSites.assignAll(value);
         break;
       case SearchResultFilterType.season:
-        selectedSeasons.value = value;
+        selectedSeasons.assignAll(value);
         break;
       case SearchResultFilterType.promotion:
-        selectedPromotions.value = value;
+        selectedPromotions.assignAll(value);
         break;
       case SearchResultFilterType.videoEncode:
-        selectedVideoEncodes.value = value;
+        selectedVideoEncodes.assignAll(value);
         break;
       case SearchResultFilterType.quality:
-        selectedQualities.value = value;
+        selectedQualities.assignAll(value);
         break;
       case SearchResultFilterType.resolution:
-        selectedResolutions.value = value;
+        selectedResolutions.assignAll(value);
         break;
       case SearchResultFilterType.team:
-        selectedTeams.value = value;
+        selectedTeams.assignAll(value);
         break;
     }
   }

@@ -117,6 +117,8 @@ jobs:
         run: >-
           flutter build apk
           --release
+          --obfuscate
+          --split-debug-info=build/symbols/apk-universal
           --dart-define=FLUTTER_APP_ENV=release
           --dart-define=PAN115_COOKIE="${{ secrets.PAN115_COOKIE }}"
           --dart-define=GITHUB_ACTIONS_TOKEN="${{ secrets.ACTIONS_TOKEN || secrets.GITHUB_ACTIONS_TOKEN }}"
@@ -135,6 +137,8 @@ jobs:
           --release
           --target-platform android-arm64
           --split-per-abi
+          --obfuscate
+          --split-debug-info=build/symbols/apk-arm64
           --dart-define=FLUTTER_APP_ENV=release
           --dart-define=PAN115_COOKIE="${{ secrets.PAN115_COOKIE }}"
           --dart-define=GITHUB_ACTIONS_TOKEN="${{ secrets.ACTIONS_TOKEN || secrets.GITHUB_ACTIONS_TOKEN }}"
@@ -230,6 +234,8 @@ jobs:
         run: |
           set -euo pipefail
           flutter build ios --release --no-codesign \
+            --obfuscate \
+            --split-debug-info=build/symbols/ios \
             --dart-define=FLUTTER_APP_ENV=release \
             --dart-define=PAN115_COOKIE="${{ secrets.PAN115_COOKIE }}" \
             --dart-define=GITHUB_ACTIONS_TOKEN="${{ secrets.ACTIONS_TOKEN || secrets.GITHUB_ACTIONS_TOKEN }}"

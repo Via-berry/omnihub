@@ -219,7 +219,6 @@ class SubtitleSearchController extends GetxController {
     final key = item.key;
     if (downloadingKeys.contains(key)) return false;
     downloadingKeys.add(key);
-    downloadingKeys.refresh();
     try {
       final token =
           _appService.loginResponse?.accessToken ??
@@ -268,7 +267,6 @@ class SubtitleSearchController extends GetxController {
       return false;
     } finally {
       downloadingKeys.remove(key);
-      downloadingKeys.refresh();
     }
   }
 }

@@ -101,7 +101,7 @@ class RecommendPage extends GetView<RecommendController> {
                   onRefresh: () async => controller
                       .prefetchAllVisibleCategories(forceRefresh: true),
                 ),
-                SliverToBoxAdapter(child: _buildSectionList(context)),
+                _buildSectionList(context),
                 SliverToBoxAdapter(
                   child: SizedBox(height: _bottomSpacer(context)),
                 ),
@@ -214,47 +214,46 @@ class RecommendPage extends GetView<RecommendController> {
     return Obx(() {
       final subCategories = controller.allVisibleSubCategories;
       if (subCategories.isEmpty) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Text(
-            '暂无可展示的分组，请在筛选中开启。',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.textSecondaryColor,
+        return SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Text(
+              '暂无可展示的分组，请在筛选中开启。',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textSecondaryColor,
+              ),
             ),
           ),
         );
       }
-      final sectionWidgets = subCategories.asMap().entries.map((entry) {
-        final index = entry.key;
-        final subCategory = entry.value;
-        final layoutType = _layoutTypeForSectionIndex(
-          index,
-          subCategory: subCategory,
-        );
-        final items = controller.itemsForSubCategory(subCategory).toList();
-        final themeColor = CupertinoColors.systemGrey;
-        return KeyedSubtree(
-          key: ValueKey(subCategory),
-          child: _makeSection(
-            context,
-            themeColor: themeColor,
-            layoutType: layoutType,
-            title: subCategory,
-            items: items,
-          ),
-        );
-      }).toList();
-      final insertAt = 2.clamp(0, sectionWidgets.length);
-      sectionWidgets.insert(
-        insertAt,
-        KeyedSubtree(
-          key: ValueKey('categories-section'),
-          child: _buildCategoriesSection(context),
-        ),
-      );
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: sectionWidgets,
+      final insertAt = 2.clamp(0, subCategories.length);
+      final totalCount = subCategories.length + 1;
+
+      return SliverList.builder(
+        itemCount: totalCount,
+        itemBuilder: (context, index) {
+          if (index == insertAt) {
+            return KeyedSubtree(
+              key: const ValueKey('categories-section'),
+              child: _buildCategoriesSection(context),
+            );
+          }
+          final subCategoryIndex = index > insertAt ? index - 1 : index;
+          final subCategory = subCategories[subCategoryIndex];
+          final layoutType = _layoutTypeForSectionIndex(
+            subCategoryIndex,
+            subCategory: subCategory,
+          );
+          return KeyedSubtree(
+            key: ValueKey(subCategory),
+            child: _makeSection(
+              context,
+              layoutType: layoutType,
+              title: subCategory,
+              themeColor: CupertinoColors.systemGrey,
+            ),
+          );
+        },
       );
     });
   }
@@ -262,13 +261,12 @@ class RecommendPage extends GetView<RecommendController> {
   Widget _makeSection(
     BuildContext context, {
     required _SectionLayoutType layoutType,
-    List<RecommendApiItem>? items,
     String? title,
     required Color themeColor,
   }) {
     switch (layoutType) {
       case _SectionLayoutType.continueStyle:
-        return _buildContinueStyleSection(context, title: title, items: items);
+        return _buildContinueStyleSection(context, title: title ?? '');
       case _SectionLayoutType.horizontalList:
         return _buildDefaultHorizontalList(context, title ?? '');
       case _SectionLayoutType.hotStyle:
@@ -278,8 +276,7 @@ class RecommendPage extends GetView<RecommendController> {
       case _SectionLayoutType.recommendStyle:
         return _buildRecommendStyleSection(
           context,
-          title: title,
-          items: items,
+          title: title ?? '',
           themeColor: themeColor,
         );
     }
@@ -287,53 +284,56 @@ class RecommendPage extends GetView<RecommendController> {
 
   Widget _buildContinueStyleSection(
     BuildContext context, {
-    String? title,
-    List<RecommendApiItem>? items,
+    required String title,
   }) {
-    if (title == '正在热映') {
-      return _buildNowPlayingSection(
-        context,
-        title: title ?? '',
-        items: items ?? const [],
-      );
-    }
+    return Obx(() {
+      final items = controller.itemsForSubCategory(title).toList();
+      if (title == '正在热映') {
+        return _buildNowPlayingSection(
+          context,
+          title: title,
+          items: items,
+        );
+      }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.start,
-      children: [
-        _buildSectionHeader(context, subCategory: title ?? ''),
-        SizedBox(
-          height: 100,
-          child: ListView.separated(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            separatorBuilder: (context, index) => SizedBox(width: 8),
-            scrollDirection: Axis.horizontal,
-            itemBuilder: (context, index) {
-              final item = items?[index];
-              final posterUrl = item?.poster_path ?? item?.backdrop_path;
-              if (posterUrl == null || posterUrl.isEmpty) {
-                return SizedBox.shrink();
-              }
-              return SizedBox(
-                width: 100,
-                height: 100,
-                child: RecommendItemCard(
-                  item: item,
-                  compact: true,
-                  cardWidth: 100,
-                  cardRadius: 25,
-                  onTap: () => _openDetail(item!),
-                ),
-              );
-            },
-            itemCount: items?.length ?? 0,
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          _buildSectionHeader(context, subCategory: title),
+          SizedBox(
+            height: 100,
+            child: ListView.separated(
+              key: PageStorageKey<String>('recommend-continue-$title'),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              separatorBuilder: (context, index) => const SizedBox(width: 8),
+              scrollDirection: Axis.horizontal,
+              itemBuilder: (context, index) {
+                final item = items.elementAtOrNull(index);
+                final posterUrl = item?.poster_path ?? item?.backdrop_path;
+                if (posterUrl == null || posterUrl.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: RecommendItemCard(
+                    item: item,
+                    compact: true,
+                    cardWidth: 100,
+                    cardRadius: 25,
+                    onTap: () => _openDetail(item!),
+                  ),
+                );
+              },
+              itemCount: items.length,
+            ),
           ),
-        ),
-        SizedBox(height: 16),
-      ],
-    );
+          const SizedBox(height: 16),
+        ],
+      );
+    });
   }
 
   Widget _buildNowPlayingSection(
@@ -355,6 +355,7 @@ class RecommendPage extends GetView<RecommendController> {
         SizedBox(
           height: 180,
           child: ListView.separated(
+            key: PageStorageKey<String>('recommend-nowplaying-$title'),
             padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -377,139 +378,143 @@ class RecommendPage extends GetView<RecommendController> {
 
   Widget _buildRecommendStyleSection(
     BuildContext context, {
-    String? title,
-    List<RecommendApiItem>? items,
+    required String title,
     required Color themeColor,
   }) {
-    final key = controller.keyForSubCategory(title ?? '');
-    final screenWidth = MediaQuery.of(context).size.width;
-    if (items == null || items.isEmpty) {
-      return SizedBox.shrink();
-    }
-    final mainItem = items.firstOrNull;
-    final sectionItem = items.elementAtOrNull(1);
-    final thirdItem = items.elementAtOrNull(2);
-    final cache = Get.find<PluginPaletteCache>();
-    final url = ImageUtil.convertCacheImageUrl(mainItem?.poster_path ?? '');
-    final color = cache.watchColor(url) ?? themeColor;
+    return Obx(() {
+      final items = controller.itemsForSubCategory(title).toList();
+      final key = controller.keyForSubCategory(title);
+      final screenWidth = MediaQuery.of(context).size.width;
+      if (items.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      final mainItem = items.firstOrNull;
+      final sectionItem = items.elementAtOrNull(1);
+      final thirdItem = items.elementAtOrNull(2);
+      final cache = Get.find<PluginPaletteCache>();
+      final url = ImageUtil.convertCacheImageUrl(mainItem?.poster_path ?? '');
+      final color = cache.watchColor(url) ?? themeColor;
 
-    final secondUrl = ImageUtil.convertCacheImageUrl(
-      sectionItem?.poster_path ?? '',
-    );
-    final sectionThemeColor =
-        cache.watchColor(secondUrl)?.withValues(alpha: 0.5) ?? Colors.blueGrey;
-    return Column(
-      children: [
-        _buildSectionHeader(
-          context,
-          subCategory: title ?? '',
-          onTapMore: () =>
-              _openCategoryList(key: key ?? '', title: title ?? ''),
-        ),
-        if (screenWidth > 600) ...[
-          SizedBox(
-            height: 250,
-            child: Row(
-              children: [
-                SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(25),
-                    child: RecommendItemSimpleCard(
-                      item: mainItem,
-                      onTap: () =>
-                          mainItem != null ? _openDetail(mainItem) : null,
-                      themeColor: color,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.all(Radius.circular(25)),
-                    child: RecommendItemSimpleCard(
-                      item: sectionItem,
-                      onTap: () =>
-                          sectionItem != null ? _openDetail(sectionItem) : null,
-                      themeColor: sectionThemeColor,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.all(Radius.circular(25)),
-                    child: RecommendItemCard(
-                      cardHeight: 250,
-                      item: thirdItem,
-                      onTap: () =>
-                          thirdItem != null ? _openDetail(thirdItem) : null,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 16),
-              ],
-            ),
+      final secondUrl = ImageUtil.convertCacheImageUrl(
+        sectionItem?.poster_path ?? '',
+      );
+      final sectionThemeColor =
+          cache.watchColor(secondUrl)?.withValues(alpha: 0.5) ?? Colors.blueGrey;
+      return Column(
+        children: [
+          _buildSectionHeader(
+            context,
+            subCategory: title,
+            onTapMore: () =>
+                _openCategoryList(key: key ?? '', title: title),
           ),
-        ] else ...[
-          Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                height: 250,
-                width: screenWidth - 36,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(25),
-                  child: RecommendItemSimpleCard(
-                    item: mainItem,
-                    onTap: () =>
-                        mainItem != null ? _openDetail(mainItem) : null,
-                    themeColor: color,
-                  ),
-                ),
-              ),
-              SizedBox(height: 8),
-              Row(
+          if (screenWidth > 600) ...[
+            SizedBox(
+              height: 250,
+              child: Row(
                 children: [
-                  if (sectionItem != null) ...[
-                    SizedBox(width: 16),
-                    ClipRRect(
-                      borderRadius: BorderRadius.all(Radius.circular(25)),
-                      child: SizedBox(
-                        height: 250,
-                        width: (screenWidth - 44) / 2,
-                        child: RecommendItemSimpleCard(
-                          item: sectionItem,
-                          onTap: () => _openDetail(sectionItem),
-                          themeColor: sectionThemeColor,
-                        ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(25),
+                      child: RecommendItemSimpleCard(
+                        item: mainItem,
+                        onTap: () =>
+                            mainItem != null ? _openDetail(mainItem) : null,
+                        themeColor: color,
                       ),
                     ),
-                  ],
-                  if (thirdItem != null) ...[
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.all(Radius.circular(25)),
-                        child: RecommendItemCard(
-                          cardHeight: 250,
-                          item: thirdItem,
-                          onTap: () => _openDetail(thirdItem),
-                        ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.all(Radius.circular(25)),
+                      child: RecommendItemSimpleCard(
+                        item: sectionItem,
+                        onTap: () =>
+                            sectionItem != null ? _openDetail(sectionItem) : null,
+                        themeColor: sectionThemeColor,
                       ),
                     ),
-                    SizedBox(width: 16),
-                  ],
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.all(Radius.circular(25)),
+                      child: RecommendItemCard(
+                        cardHeight: 250,
+                        item: thirdItem,
+                        onTap: () =>
+                            thirdItem != null ? _openDetail(thirdItem) : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
                 ],
               ),
-              SizedBox(height: 16),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+          ] else ...[
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: SizedBox(
+                      height: 200,
+                      width: double.infinity,
+                      child: RecommendItemSimpleCard(
+                        item: mainItem,
+                        onTap: () =>
+                            mainItem != null ? _openDetail(mainItem) : null,
+                        themeColor: color,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    if (sectionItem != null) ...[
+                      const SizedBox(width: 16),
+                      ClipRRect(
+                        borderRadius: const BorderRadius.all(Radius.circular(25)),
+                        child: SizedBox(
+                          height: 250,
+                          width: (screenWidth - 44) / 2,
+                          child: RecommendItemSimpleCard(
+                            item: sectionItem,
+                            onTap: () => _openDetail(sectionItem),
+                            themeColor: sectionThemeColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (thirdItem != null) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.all(Radius.circular(25)),
+                          child: RecommendItemCard(
+                            cardHeight: 250,
+                            item: thirdItem,
+                            onTap: () => _openDetail(thirdItem),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ],
         ],
-      ],
-    );
+      );
+    });
   }
 
   Widget _buildDefaultHorizontalList(BuildContext context, String subCategory) {

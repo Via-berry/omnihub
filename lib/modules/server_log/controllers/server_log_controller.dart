@@ -1,9 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/applog/app_log.dart';
-import 'package:moviepilot_mobile/modules/login/models/login_profile.dart';
 import 'package:moviepilot_mobile/modules/login/repositories/auth_repository.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 
@@ -41,6 +39,8 @@ class ServerLogController extends GetxController {
   StreamSubscription<String>? _subscription;
   DateTime? _lastEventAt;
   Timer? _idleTimer;
+  final List<LogEntry> _pendingBatch = [];
+  bool _isFlushScheduled = false;
 
   @override
   void onReady() {
@@ -52,13 +52,29 @@ class ServerLogController extends GetxController {
   void onClose() {
     _subscription?.cancel();
     _idleTimer?.cancel();
+    _pendingBatch.clear();
     super.onClose();
+  }
+
+  void _flushPendingLogs() {
+    if (isClosed || _pendingBatch.isEmpty) return;
+    final batch = List<LogEntry>.from(_pendingBatch);
+    _pendingBatch.clear();
+
+    final combined = <LogEntry>[...batch, ...logs];
+    combined.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    const maxLines = 500;
+    if (combined.length > maxLines) {
+      combined.removeRange(maxLines, combined.length);
+    }
+    logs.assignAll(combined);
   }
 
   /// 启动实时日志流，从 /api/v1/system/logging 订阅 SSE。
   Future<void> startLogStream({bool allowRefresh = true}) async {
     isLoading.value = true;
     logs.clear();
+    _pendingBatch.clear();
     await _subscription?.cancel();
     isStreaming.value = false;
     isIdle.value = true;
@@ -86,22 +102,25 @@ class ServerLogController extends GetxController {
           isIdle.value = false;
 
           final entry = LogEntry.fromLine(payload);
-          logs.add(entry);
-          logs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-          // 简单限制列表长度，防止无限增长
-          const maxLines = 500;
-          if (logs.length > maxLines) {
-            logs.removeRange(maxLines, logs.length);
+          _pendingBatch.add(entry);
+
+          if (!_isFlushScheduled) {
+            _isFlushScheduled = true;
+            scheduleMicrotask(() {
+              _isFlushScheduled = false;
+              _flushPendingLogs();
+            });
           }
-          logs.refresh();
         },
         onError: (e, st) {
+          _flushPendingLogs();
           _log.handle(e, stackTrace: st, message: '实时日志流订阅失败');
           isLoading.value = false;
           isStreaming.value = false;
           isIdle.value = false;
         },
         onDone: () {
+          _flushPendingLogs();
           isLoading.value = false;
           isStreaming.value = false;
           isIdle.value = false;
@@ -174,10 +193,8 @@ class ServerLogController extends GetxController {
       if (level != 'ALL' && e.level.toUpperCase() != level) {
         return false;
       }
-      if (key.isNotEmpty) {
-        final haystack = '${e.level} ${e.module} ${e.message} ${e.raw}'
-            .toLowerCase();
-        if (!haystack.contains(key)) return false;
+      if (key.isNotEmpty && !e.searchContent.contains(key)) {
+        return false;
       }
       return true;
     }).toList();
@@ -191,13 +208,16 @@ class LogEntry {
     required this.module,
     required this.message,
     required this.raw,
-  });
+    String? searchContent,
+  }) : searchContent = searchContent ??
+            '$level $module $message $raw'.toLowerCase();
 
   final String level;
   final DateTime timestamp;
   final String module;
   final String message;
   final String raw;
+  final String searchContent;
 
   static final RegExp _pattern = RegExp(
     r'^[【\[]([A-Z]+)[】\]]\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})\s*-\s*(.+?)\s*-\s*(.*)$',
@@ -212,6 +232,7 @@ class LogEntry {
         module: 'unknown',
         message: line,
         raw: line,
+        searchContent: 'info unknown $line $line'.toLowerCase(),
       );
     }
 
@@ -234,6 +255,7 @@ class LogEntry {
       module: module,
       message: message,
       raw: line,
+      searchContent: '$level $module $message $line'.toLowerCase(),
     );
   }
 }

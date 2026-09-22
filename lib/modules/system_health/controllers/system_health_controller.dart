@@ -142,7 +142,11 @@ class SystemHealthController extends GetxController {
     Response<dynamic>? lastResponse;
     for (final endpoint in endpoints.toSet()) {
       try {
-        final response = await _apiClient.get<dynamic>(endpoint, token: token);
+        final response = await _apiClient.get<dynamic>(
+          endpoint,
+          token: token,
+          timeout: 10,
+        );
         lastResponse = response;
         final statusCode = response.statusCode ?? 0;
         if (statusCode != 404) {
@@ -180,7 +184,11 @@ class SystemHealthController extends GetxController {
     try {
       final endpoint =
           '$_moduleTestEndpointBase/${Uri.encodeComponent(item.id)}';
-      final response = await _apiClient.get<dynamic>(endpoint, token: token);
+      final response = await _apiClient.get<dynamic>(
+        endpoint,
+        token: token,
+        timeout: 15,
+      );
       final statusCode = response.statusCode ?? 0;
       if (statusCode >= 400) {
         _updateItem(item, (target) {

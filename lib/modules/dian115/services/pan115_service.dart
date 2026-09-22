@@ -358,7 +358,8 @@ class Pan115Service extends GetxService {
       ),
     );
 
-    // 1. 离线磁力/电驴批量下载
+    try {
+      // 1. 离线磁力/电驴批量下载
     final targetUrls = effectiveOfflineUrls.isNotEmpty
         ? effectiveOfflineUrls
         : (singleMagnetUrl != null && singleMagnetUrl.trim().isNotEmpty
@@ -529,11 +530,14 @@ class Pan115Service extends GetxService {
       }
     }
 
-    return {
-      'success': false,
-      'target_folder': targetFolder,
-      'cid': effectiveCid,
-      'msg': '未提供有效的 115 链接或磁力链接',
-    };
+      return {
+        'success': false,
+        'target_folder': targetFolder,
+        'cid': effectiveCid,
+        'msg': '未提供有效的 115 链接或磁力链接',
+      };
+    } finally {
+      directDio.close();
+    }
   }
 }

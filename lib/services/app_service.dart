@@ -233,15 +233,15 @@ class AppService extends GetxService {
   Future<bool> cacheBackgroundImageFromServerUrl() async {
     final raw = backgroundImageServerUrl.value.trim();
     if (!_isValidHttpUrl(raw)) return false;
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+        responseType: ResponseType.bytes,
+        headers: const {'cache-control': 'no-cache', 'pragma': 'no-cache'},
+      ),
+    );
     try {
-      final dio = Dio(
-        BaseOptions(
-          connectTimeout: const Duration(seconds: 20),
-          receiveTimeout: const Duration(seconds: 20),
-          responseType: ResponseType.bytes,
-          headers: const {'cache-control': 'no-cache', 'pragma': 'no-cache'},
-        ),
-      );
       final resp = await dio.get<List<int>>(_cacheBustingUrl(raw));
       if (resp.statusCode != 200) return false;
       final data = resp.data;
@@ -250,6 +250,8 @@ class AppService extends GetxService {
       return true;
     } catch (_) {
       return false;
+    } finally {
+      dio.close();
     }
   }
 

@@ -7,7 +7,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:moviepilot_mobile/applog/app_log.dart';
 import 'package:moviepilot_mobile/modules/login/repositories/auth_repository.dart';
-import 'package:moviepilot_mobile/modules/recommend/controllers/recommend_api_item_ext.dart';
 import 'package:moviepilot_mobile/modules/recommend/models/recommend_api_item.dart';
 import 'package:moviepilot_mobile/modules/search/services/search_keyword_hints_service.dart';
 import 'package:moviepilot_mobile/modules/subscribe/controllers/subscribe_service.dart';
@@ -259,9 +258,6 @@ class RecommendController extends GetxController {
     }
   }
 
-  void _trimInactiveDecodedImages() {
-    // Keep decoded images in memory to avoid scroll stuttering and re-decoding
-  }
 
   bool isCategoryVisible(RecommendCategory category) {
     return _visibleCategories.contains(category);
@@ -507,8 +503,6 @@ class RecommendController extends GetxController {
   Future<void> _fetchSubCategory(String key, String subCategory) async {
     isLoadingByKey[key] = true;
     errorByKey[key] = null;
-    isLoadingByKey.refresh();
-    errorByKey.refresh();
 
     try {
       final url = '$_recommendBaseUrl$key';
@@ -526,7 +520,6 @@ class RecommendController extends GetxController {
       final items = _parseItems(list, fallbackMediaType: fallbackMediaType);
 
       itemsByKey[key] = items;
-      itemsByKey.refresh();
       _lastFetchAt[key] = DateTime.now();
       unawaited(Get.find<SearchKeywordHintsService>().ingestFromItems(items));
     } catch (e, st) {
@@ -534,7 +527,6 @@ class RecommendController extends GetxController {
       errorByKey[key] = '请求异常';
     } finally {
       isLoadingByKey[key] = false;
-      isLoadingByKey.refresh();
     }
   }
 
@@ -619,11 +611,4 @@ class RecommendController extends GetxController {
     return null;
   }
 
-  _fetchItemsSubscribeStatus(RecommendApiItem item) {
-    subscribeService.fetchAndSaveSubscribeStatus(
-      item.mediaKey,
-      season: item.season,
-      title: item.title,
-    );
-  }
 }

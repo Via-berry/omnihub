@@ -250,7 +250,9 @@ class AppThemeSettingPage extends GetView<AppSettingController> {
                               child: Image.asset(
                                 option.assetPath,
                                 fit: BoxFit.contain,
-                                filterQuality: FilterQuality.high,
+                                filterQuality: FilterQuality.medium,
+                                cacheWidth: 256,
+                                cacheHeight: 256,
                               ),
                             ),
                           ),

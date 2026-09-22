@@ -528,11 +528,14 @@ class ServerLogPage extends GetView<ServerLogController> {
     );
   }
 
+  static final _dayFormat = DateFormat('MM-dd');
+  static final _timeFormat = DateFormat('HH:mm:ss');
+
   Widget _buildLogItem(BuildContext context, LogEntry entry) {
     final colors = Theme.of(context).colorScheme;
     final levelColor = _levelColor(context, entry.level);
-    final dayLabel = DateFormat('MM-dd').format(entry.timestamp);
-    final timeLabel = DateFormat('HH:mm:ss').format(entry.timestamp);
+    final dayLabel = _dayFormat.format(entry.timestamp);
+    final timeLabel = _timeFormat.format(entry.timestamp);
     final timestampLabel = '$dayLabel $timeLabel';
 
     return Padding(

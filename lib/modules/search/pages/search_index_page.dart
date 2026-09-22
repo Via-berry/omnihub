@@ -358,11 +358,13 @@ class SearchIndexPage extends GetView<SearchIndexController> {
 
   Widget _buildRecommendMediaPager(BuildContext context) {
     final rec = Get.find<RecommendController>();
-    final sub = _pickRecommendPagerSubcategory(rec);
-    rec.ensureSubCategoryLoaded(sub);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Obx(() {
+      final sub = _pickRecommendPagerSubcategory(rec);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        rec.ensureSubCategoryLoaded(sub);
+      });
       final items = rec.itemsForSubCategory(sub);
       final loading = rec.isLoadingForSubCategory(sub);
       final err = rec.errorForSubCategory(sub);

@@ -25,6 +25,7 @@ class ServerApiVersionService extends GetxService {
     try {
       final response = await _apiClient.get<dynamic>(
         '/api/v1/media/source',
+        timeout: 10,
         skipV3EnvelopeUnwrap: true,
       );
       final data = response.data;

@@ -590,7 +590,6 @@ class AgentController extends GetxController {
     } else {
       sessions.insert(0, summary);
     }
-    sessions.refresh();
     unawaited(_localCache.saveSessions(sessions));
   }
 

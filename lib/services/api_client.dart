@@ -77,7 +77,7 @@ class ApiClient extends g.GetxController {
       BaseOptions(
         // 初始时 baseUrl 为空，后续在登录时根据服务器地址进行配置。
         baseUrl: _appService.baseUrl ?? '',
-        connectTimeout: const Duration(seconds: 120),
+        connectTimeout: const Duration(seconds: 45),
         receiveTimeout: const Duration(seconds: 120),
         // FormData 需要 multipart/form-data；这里不强行设置，
         // 让 dio 根据 data 类型自动推导 Content-Type。
@@ -121,19 +121,21 @@ class ApiClient extends g.GetxController {
         },
       ),
     );
-    _dio.interceptors.add(
-      TalkerDioLogger(
-        talker: _log.talker,
-        settings: const TalkerDioLoggerSettings(
-          printRequestHeaders: true,
-          printResponseHeaders: true,
-          printResponseMessage: true,
-          printRequestData: true,
-          printResponseData: true,
-          logLevel: LogLevel.debug,
+    if (kDebugMode) {
+      _dio.interceptors.add(
+        TalkerDioLogger(
+          talker: _log.talker,
+          settings: const TalkerDioLoggerSettings(
+            printRequestHeaders: true,
+            printResponseHeaders: true,
+            printResponseMessage: true,
+            printRequestData: true,
+            printResponseData: true,
+            logLevel: LogLevel.debug,
+          ),
         ),
-      ),
-    );
+      );
+    }
     if (kIsWeb) {
       _dio.interceptors.add(
         InterceptorsWrapper(

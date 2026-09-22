@@ -171,25 +171,38 @@ class UserManagementItemCard extends StatelessWidget {
     );
   }
 
+  static final Map<String, Uint8List> _avatarBytesCache = {};
+
   Widget _buildAvatar(String? avatar) {
     if (avatar == null || avatar.isEmpty) {
       return _buildDefaultAvatar();
     }
     try {
-      String base64String = avatar;
-      if (base64String.startsWith('data:image')) {
-        final commaIndex = base64String.indexOf(',');
-        if (commaIndex != -1) {
-          base64String = base64String.substring(commaIndex + 1);
+      final cached = _avatarBytesCache[avatar];
+      final Uint8List bytes;
+      if (cached != null) {
+        bytes = cached;
+      } else {
+        String base64String = avatar;
+        if (base64String.startsWith('data:image')) {
+          final commaIndex = base64String.indexOf(',');
+          if (commaIndex != -1) {
+            base64String = base64String.substring(commaIndex + 1);
+          }
         }
-      }
-      final bytes = base64Decode(base64String);
-      if (bytes.isEmpty) {
-        return _buildDefaultAvatar();
+        final decoded = base64Decode(base64String);
+        if (decoded.isEmpty) {
+          return _buildDefaultAvatar();
+        }
+        bytes = Uint8List.fromList(decoded);
+        if (_avatarBytesCache.length > 100) {
+          _avatarBytesCache.clear();
+        }
+        _avatarBytesCache[avatar] = bytes;
       }
       return CircleAvatar(
         radius: 28,
-        backgroundImage: MemoryImage(Uint8List.fromList(bytes)),
+        backgroundImage: MemoryImage(bytes),
       );
     } catch (_) {
       return _buildDefaultAvatar();

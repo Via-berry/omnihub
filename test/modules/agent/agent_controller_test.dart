@@ -79,7 +79,7 @@ void main() {
     );
 
     await controller.sendMessage('推荐历史纪录片');
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await Future<void>.delayed(const Duration(milliseconds: 60));
 
     expect(controller.activeServerSessionId.value, 'web-agent:abc');
     expect(controller.messages.length, 2);
@@ -496,6 +496,11 @@ class _StalledStreamAgentRepository implements AgentRepositoryContract {
     sendCount += 1;
     if (sendCount == 1) {
       final controller = StreamController<AgentStreamEvent>();
+      controller.onCancel = () {
+        if (!controller.isClosed) {
+          controller.close();
+        }
+      };
       controller.add(
         const AgentStreamEvent(type: 'start', sessionId: 'web-agent:stall'),
       );

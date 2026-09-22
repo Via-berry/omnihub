@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:moviepilot_mobile/utils/open_url.dart';
@@ -38,6 +39,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
     super.initState();
     _currentUrl = widget.url; // 初始化当前 URL
     _initializeWebView();
+  }
+
+  @override
+  void dispose() {
+    try {
+      _controller.loadRequest(Uri.parse('about:blank'));
+    } catch (_) {}
+    super.dispose();
   }
 
   void _initializeWebView() async {
@@ -115,7 +124,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
     // Android 平台特殊处理
     if (controller.platform is AndroidWebViewController) {
-      AndroidWebViewController.enableDebugging(true);
+      AndroidWebViewController.enableDebugging(kDebugMode);
       (controller.platform as AndroidWebViewController)
           .setMediaPlaybackRequiresUserGesture(false);
     }
