@@ -83,4 +83,43 @@ void main() {
       expect(result.length, 2);
     });
   });
+
+  group('提取码回退', () {
+    const shareUrlWithQueryCode =
+        'https://115cdn.com/s/swsg4m13zrk?password=t58d';
+
+    test('extractReceiveCode 从 query 里取 password / pwd / pass', () {
+      expect(extractReceiveCode(shareUrlWithQueryCode), 't58d');
+      expect(extractReceiveCode('https://pan.quark.cn/s/abc?pwd=abc1'), 'abc1');
+      expect(extractReceiveCode('https://pan.quark.cn/s/abc?pass=zzz'), 'zzz');
+      expect(extractReceiveCode('https://115.com/s/abc'), '');
+      expect(extractReceiveCode('not a url'), '');
+    });
+
+    test('password 字段为空时从链接 query 补出来', () {
+      final item = PansouItem.fromMergedJson(
+        rawType: '115',
+        json: {
+          'url': shareUrlWithQueryCode,
+          'note': '年会不能停！2 (2026)',
+          'source': 'Pansou',
+        },
+      );
+
+      expect(item.is115, isTrue);
+      expect(item.password, 't58d');
+    });
+
+    test('password 字段已有值时不被链接 query 覆盖', () {
+      final item = PansouItem.fromMergedJson(
+        rawType: '115',
+        json: {
+          'url': shareUrlWithQueryCode,
+          'password': 'fromfield',
+        },
+      );
+
+      expect(item.password, 'fromfield');
+    });
+  });
 }

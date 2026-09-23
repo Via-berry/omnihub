@@ -1,5 +1,20 @@
 import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
 
+/// 从分享链接的 query 中提取码。
+///
+/// 部分盘搜数据源只把提取码放在链接里（115 用 `?password=`，夸克等用 `?pwd=`），
+/// `password` 字段留空。不补出来的话测容探针能过、真正转存却因缺提取码失败。
+String extractReceiveCode(String url) {
+  if (url.isEmpty) return '';
+  final uri = Uri.tryParse(url);
+  if (uri == null) return '';
+  return (uri.queryParameters['password'] ??
+          uri.queryParameters['pwd'] ??
+          uri.queryParameters['pass'] ??
+          '')
+      .trim();
+}
+
 enum PansouItemType {
   pan115,
   quark,
@@ -161,7 +176,7 @@ class PansouItem {
     int index = 0,
   }) {
     final rawUrl = json['url']?.toString().trim() ?? '';
-    final password = json['password']?.toString().trim() ?? '';
+    var password = json['password']?.toString().trim() ?? '';
     final note = json['note']?.toString().trim() ?? '';
     final datetime = json['datetime']?.toString().trim() ?? '';
     final source = json['source']?.toString().trim() ?? '';
@@ -179,6 +194,12 @@ class PansouItem {
     final effectiveUrls = allUrls.isNotEmpty
         ? allUrls
         : (effectiveUrl.isNotEmpty ? [effectiveUrl] : const <String>[]);
+
+    // 数据源有时只把提取码放在链接 query 里（?password= / ?pwd=）而 password
+    // 字段留空；不补出来的话测容探针能过、真正转存却因缺提取码而失败。
+    if (password.isEmpty) {
+      password = extractReceiveCode(effectiveUrl);
+    }
 
     final rawImages = json['images'];
     final images = <String>[];
