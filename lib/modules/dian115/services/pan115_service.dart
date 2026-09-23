@@ -6,6 +6,9 @@ import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
 import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// 115 凭证在线状态
+enum One115CookieStatus { unknown, checking, online, offline }
+
 class Pan115Service extends GetxService {
   static Pan115Service get to {
     if (!Get.isRegistered<Pan115Service>()) {
@@ -36,6 +39,7 @@ class Pan115Service extends GetxService {
   final RxString movieCid = defaultMovieCid.obs;
   final RxString tvCid = defaultTvCid.obs;
   final RxBool isCustomCookie = false.obs;
+  final Rx<One115CookieStatus> cookieStatus = One115CookieStatus.unknown.obs;
 
   late final Dio _dio;
 
@@ -116,6 +120,64 @@ class Pan115Service extends GetxService {
 
   bool get hasConfiguredCookie => cookie.value.trim().isNotEmpty;
   bool get hasDefaultCookie => defaultCookie.trim().isNotEmpty;
+
+  /// 探测当前 Cookie 是否仍然有效（移植自 115scan one15-status.mjs）
+  Future<void> refreshCookieStatus() async {
+    final raw = cookie.value.trim();
+    if (raw.isEmpty) {
+      cookieStatus.value = One115CookieStatus.offline;
+      return;
+    }
+    if (cookieStatus.value == One115CookieStatus.checking) return;
+    cookieStatus.value = One115CookieStatus.checking;
+    try {
+      final probe = Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+          headers: {
+            'Cookie': raw,
+            'Accept': 'application/json, text/plain, */*',
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          },
+        ),
+      );
+      try {
+        final resp = await probe.get(
+          'https://aps.115.com/natsort/files.php?aid=1&cid=0&offset=0&show_dir=1&limit=1&format=json',
+        );
+        final data = resp.data is String ? jsonDecode(resp.data) : resp.data;
+        if (data is Map && data['state'] == true) {
+          cookieStatus.value = One115CookieStatus.online;
+        } else {
+          final text =
+              '${data?['error'] ?? ''} ${data?['message'] ?? ''}';
+          final expired = data?['errno'] == 99 ||
+              text.contains('请先登录') ||
+              text.contains('请重新登录');
+          cookieStatus.value = expired
+              ? One115CookieStatus.offline
+              : One115CookieStatus.unknown;
+        }
+      } finally {
+        probe.close();
+      }
+    } catch (e) {
+      debugPrint('115 凭证探针异常: $e');
+      cookieStatus.value = One115CookieStatus.unknown;
+    }
+  }
+
+  /// 扫码登录成功后保存 Cookie（复用手动配置的持久化链路）
+  Future<void> saveQrLoginCookie(String cookieString) async {
+    await updateConfig(newCookie: cookieString);
+    cookieStatus.value = One115CookieStatus.online;
+  }
+
+  void markCookieOffline() {
+    cookieStatus.value = One115CookieStatus.offline;
+  }
 
   String get cookieSummary {
     final raw = cookie.value.trim();
@@ -291,6 +353,7 @@ class Pan115Service extends GetxService {
             errorMsg.contains('验证账号') ||
             errorMsg.contains('登录已超时')) {
           errorMsg = '115 网盘凭证已失效（登录过期），请在转存弹窗中更新 115 Cookie';
+          markCookieOffline();
         }
 
         // 若不是 Cookie 失效导致的网关失败，尝试客户端直连兜底
@@ -396,6 +459,7 @@ class Pan115Service extends GetxService {
             successCount++;
           } else if (errno == 911 || errno == 990002) {
             errorMsgs.add('115 账号凭证失效，请更新 Cookie');
+            markCookieOffline();
           } else {
             errorMsgs.add(resData?['error_msg']?.toString() ?? '第${i + 1}个链接添加失败');
           }
@@ -460,6 +524,7 @@ class Pan115Service extends GetxService {
           var friendlyMsg = '115 分享快照获取失败: $snapMsg';
           if (snapErrno == 990002 || snapErrno == 911 || snapMsg.toString().contains('登录')) {
             friendlyMsg = '115 网盘凭证已失效（登录过期），请在转存弹窗中更新 115 Cookie';
+            markCookieOffline();
           }
           return {
             'success': false,
@@ -511,6 +576,7 @@ class Pan115Service extends GetxService {
         var recMsg = recData?['error_msg'] ?? recData?['msg'] ?? (state ? '成功转存至 115 $targetFolder' : '转存失败');
         if (recErrno == 990002 || recErrno == 911 || recMsg.toString().contains('登录')) {
           recMsg = '115 网盘凭证已失效（登录过期），请在转存弹窗中更新 115 Cookie';
+          markCookieOffline();
         }
 
         return {

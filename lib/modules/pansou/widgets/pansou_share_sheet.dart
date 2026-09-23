@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:moviepilot_mobile/modules/dian115/services/pan115_service.dart';
+import 'package:moviepilot_mobile/modules/dian115/widgets/one115_qr_login_sheet.dart';
 import 'package:moviepilot_mobile/modules/pansou/controllers/pansou_share_controller.dart';
 import 'package:moviepilot_mobile/modules/pansou/widgets/pansou_settings_sheet.dart';
 import 'package:moviepilot_mobile/modules/pansou/widgets/pansou_share_card.dart';
@@ -63,6 +65,7 @@ class _PansouShareSheetState extends State<PansouShareSheet> {
       tag: tag,
     );
     _kwController = TextEditingController(text: controller.searchKeyword.value);
+    Pan115Service.to.refreshCookieStatus();
   }
 
   @override
@@ -166,12 +169,21 @@ class _PansouShareSheetState extends State<PansouShareSheet> {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '已聚合 115 分享、磁力与电驴资源',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.50),
-                        fontSize: 10,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '已聚合 115 分享、磁力与电驴资源',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.50),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _buildCookieStatusPill(context),
+                      ],
                     ),
                   ],
                 ),
@@ -218,6 +230,74 @@ class _PansouShareSheetState extends State<PansouShareSheet> {
         ],
       ),
     );
+  }
+
+  Widget _buildCookieStatusPill(BuildContext context) {
+    return Obx(() {
+      final status = Pan115Service.to.cookieStatus.value;
+      final Color color;
+      final IconData icon;
+      final String label;
+      switch (status) {
+        case One115CookieStatus.online:
+          color = const Color(0xFF34D399);
+          icon = CupertinoIcons.checkmark_circle_fill;
+          label = '115 在线';
+          break;
+        case One115CookieStatus.offline:
+          color = const Color(0xFFF87171);
+          icon = CupertinoIcons.exclamationmark_circle_fill;
+          label = '115 离线 · 点击扫码';
+          break;
+        case One115CookieStatus.checking:
+          color = Colors.white54;
+          icon = CupertinoIcons.arrow_2_circlepath;
+          label = '凭证检测中';
+          break;
+        case One115CookieStatus.unknown:
+          color = Colors.white54;
+          icon = CupertinoIcons.question_circle;
+          label = '凭证未知';
+          break;
+      }
+      return GestureDetector(
+        onTap: () async {
+          if (status == One115CookieStatus.checking) return;
+          if (status == One115CookieStatus.offline ||
+              status == One115CookieStatus.unknown) {
+            final ok = await One115QrLoginSheet.show(context);
+            if (ok == true) {
+              controller.fetchResults(refresh: true);
+            }
+          } else {
+            Pan115Service.to.refreshCookieStatus();
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: color.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 9, color: color),
+              const SizedBox(width: 3),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
   }
 
   Widget _buildSearchBar(BuildContext context) {

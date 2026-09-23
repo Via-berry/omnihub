@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
 import 'package:moviepilot_mobile/modules/dian115/services/pan115_service.dart';
+import 'package:moviepilot_mobile/modules/dian115/widgets/one115_qr_login_sheet.dart';
 import 'package:moviepilot_mobile/utils/toast_util.dart';
 
 /// 115 转存确认与目标目录选择弹窗
@@ -58,6 +59,7 @@ class _Dian115TransferConfirmSheetState
   void initState() {
     super.initState();
     final pan115 = Pan115Service.to;
+    pan115.refreshCookieStatus();
     final isMovie = Pan115Service.isMovieType(
       mediaType: widget.mediaType,
       item: widget.item,
@@ -177,17 +179,20 @@ class _Dian115TransferConfirmSheetState
             final hasCookie = pan115.hasConfiguredCookie;
             final summary = pan115.cookieSummary;
             final isCustom = pan115.isCustomCookie.value;
+            final isOffline =
+                pan115.cookieStatus.value == One115CookieStatus.offline;
+            final showOk = hasCookie && !isOffline;
 
             return Container(
               margin: const EdgeInsets.only(bottom: 14),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: hasCookie
+                color: showOk
                     ? const Color(0xFF10B981).withValues(alpha: 0.08)
                     : const Color(0xFFF59E0B).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: hasCookie
+                  color: showOk
                       ? const Color(0xFF10B981).withValues(alpha: 0.25)
                       : const Color(0xFFF59E0B).withValues(alpha: 0.4),
                 ),
@@ -195,11 +200,11 @@ class _Dian115TransferConfirmSheetState
               child: Row(
                 children: [
                   Icon(
-                    hasCookie
+                    showOk
                         ? CupertinoIcons.checkmark_shield_fill
                         : CupertinoIcons.exclamationmark_shield_fill,
                     size: 18,
-                    color: hasCookie
+                    color: showOk
                         ? const Color(0xFF34D399)
                         : const Color(0xFFFBBF24),
                   ),
@@ -211,9 +216,13 @@ class _Dian115TransferConfirmSheetState
                         Row(
                           children: [
                             Text(
-                              hasCookie ? '115 账号凭证已就绪' : '未检测到 115 网盘凭证',
+                              showOk
+                                  ? '115 账号凭证已就绪'
+                                  : (hasCookie
+                                      ? '115 凭证已离线，需重新登录'
+                                      : '未检测到 115 网盘凭证'),
                               style: TextStyle(
-                                color: hasCookie
+                                color: showOk
                                     ? Colors.white
                                     : const Color(0xFFFDE68A),
                                 fontSize: 12,
@@ -248,13 +257,15 @@ class _Dian115TransferConfirmSheetState
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          hasCookie
+                          showOk
                               ? summary
-                              : '需配置 115 账号 Cookie 才能保存至个人网盘',
+                              : (hasCookie
+                                  ? '点击右侧「扫码」用手机 115 App 重新登录'
+                                  : '需配置 115 账号 Cookie 才能保存至个人网盘'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: hasCookie
+                            color: showOk
                                 ? Colors.white.withValues(alpha: 0.5)
                                 : const Color(0xFFFCD34D),
                             fontSize: 10,
@@ -264,6 +275,42 @@ class _Dian115TransferConfirmSheetState
                     ),
                   ),
                   const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      final ok = await One115QrLoginSheet.show(context);
+                      if (ok == true) {
+                        ToastUtil.success('115 凭证已通过扫码更新');
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(CupertinoIcons.qrcode,
+                              size: 11, color: Color(0xFF00E5FF)),
+                          SizedBox(width: 3),
+                          Text(
+                            '扫码',
+                            style: TextStyle(
+                              color: Color(0xFF00E5FF),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
                   GestureDetector(
                     onTap: () => _showQuickCookieDialog(context),
                     child: Container(
@@ -456,6 +503,12 @@ class _Dian115TransferConfirmSheetState
                     if (!pan115.hasConfiguredCookie) {
                       ToastUtil.info('请先配置 115 网盘凭证');
                       _showQuickCookieDialog(context);
+                      return;
+                    }
+                    if (pan115.cookieStatus.value ==
+                        One115CookieStatus.offline) {
+                      ToastUtil.info('115 凭证已离线，请先扫码重新登录');
+                      One115QrLoginSheet.show(context);
                       return;
                     }
                     Navigator.of(context).pop((
