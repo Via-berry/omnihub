@@ -61,6 +61,22 @@ class OmniHubReleaseItem {
 class OmniHubReleaseHistory {
   static const List<OmniHubReleaseItem> releases = [
     OmniHubReleaseItem(
+      id: 'omnihub-20260923-magnetfix',
+      version: 'v1.2.5',
+      date: '2026-09-23',
+      title: '磁力转存误判修复 & 115 凭证本机化',
+      type: OmniHubReleaseType.hotPatch,
+      summary: '修复磁力链接被误判为 115 分享导致转存成 txt 文件，115 凭证改为仅存本机',
+      tags: ['热更新', '磁力转存', '凭证安全', 'PanSou', 'Dian115'],
+      highlights: [
+        '修复磁力链接因携带 115 官方 tracker 被误判为 115 分享，导致整条磁力按分享链接提交并最终存成一个 txt 文件的问题',
+        '资源类型判定改为离线协议优先，磁力与电驴链接正确走离线下载通道，真实 115 分享链接的识别保持不变',
+        '115 凭证改为仅存储于本机：移除构建期注入的共享默认 Cookie 与「恢复默认」入口',
+        '转存确认弹窗凭证条去除来源标签，统一显示凭证状态与脱敏 UID，扫码登录与手动粘贴行为一致',
+        '发布产物中不再编译明文第三方账号 Cookie，新设备需先扫码登录方可使用 115 转存',
+      ],
+    ),
+    OmniHubReleaseItem(
       id: 'omnihub-20260923-qrlogin',
       version: 'v1.2.5',
       date: '2026-09-23',
