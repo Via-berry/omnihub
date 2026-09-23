@@ -61,6 +61,22 @@ class OmniHubReleaseItem {
 class OmniHubReleaseHistory {
   static const List<OmniHubReleaseItem> releases = [
     OmniHubReleaseItem(
+      id: 'omnihub-20260923-magnetoffline',
+      version: 'v1.2.5',
+      date: '2026-09-23',
+      title: '磁力离线任务防污染与截断磁力拦截',
+      type: OmniHubReleaseType.hotPatch,
+      summary: '拦截残缺磁力与盘搜混入的资源编号，不再把非链接文本提交给 115 离线下载生成 txt 文件',
+      tags: ['热更新', '磁力转存', '离线下载', 'PanSou', 'Dian115'],
+      highlights: [
+        '修复盘搜把资源名与编号（如 swsaoay36l0）混入离线链接列表、被当作 url 提交给 115 的问题——115 会把整段文本落成以它命名的 txt 文件',
+        '离线下载入口新增链接准入校验：只有磁力与电驴协议或 http(s) 种子直链才会下发，其余文本一律丢弃并在转存提示中回报丢弃数量',
+        '新增磁力 info-hash 完整性校验，btih 不满足 40 位十六进制或 32 位 base32 的截断磁力直接拦下，不再提交生成垃圾文件',
+        '磁力与电驴条目在盘搜解析阶段即丢弃非链接文本，资源编号不再成为条目主链接，复制与链接计数也不再包含它',
+        '无有效可提交链接时明确报「未提交离线任务」并提示盘搜数据不完整，不再静默退化提交原始文本',
+      ],
+    ),
+    OmniHubReleaseItem(
       id: 'omnihub-20260923-magnetfix',
       version: 'v1.2.5',
       date: '2026-09-23',
