@@ -311,6 +311,22 @@ class Pan115Service extends GetxService {
     return '已配置';
   }
 
+  /// 弹窗回填用的脱敏 Cookie：保留键名，值只露前 2 位。
+  /// 保存时若文本与此一致则视为未修改，避免把脱敏串写回覆盖真实 Cookie。
+  static String maskCookie(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return '';
+    return trimmed.split(';').map((pair) {
+      final kv = pair.split('=');
+      if (kv.length < 2) return pair.trim();
+      final name = kv[0].trim();
+      final value = kv.sublist(1).join('=').trim();
+      if (value.isEmpty) return '$name=';
+      final head = value.length <= 2 ? value : value.substring(0, 2);
+      return '$name=$head***';
+    }).join('; ');
+  }
+
   static bool isMovieType({String? mediaType, Dian115ShareItem? item}) {
     // 若片源明确包含分季或集数，则确认为剧集
     if (item != null) {

@@ -61,6 +61,25 @@ class OmniHubReleaseItem {
 class OmniHubReleaseHistory {
   static const List<OmniHubReleaseItem> releases = [
     OmniHubReleaseItem(
+      id: 'omnihub-20260923-dian115hardening',
+      version: 'v1.2.5',
+      date: '2026-09-23',
+      title: '癫影链路与 115 凭证安全加固',
+      type: OmniHubReleaseType.hotPatch,
+      summary: '移除登录弹窗内自动填充的账号凭据，修复签到误报与解锁误弹验证，Cookie 脱敏显示，解锁缓存增加 24 小时有效期',
+      tags: ['热更新', 'Dian115', '115转存', '安全加固'],
+      highlights: [
+        '癫影授权登录弹窗不再自动填充账号密码，杜绝凭据随补丁分发，登录完全由用户手动输入',
+        '115 Cookie 在配置弹窗中脱敏回填（仅露前 2 位），未修改时不回写，避免掩码覆盖真实凭证',
+        '网关配置为公网明文 HTTP 地址时明确警告凭证明文传输风险，建议 HTTPS 或回家代理',
+        '修复签到异常一律误报"今日已签到"的问题，失败时展示真实原因',
+        '解锁的人机安全验证弹窗只在服务端明确要求时拉起，网络异常不再误弹验证',
+        '解锁链接本地缓存增加 24 小时有效期，过期自动重新解锁，避免上游换链后用到旧链接',
+        '修复剧集按季筛选把其他季资源混入的问题',
+        '癫影会话同步网关的超时放宽至 10/20 秒并自动重试一次，弱网与回家代理下更稳定',
+      ],
+    ),
+    OmniHubReleaseItem(
       id: 'omnihub-20260923-shareoffline',
       version: 'v1.2.5',
       date: '2026-09-23',

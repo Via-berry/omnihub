@@ -190,26 +190,8 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
         `;
         document.head.appendChild(style);
 
-        // 3. 自动填充账号密码
-        function fillInputs() {
-          const emailInput = document.querySelector('input[type="email"]');
-          const pwdInput = document.querySelector('input[type="password"]');
-          if (emailInput && !emailInput.value) {
-            emailInput.value = '215736296@qq.com';
-            emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-            emailInput.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-          if (pwdInput && !pwdInput.value) {
-            pwdInput.value = 'admin@@@';
-            pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
-            pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-        }
-        fillInputs();
-        setTimeout(fillInputs, 600);
-        setTimeout(fillInputs, 1500);
-
-        // 4. 自动轻微下滚，居中展示人机验证与登录按钮
+        // 3. 自动轻微下滚，居中展示人机验证与登录按钮
+        //    （账号密码由用户手动填写，不在客户端注入任何凭据）
         function scrollToLogin() {
           const btn = document.querySelector('button[type="submit"]') ||
                       Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('登录') || b.textContent.includes('登 录'));
@@ -219,7 +201,7 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
         }
         setTimeout(scrollToLogin, 700);
 
-        // 5. 监听 Turnstile 验证完成
+        // 4. 监听 Turnstile 验证完成
         let turnstileHandled = false;
         const turnstileWatcher = setInterval(() => {
           const respInput = document.querySelector('[name="cf-turnstile-response"]');
@@ -238,7 +220,7 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
           }
         }, 400);
 
-        // 6. 登录状态检测并通知 App
+        // 5. 登录状态检测并通知 App
         function checkAndNotify() {
           try {
             const userStr = localStorage.getItem('portal_user');
@@ -572,7 +554,11 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
                     Navigator.of(ctx).pop();
                   }
                   if (mounted) {
-                    ToastUtil.success('网关地址已更新');
+                    if (Dian115Service.to.isInsecurePublicHost) {
+                      ToastUtil.warning('网关为公网明文 HTTP 地址，账号会话将明文传输，建议改用 HTTPS 或回家代理');
+                    } else {
+                      ToastUtil.success('网关地址已更新');
+                    }
                     _triggerSync(isManual: true);
                   }
                 }

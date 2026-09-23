@@ -603,7 +603,8 @@ class _Dian115TransferConfirmSheetState
 
   void _showQuickCookieDialog(BuildContext context) {
     final pan115 = Pan115Service.to;
-    final textController = TextEditingController(text: pan115.cookie.value);
+    final maskedCurrent = Pan115Service.maskCookie(pan115.cookie.value);
+    final textController = TextEditingController(text: maskedCurrent);
 
     showCupertinoDialog(
       context: context,
@@ -619,7 +620,7 @@ class _Dian115TransferConfirmSheetState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '请粘贴 115.com 网页端或抓包获取的完整 Cookie（包含 UID、CID、SEID 等）：',
+                '请粘贴 115.com 网页端或抓包获取的完整 Cookie（包含 UID、CID、SEID 等）。已保存的凭证已脱敏显示，粘贴新内容即覆盖：',
                 style: TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
               ),
               const SizedBox(height: 8),
@@ -641,13 +642,19 @@ class _Dian115TransferConfirmSheetState
             isDefaultAction: true,
             onPressed: () async {
               final newCookie = textController.text.trim();
-              if (newCookie.isNotEmpty) {
-                await pan115.updateConfig(newCookie: newCookie);
-                if (ctx.mounted) Navigator.of(ctx).pop();
-                ToastUtil.success('115 凭证已更新并生效');
-              } else {
+              if (newCookie.isEmpty) {
                 ToastUtil.error('请输入有效的 Cookie 内容');
+                return;
               }
+              if (ctx.mounted) Navigator.of(ctx).pop();
+              // 未改动脱敏内容时不回写，防止把掩码串覆盖真实 Cookie
+              if (newCookie == maskedCurrent) {
+                ToastUtil.info('凭证未修改');
+                return;
+              }
+              await pan115.updateConfig(newCookie: newCookie);
+              pan115.refreshCookieStatus();
+              ToastUtil.success('115 凭证已更新并生效');
             },
             child: const Text('保存'),
           ),

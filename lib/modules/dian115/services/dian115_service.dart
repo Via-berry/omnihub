@@ -17,6 +17,9 @@ class Dian115Service extends GetxService {
   static const String _hostPrefKey = 'dian115_server_host';
   static const String _unlockedMapKey = 'dian115_unlocked_items_map';
 
+  /// 解锁凭据本地缓存有效期：超过后需重新向服务端解锁，避免上游换链后用到旧链接
+  static const Duration unlockedCacheTtl = Duration(hours: 24);
+
   final RxString host = defaultHost.obs;
   final RxMap<int, Dian115UnlockResult> unlockedMap = <int, Dian115UnlockResult>{}.obs;
   final Rx<Dian115StatusResult?> accountStatus = Rx<Dian115StatusResult?>(null);
@@ -35,6 +38,10 @@ class Dian115Service extends GetxService {
         h.contains('localhost') ||
         h.contains('127.0.0.1');
   }
+
+  /// 公网地址仍走明文 HTTP 时，115 Cookie 等敏感数据会被中间人窥探
+  bool get isInsecurePublicHost =>
+      host.value.toLowerCase().startsWith('http://') && !isLanHost;
 
   late final Dio _dio;
 
@@ -102,12 +109,35 @@ class Dian115Service extends GetxService {
     return '$currentHost$path';
   }
 
-  bool isUnlocked(int shareId) => unlockedMap.containsKey(shareId);
+  bool isUnlocked(int shareId) {
+    final info = unlockedMap[shareId];
+    if (info == null) return false;
+    final ts = info.unlockedAtTimestamp;
+    if (ts != null &&
+        DateTime.now().millisecondsSinceEpoch - ts >
+            unlockedCacheTtl.inMilliseconds) {
+      unlockedMap.remove(shareId);
+      return false;
+    }
+    return true;
+  }
 
-  Dian115UnlockResult? getUnlockedInfo(int shareId) => unlockedMap[shareId];
+  Dian115UnlockResult? getUnlockedInfo(int shareId) =>
+      isUnlocked(shareId) ? unlockedMap[shareId] : null;
 
   Future<void> saveUnlockedInfo(int shareId, Dian115UnlockResult result) async {
-    unlockedMap[shareId] = result;
+    final stamped = result.unlockedAtTimestamp != null
+        ? result
+        : Dian115UnlockResult(
+            code: result.code,
+            shareUrl: result.shareUrl,
+            receiveCode: result.receiveCode,
+            magnetUrl: result.magnetUrl,
+            urls: result.urls,
+            pointsCost: result.pointsCost,
+            unlockedAtTimestamp: DateTime.now().millisecondsSinceEpoch,
+          );
+    unlockedMap[shareId] = stamped;
     try {
       final prefs = await SharedPreferences.getInstance();
       final mapToSave = <String, dynamic>{};
@@ -163,6 +193,7 @@ class Dian115Service extends GetxService {
             receiveCode: s.receiveCode,
             magnetUrl: s.magnetUrl,
             pointsCost: s.unlockCost,
+            unlockedAtTimestamp: DateTime.now().millisecondsSinceEpoch,
           );
           unlockedMap[s.id] = cached;
         }
@@ -206,71 +237,83 @@ class Dian115Service extends GetxService {
     String? cookieString,
   }) async {
     lastSyncError.value = '';
-    try {
-      final body = <String, dynamic>{
-        'cookies': cookies,
-        if (userData != null) 'user_data': userData,
-        if (cookieString != null && cookieString.isNotEmpty)
-          'cookie_string': cookieString,
-      };
+    final body = <String, dynamic>{
+      'cookies': cookies,
+      if (userData != null) 'user_data': userData,
+      if (cookieString != null && cookieString.isNotEmpty)
+        'cookie_string': cookieString,
+    };
 
-      final resp = await _dio.post(
-        _cleanUrl('/api/auth/session'),
-        data: body,
-        options: Options(
-          contentType: 'application/json',
-          sendTimeout: const Duration(seconds: 5),
-          receiveTimeout: const Duration(seconds: 6),
-        ),
-      );
+    // 弱网/回家代理下 5-6s 超时偏紧，放宽并对网络类错误自动重试一次
+    const maxAttempts = 2;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        final resp = await _dio.post(
+          _cleanUrl('/api/auth/session'),
+          data: body,
+          options: Options(
+            contentType: 'application/json',
+            sendTimeout: const Duration(seconds: 10),
+            receiveTimeout: const Duration(seconds: 20),
+          ),
+        );
 
-      if (resp.data is Map<String, dynamic>) {
-        final data = resp.data as Map<String, dynamic>;
-        final success = data['success'] as bool? ?? false;
-        if (success) {
-          await getStatus().catchError((_) => const Dian115StatusResult());
-          return true;
-        } else {
-          lastSyncError.value = data['message'] as String? ?? '网关未能识别该会话';
+        if (resp.data is Map<String, dynamic>) {
+          final data = resp.data as Map<String, dynamic>;
+          final success = data['success'] as bool? ?? false;
+          if (success) {
+            await getStatus().catchError((_) => const Dian115StatusResult());
+            return true;
+          } else {
+            lastSyncError.value = data['message'] as String? ?? '网关未能识别该会话';
+          }
         }
+        return false;
+      } on DioException catch (e) {
+        final retriable = e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError;
+        if (retriable && attempt < maxAttempts - 1) {
+          await Future.delayed(const Duration(seconds: 1));
+          continue;
+        }
+        if (retriable) {
+          if (isLanHost) {
+            lastSyncError.value =
+                '无法连接到 NAS 网关 (${host.value})。检测到当前网关为局域网 IP，若处于移动网络 (5G/4G)，请连接家庭 WiFi 或开启回家代理。';
+          } else {
+            lastSyncError.value = '无法连接到 NAS 网关 (${host.value})，连接超时或网络不可达';
+          }
+        } else {
+          String? detailMsg;
+          if (e.response?.data is Map<String, dynamic>) {
+            final data = e.response!.data as Map<String, dynamic>;
+            detailMsg = data['detail']?.toString() ?? data['message']?.toString();
+          } else if (e.response?.data is String) {
+            try {
+              final data = jsonDecode(e.response!.data as String);
+              if (data is Map<String, dynamic>) {
+                detailMsg =
+                    data['detail']?.toString() ?? data['message']?.toString();
+              }
+            } catch (_) {}
+          }
+          if (detailMsg != null && detailMsg.isNotEmpty) {
+            lastSyncError.value =
+                '网关请求失败 (${e.response?.statusCode ?? 400}): $detailMsg';
+          } else {
+            lastSyncError.value =
+                '网关请求失败 (${e.response?.statusCode ?? e.message})';
+          }
+        }
+        debugPrint('Dian115Service importSession DioException: $e');
+        return false;
+      } catch (e) {
+        lastSyncError.value = '同步异常: $e';
+        debugPrint('Dian115Service importSession error: $e');
+        return false;
       }
-    } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.sendTimeout ||
-          e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.connectionError) {
-        if (isLanHost) {
-          lastSyncError.value =
-              '无法连接到 NAS 网关 (${host.value})。检测到当前网关为局域网 IP，若处于移动网络 (5G/4G)，请连接家庭 WiFi 或开启回家代理。';
-        } else {
-          lastSyncError.value = '无法连接到 NAS 网关 (${host.value})，连接超时或网络不可达';
-        }
-      } else {
-        String? detailMsg;
-        if (e.response?.data is Map<String, dynamic>) {
-          final data = e.response!.data as Map<String, dynamic>;
-          detailMsg = data['detail']?.toString() ?? data['message']?.toString();
-        } else if (e.response?.data is String) {
-          try {
-            final data = jsonDecode(e.response!.data as String);
-            if (data is Map<String, dynamic>) {
-              detailMsg =
-                  data['detail']?.toString() ?? data['message']?.toString();
-            }
-          } catch (_) {}
-        }
-        if (detailMsg != null && detailMsg.isNotEmpty) {
-          lastSyncError.value =
-              '网关请求失败 (${e.response?.statusCode ?? 400}): $detailMsg';
-        } else {
-          lastSyncError.value =
-              '网关请求失败 (${e.response?.statusCode ?? e.message})';
-        }
-      }
-      debugPrint('Dian115Service importSession DioException: $e');
-    } catch (e) {
-      lastSyncError.value = '同步异常: $e';
-      debugPrint('Dian115Service importSession error: $e');
     }
     return false;
   }

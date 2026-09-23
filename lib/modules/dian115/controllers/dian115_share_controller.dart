@@ -165,7 +165,7 @@ class Dian115ShareController extends GetxController {
           final parts = item.seasons.split(RegExp(r'[, -]'));
           return parts.contains(filterSeason.value.toString());
         }
-        return true;
+        return false;
       }).toList();
     }
 
@@ -223,8 +223,8 @@ class Dian115ShareController extends GetxController {
         return result;
       }
 
-      // 3. 若触发人机安全验证，拉起应用内原生验证弹窗无缝过检
-      if (context != null && context.mounted) {
+      // 3. 仅在服务端明确要求人机验证时，拉起应用内原生验证弹窗无缝过检
+      if (result.isTurnstileRequired && context != null && context.mounted) {
         ToastUtil.info('此资源需进行安全验证，请在弹窗中轻触验证');
         final verifiedResult = await Dian115VerifySheet.show(
           context,
@@ -238,29 +238,13 @@ class Dian115ShareController extends GetxController {
           await _refreshStatus();
           return verifiedResult;
         }
+        ToastUtil.error('人机安全验证未完成');
+        return null;
       }
 
-      if (!result.isSuccess) {
-        ToastUtil.error(result.isTurnstileRequired
-            ? '人机安全验证未完成'
-            : '解锁失败：${result.code}');
-      }
+      ToastUtil.error('解锁失败：${result.code}');
       return null;
     } catch (e) {
-      if (context != null && context.mounted) {
-        final verifiedResult = await Dian115VerifySheet.show(
-          context,
-          item: item,
-          tmdbId: tmdbId,
-          mediaType: mediaType,
-          season: filterSeason.value >= 0 ? filterSeason.value : (initialSeason ?? 0),
-        );
-        if (verifiedResult != null && verifiedResult.isSuccess) {
-          await service.saveUnlockedInfo(item.id, verifiedResult);
-          await _refreshStatus();
-          return verifiedResult;
-        }
-      }
       ToastUtil.error('解锁请求异常：$e');
       return null;
     } finally {
@@ -299,6 +283,7 @@ class Dian115ShareController extends GetxController {
       isUnlock: true,
     );
     if (selection == null) return;
+    if (!context.mounted) return;
 
     // 3. 执行解锁（含安全验证重试机制）
     final unlockResult = await unlock(item, context: context);
@@ -382,7 +367,11 @@ class Dian115ShareController extends GetxController {
       }
     } catch (e) {
       await _refreshStatus();
-      ToastUtil.info('今日已完成签到');
+      if (isTodaySigned.value) {
+        ToastUtil.info('今日已完成签到');
+      } else {
+        ToastUtil.error('签到失败，请稍后重试：$e');
+      }
     } finally {
       isSigningIn.value = false;
     }

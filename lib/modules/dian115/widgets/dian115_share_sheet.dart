@@ -726,7 +726,8 @@ class _Dian115ShareSheetState extends State<Dian115ShareSheet> {
     final hostController = TextEditingController(text: Dian115Service.to.host.value);
     final movieCidController = TextEditingController(text: Pan115Service.to.movieCid.value);
     final tvCidController = TextEditingController(text: Pan115Service.to.tvCid.value);
-    final cookieController = TextEditingController(text: Pan115Service.to.cookie.value);
+    final maskedCookie = Pan115Service.maskCookie(Pan115Service.to.cookie.value);
+    final cookieController = TextEditingController(text: maskedCookie);
 
     showCupertinoDialog(
       context: context,
@@ -804,14 +805,23 @@ class _Dian115ShareSheetState extends State<Dian115ShareSheet> {
                 if (newHost.isNotEmpty) {
                   await Dian115Service.to.updateHost(newHost);
                 }
+                // Cookie 为脱敏回填，未改动时不回写，防止掩码覆盖真实凭证
+                final cookieChanged =
+                    newCookie.isNotEmpty && newCookie != maskedCookie;
                 await Pan115Service.to.updateConfig(
                   newMovieCid: newMovieCid.isNotEmpty ? newMovieCid : null,
                   newTvCid: newTvCid.isNotEmpty ? newTvCid : null,
-                  newCookie: newCookie.isNotEmpty ? newCookie : null,
+                  newCookie: cookieChanged ? newCookie : null,
                 );
+                if (cookieChanged) {
+                  Pan115Service.to.refreshCookieStatus();
+                }
 
                 if (ctx.mounted) {
                   Navigator.of(ctx).pop();
+                }
+                if (Dian115Service.to.isInsecurePublicHost) {
+                  ToastUtil.warning('网关为公网明文 HTTP 地址，115 Cookie 将明文传输，建议改用 HTTPS 或回家代理');
                 }
                 controller.fetchShares();
                 ToastUtil.success('已保存配置并刷新');
