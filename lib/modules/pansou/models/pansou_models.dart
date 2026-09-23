@@ -16,6 +16,21 @@ enum PansouItemType {
   static PansouItemType fromRaw(String raw, String url) {
     final lowerRaw = raw.toLowerCase().trim();
     final lowerUrl = url.toLowerCase().trim();
+
+    // 离线下载协议必须优先于域名判定：磁力链接普遍携带
+    // udp://tracker.115.com:8090/announce 等 115 tracker，
+    // 若先按 115.com 域名匹配，整条磁力会被误判为 115 分享，
+    // 最终以 share_url 提交，115 把它落成一个 txt 文件。
+    if (lowerRaw == 'magnet' ||
+        lowerUrl.startsWith('magnet:?') ||
+        lowerUrl.contains('magnet:?xt=')) {
+      return PansouItemType.magnet;
+    }
+    if (lowerRaw == 'ed2k' ||
+        lowerUrl.startsWith('ed2k://') ||
+        lowerUrl.contains('ed2k://')) {
+      return PansouItemType.ed2k;
+    }
     if (lowerRaw == '115' ||
         lowerUrl.contains('115.com') ||
         lowerUrl.contains('115cdn.com') ||
@@ -50,12 +65,6 @@ enum PansouItemType {
     }
     if (lowerRaw == '123pan' || lowerUrl.contains('123pan.com')) {
       return PansouItemType.pan123;
-    }
-    if (lowerRaw == 'magnet' || lowerUrl.startsWith('magnet:?')) {
-      return PansouItemType.magnet;
-    }
-    if (lowerRaw == 'ed2k' || lowerUrl.startsWith('ed2k://')) {
-      return PansouItemType.ed2k;
     }
     return PansouItemType.other;
   }
