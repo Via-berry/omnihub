@@ -61,6 +61,23 @@ class OmniHubReleaseItem {
 class OmniHubReleaseHistory {
   static const List<OmniHubReleaseItem> releases = [
     OmniHubReleaseItem(
+      id: 'omnihub-20260923-qrlogin',
+      version: 'v1.2.5',
+      date: '2026-09-23',
+      title: '115 扫码登录与凭证状态指示',
+      type: OmniHubReleaseType.hotPatch,
+      summary: '盘搜与转存链路新增 115 手机扫码登录，实时显示凭证在线状态，无需手动粘贴 Cookie',
+      tags: ['热更新', '115扫码', '凭证状态', 'Dian115', 'PanSou'],
+      highlights: [
+        '盘搜聚合弹窗头部新增 115 凭证状态胶囊（在线/离线/检测中/未知），离线或未知时点击直接进入扫码',
+        '内置 115 官方扫码登录协议客户端，支持网页端、手机客户端、iOS 与电视版四种设备身份自由切换',
+        '二维码 120 秒有效期倒计时与点击刷新，确认后自动换取并持久化 Cookie 供转存使用',
+        '转存确认弹窗新增扫码入口，凭证离线时拦截转存并引导重新登录',
+        '凭证探针自动检测登录态，转存命中 990002/4100026/911 等失效错误码时即时标记离线',
+        '修复扫码确认后切到 115 App 导致轮询停摆的问题：回到前台自动补轮询并显示检测心跳',
+      ],
+    ),
+    OmniHubReleaseItem(
       id: 'omnihub-20260912-multitransfer',
       version: 'v1.2.5',
       date: '2026-09-12',
