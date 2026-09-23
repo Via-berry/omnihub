@@ -25,7 +25,8 @@ class One115QrLoginSheet extends StatefulWidget {
   State<One115QrLoginSheet> createState() => _One115QrLoginSheetState();
 }
 
-class _One115QrLoginSheetState extends State<One115QrLoginSheet> {
+class _One115QrLoginSheetState extends State<One115QrLoginSheet>
+    with WidgetsBindingObserver {
   final One115QrLoginService _qrService = One115QrLoginService();
 
   One115DeviceProfile _profile = One115QrLoginService.defaultProfile;
@@ -38,20 +39,27 @@ class _One115QrLoginSheetState extends State<One115QrLoginSheet> {
   bool _isExpired = false;
   bool _timedOut = false;
   int _refreshCount = 0;
+  int _pollGen = 0;
 
   Timer? _pollTimer;
   Timer? _timeoutTimer;
   Timer? _countdownTimer;
   int _remainSeconds = 0;
 
+  /// 上一次轮询时间，用于判断轮询是否还活着
+  DateTime? _lastPollAt;
+  bool _lastPollOk = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _startLogin();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _timeoutTimer?.cancel();
     _countdownTimer?.cancel();
@@ -75,6 +83,8 @@ class _One115QrLoginSheetState extends State<One115QrLoginSheet> {
   Future<void> _refreshToken() async {
     _pollTimer?.cancel();
     _countdownTimer?.cancel();
+    _pollGen++;
+    final gen = _pollGen;
     setState(() {
       _isLoading = true;
       _isExpired = false;
@@ -85,7 +95,7 @@ class _One115QrLoginSheetState extends State<One115QrLoginSheet> {
     });
     try {
       final token = await _qrService.fetchToken();
-      if (!mounted) return;
+      if (!mounted || gen != _pollGen) return;
       setState(() {
         _token = token;
         _isLoading = false;
@@ -97,7 +107,7 @@ class _One115QrLoginSheetState extends State<One115QrLoginSheet> {
         setState(() => _remainSeconds--);
         if (_remainSeconds <= 0) t.cancel();
       });
-      _startPolling(token);
+      _schedulePoll(token, gen);
     } catch (e) {
       if (!mounted) return;
       final detail = e is One115QrException ? e.message : e.toString();
@@ -110,38 +120,70 @@ class _One115QrLoginSheetState extends State<One115QrLoginSheet> {
     }
   }
 
-  void _startPolling(One115QrToken token) {
-    _pollTimer = Timer.periodic(One115QrLoginService.pollInterval, (_) async {
-      if (!mounted || _isExchanging) return;
-      try {
-        final status = await _qrService.checkStatus(token);
-        if (!mounted) return;
-        switch (status.state) {
-          case One115QrState.waiting:
-            if (token.isExpired) {
-              _onTokenExpired();
-            }
-            break;
-          case One115QrState.scanned:
-            if (!_isScanned) {
-              setState(() {
-                _isScanned = true;
-                _statusText = '已扫码，请在手机上确认登录';
-              });
-            }
-            break;
-          case One115QrState.confirmed:
-            _pollTimer?.cancel();
-            await _exchange(token);
-            break;
-          case One115QrState.expired:
-            _onTokenExpired();
-            break;
-        }
-      } catch (_) {
-        // 网络抖动不打断轮询
-      }
+  void _schedulePoll(One115QrToken token, int gen) {
+    _pollTimer?.cancel();
+    _pollTimer = Timer(One115QrLoginService.pollInterval, () {
+      _pollOnce(token, gen);
     });
+  }
+
+  /// 单次轮询 + 自调度。
+  ///
+  /// 不用 Timer.periodic：它的回调一旦抛出未捕获异常，定时器会被 Dart 静默取消，
+  /// 之后轮询永久停摆（表现为"扫码确认后 app 毫无反应"）。改成每次自己排下一轮，
+  /// 失败也不会停。gen 防止刷新二维码后旧票据的轮询抢回定时器。
+  Future<void> _pollOnce(One115QrToken token, int gen) async {
+    if (!mounted || _isExchanging || gen != _pollGen) return;
+    try {
+      final status = await _qrService.checkStatus(token);
+      if (!mounted || gen != _pollGen) return;
+      _markPolled(ok: true);
+      switch (status.state) {
+        case One115QrState.waiting:
+          if (token.isExpired) {
+            _onTokenExpired();
+          }
+          break;
+        case One115QrState.scanned:
+          if (!_isScanned) {
+            setState(() {
+              _isScanned = true;
+              _statusText = '已扫码，请在手机上确认登录';
+            });
+          }
+          break;
+        case One115QrState.confirmed:
+          _pollTimer?.cancel();
+          await _exchange(token);
+          break;
+        case One115QrState.expired:
+          _onTokenExpired();
+          break;
+      }
+    } catch (_) {
+      _markPolled(ok: false);
+    } finally {
+      if (mounted && gen == _pollGen && !_isExchanging && !_isExpired) {
+        _schedulePoll(token, gen);
+      }
+    }
+  }
+
+  void _markPolled({required bool ok}) {
+    if (!mounted) return;
+    _lastPollAt = DateTime.now();
+    _lastPollOk = ok;
+    setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // iOS 上切到 115 App 扫码时本进程被挂起，Timer 不推进，确认动作会被漏掉。
+    // 回到前台立刻补一次轮询。
+    if (state != AppLifecycleState.resumed) return;
+    final token = _token;
+    if (token == null || _isLoading || _isExchanging || _isExpired) return;
+    _schedulePoll(token, _pollGen);
   }
 
   void _onTokenExpired() {
@@ -362,15 +404,57 @@ class _One115QrLoginSheetState extends State<One115QrLoginSheet> {
           if (!_isLoading && !_isExpired && _token != null) ...[
             const SizedBox(height: 6),
             Text(
-              '二维码 ${_remainSeconds.clamp(0, 999)}s 后过期 · 当前身份：${_profile.label}',
+              '二维码 ${_secondsLeft().clamp(0, 999)}s 后过期 · 当前身份：${_profile.label}',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.35),
                 fontSize: 10,
               ),
             ),
+            const SizedBox(height: 2),
+            _buildPollIndicator(),
           ],
         ],
       ),
+    );
+  }
+
+  /// 用绝对时间算剩余秒数。倒计时 Timer 在切后台时会被挂起，
+  /// 用 obtainedAt 算才不会在返回前台时显示错乱。
+  int _secondsLeft() {
+    final token = _token;
+    if (token == null) return 0;
+    return One115QrLoginService.qrCodeTtl.inSeconds -
+        DateTime.now().difference(token.obtainedAt).inSeconds;
+  }
+
+  /// 轮询心跳。用户切到 115 App 扫码时本 app 被挂起，轮询会停；
+  /// 这个指示器让人一眼看出是"没扫到"还是"检测没在跑"。
+  Widget _buildPollIndicator() {
+    final at = _lastPollAt;
+    if (at == null) return const SizedBox.shrink();
+    final ago = DateTime.now().difference(at).inSeconds;
+    final bad = ago > 5 || !_lastPollOk;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          bad
+              ? CupertinoIcons.xmark_circle_fill
+              : CupertinoIcons.checkmark_circle_fill,
+          size: 9,
+          color: bad ? const Color(0xFFF87171) : const Color(0xFF34D399),
+        ),
+        const SizedBox(width: 3),
+        Text(
+          bad ? '状态检测异常（${ago}s 前）' : '状态检测正常（${ago}s 前）',
+          style: TextStyle(
+            color: bad
+                ? const Color(0xFFF87171).withValues(alpha: 0.85)
+                : Colors.white.withValues(alpha: 0.35),
+            fontSize: 10,
+          ),
+        ),
+      ],
     );
   }
 
