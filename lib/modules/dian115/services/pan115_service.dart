@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
 import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart';
@@ -167,6 +168,12 @@ class Pan115Service extends GetxService {
   final RxString tvCid = defaultTvCid.obs;
   final Rx<One115CookieStatus> cookieStatus = One115CookieStatus.unknown.obs;
 
+  /// 115 会话 Cookie 属高敏感凭据，存系统安全存储
+  /// （iOS Keychain / Android EncryptedSharedPreferences），不再明文落盘
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+
   late final Dio _dio;
 
   @override
@@ -188,9 +195,23 @@ class Pan115Service extends GetxService {
   Future<void> _loadConfig() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedCookie = prefs.getString(_prefCookieKey);
-      if (savedCookie != null && savedCookie.trim().isNotEmpty) {
-        cookie.value = savedCookie.trim();
+
+      // Cookie 从 SharedPreferences 明文迁移到系统安全存储；
+      // 旧键读出即删除，之后只走安全存储
+      final secureCookie = await _secureStorage.read(key: _prefCookieKey);
+      if (secureCookie != null && secureCookie.trim().isNotEmpty) {
+        cookie.value = secureCookie.trim();
+        if (prefs.containsKey(_prefCookieKey)) {
+          await prefs.remove(_prefCookieKey);
+        }
+      } else {
+        final savedCookie = prefs.getString(_prefCookieKey);
+        if (savedCookie != null && savedCookie.trim().isNotEmpty) {
+          cookie.value = savedCookie.trim();
+          await _secureStorage.write(
+              key: _prefCookieKey, value: savedCookie.trim());
+          await prefs.remove(_prefCookieKey);
+        }
       }
 
       final savedMovieCid = prefs.getString(_prefMovieCidKey);
@@ -218,10 +239,14 @@ class Pan115Service extends GetxService {
         final trimmed = newCookie.trim();
         if (trimmed.isEmpty) {
           cookie.value = '';
-          await prefs.remove(_prefCookieKey);
+          await _secureStorage.delete(key: _prefCookieKey);
         } else {
           cookie.value = trimmed;
-          await prefs.setString(_prefCookieKey, trimmed);
+          await _secureStorage.write(key: _prefCookieKey, value: trimmed);
+        }
+        // 清理可能残留的明文副本
+        if (prefs.containsKey(_prefCookieKey)) {
+          await prefs.remove(_prefCookieKey);
         }
       }
       if (newMovieCid != null && newMovieCid.trim().isNotEmpty) {

@@ -1,7 +1,7 @@
 name: moviepilot_mobile
 description: MoviePilot Flutter mobile client
 publish_to: none
-version: 1.2.5+36
+version: 1.2.6+37
 license: BSL-1.1
 environment:
   sdk: ^3.8.1
@@ -31,6 +31,7 @@ dependencies:
   syncfusion_flutter_charts: ^31.1.25
   intl: ^0.20.2
   shared_preferences: ^2.3.2
+  flutter_secure_storage: ^9.2.4
   skeletonizer: ^2.1.2
   url_launcher: ^6.3.2
   path_provider: ^2.1.5

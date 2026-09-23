@@ -61,6 +61,21 @@ class OmniHubReleaseItem {
 class OmniHubReleaseHistory {
   static const List<OmniHubReleaseItem> releases = [
     OmniHubReleaseItem(
+      id: 'omnihub-20260923-securecookie',
+      version: 'v1.2.6',
+      date: '2026-09-23',
+      title: '115 凭证迁入系统安全存储',
+      type: OmniHubReleaseType.bugFix,
+      summary: '115 网盘会话 Cookie 从明文 SharedPreferences 迁移至系统安全存储（iOS Keychain / Android 加密存储），旧数据自动迁移并清除明文副本',
+      tags: ['完整发版', '115转存', '安全加固'],
+      highlights: [
+        '115 Cookie 改存 iOS Keychain / Android EncryptedSharedPreferences，不再明文落盘',
+        '首次启动自动迁移旧版明文存储的 Cookie，迁移完成后删除明文副本，全程无感',
+        '配合上一补丁的配置弹窗脱敏回填，凭证在存储与展示两侧均不再明文暴露',
+        '本项含原生插件变更，需安装完整安装包后生效，热更新补丁无法下发',
+      ],
+    ),
+    OmniHubReleaseItem(
       id: 'omnihub-20260923-dian115hardening',
       version: 'v1.2.5',
       date: '2026-09-23',
