@@ -108,7 +108,7 @@ class One115QrLoginService {
       options: Options(responseType: ResponseType.json),
     );
     final body = _asMap(resp.data);
-    if (body?['state'] != true) {
+    if (!isStateOk(body?['state'])) {
       throw One115QrException('token', '获取二维码票据失败: state=${body?['state']}');
     }
     final data = _asMap(body?['data']);
@@ -142,7 +142,7 @@ class One115QrLoginService {
       options: Options(responseType: ResponseType.json),
     );
     final body = _asMap(resp.data);
-    if (body?['state'] != true) {
+    if (!isStateOk(body?['state'])) {
       // 票据无效（key invalid），需重新取票据
       return One115QrStatus.expired(message: body?['message']?.toString());
     }
@@ -207,6 +207,13 @@ class One115QrLoginService {
       cookies: cookie.map((k, v) => MapEntry(k, v.toString())),
       cookieString: cookieString,
     );
+  }
+
+  /// 115 的 state 字段在不同端点可能是布尔 true 或数字 1
+  static bool isStateOk(dynamic state) {
+    if (state == true) return true;
+    final s = state?.toString() ?? '';
+    return s == '1' || s == 'true';
   }
 
   Map<String, dynamic>? _asMap(dynamic v) {

@@ -31,6 +31,7 @@ class _One115QrLoginSheetState extends State<One115QrLoginSheet> {
   One115DeviceProfile _profile = One115QrLoginService.defaultProfile;
   One115QrToken? _token;
   String _statusText = '正在获取二维码...';
+  String _lastError = '';
   bool _isLoading = true;
   bool _isScanned = false;
   bool _isExchanging = false;
@@ -77,6 +78,7 @@ class _One115QrLoginSheetState extends State<One115QrLoginSheet> {
     setState(() {
       _isLoading = true;
       _isExpired = false;
+      _lastError = '';
       _timedOut = false;
       _isScanned = false;
       _statusText = '正在获取二维码...';
@@ -98,9 +100,11 @@ class _One115QrLoginSheetState extends State<One115QrLoginSheet> {
       _startPolling(token);
     } catch (e) {
       if (!mounted) return;
+      final detail = e is One115QrException ? e.message : e.toString();
       setState(() {
         _isLoading = false;
         _isExpired = true;
+        _lastError = detail.length > 80 ? '${detail.substring(0, 80)}...' : detail;
         _statusText = '二维码获取失败，点击重试';
       });
     }
@@ -342,6 +346,19 @@ class _One115QrLoginSheetState extends State<One115QrLoginSheet> {
               ),
             ],
           ),
+          if (_isExpired && _lastError.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              _lastError,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: const Color(0xFFF87171).withValues(alpha: 0.7),
+                fontSize: 10,
+              ),
+            ),
+          ],
           if (!_isLoading && !_isExpired && _token != null) ...[
             const SizedBox(height: 6),
             Text(
