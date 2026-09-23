@@ -1,8 +1,12 @@
+/// 是否像一个真实链接（带协议头）。用于过滤盘搜混在 urls 里的资源名、编号。
+bool looksLikeUrl(String s) => s.toLowerCase().contains('://');
+
 List<String> extractAllOfflineUrls({
   dynamic rawUrls,
   String? rawUrl,
   String? rawMagnet,
   String? rawNote,
+  bool offlineOnly = false,
 }) {
   final result = <String>[];
   final seen = <String>{};
@@ -25,6 +29,12 @@ List<String> extractAllOfflineUrls({
         return;
       }
     }
+
+    // 没有磁力/电驴协议的文本，只有在它本身像一个真实链接时才收下。
+    // 盘搜经常把资源名、编号（如 "swsaoay36l0"）混在 urls 里；条目已判定为
+    // 磁力/电驴时必须严格只收离线协议链接，否则这段文本会一路传到 115 的
+    // 离线下载接口，被当成 url 落成 txt 文件。
+    if (!looksLikeUrl(trimmed) && offlineOnly) return;
 
     if (seen.add(trimmed)) {
       result.add(trimmed);

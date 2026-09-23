@@ -171,6 +171,9 @@ class PansouItem {
       rawUrls: json['urls'],
       rawUrl: rawUrl,
       rawNote: note,
+      // 条目已判定为磁力/电驴时，不把盘搜混进 urls 的资源名/编号收进来
+      offlineOnly: parsedType == PansouItemType.magnet ||
+          parsedType == PansouItemType.ed2k,
     );
     final effectiveUrl = allUrls.isNotEmpty ? allUrls.first : rawUrl;
     final effectiveUrls = allUrls.isNotEmpty

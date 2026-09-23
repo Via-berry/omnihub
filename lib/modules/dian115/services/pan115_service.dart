@@ -9,6 +9,99 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// 115 凭证在线状态
 enum One115CookieStatus { unknown, checking, online, offline }
 
+/// 离线下载协议链接：磁力 / 电驴
+final RegExp _offlineLinkPattern = RegExp(r'(ed2k://[^\s\r\n]+|magnet:\?[^\s\r\n]+)');
+
+/// 可作为 115 离线下载的种子文件地址（http/https 直链，如 .torrent 文件）
+bool isOfflineFileUrl(String url) {
+  final lower = url.toLowerCase();
+  return lower.startsWith('http://') || lower.startsWith('https://');
+}
+
+/// 校验磁力链接的 info-hash 是否完整。
+///
+/// 盘搜部分数据源会返回被截断的磁力（btih 只有三四十位而非完整的 40 位
+/// 十六进制或 32 位 base32）。这类磁力在 115 侧无法匹配到真实资源，
+/// 提交后只会得到一个内容为链接文本的垃圾 txt 文件，必须提交前拦下。
+bool isValidMagnetLink(String magnet) {
+  final xt = RegExp(r'[?&]xt=urn:(btih|btmh):([^&\s]+)').firstMatch(magnet);
+  if (xt == null) return true; // 无 xt 的稀有格式交给 115 判定
+  final kind = xt.group(1)!;
+  final hash = xt.group(2)!;
+  switch (kind) {
+    case 'btih':
+      // SHA-1：40 位十六进制，或 32 位 base32（RFC 4648 无填充）
+      return RegExp(r'^[0-9a-fA-F]{40}$').hasMatch(hash) ||
+          RegExp(r'^[A-Z2-7]{32}$').hasMatch(hash);
+    case 'btmh':
+      // 多哈希：前缀 + 摘要，至少 8 位十六进制
+      return RegExp(r'^[0-9a-fA-F]{8,}$').hasMatch(hash);
+    default:
+      return true;
+  }
+}
+
+/// 离线下载链接收集结果
+class OfflineUrlCollection {
+  final List<String> validUrls;
+  final List<String> invalidMagnets;
+  final List<String> droppedTexts;
+
+  const OfflineUrlCollection(this.validUrls, this.invalidMagnets, this.droppedTexts);
+
+  bool get hasRejected => invalidMagnets.isNotEmpty || droppedTexts.isNotEmpty;
+
+  String get rejectedNote {
+    final parts = <String>[];
+    if (invalidMagnets.isNotEmpty) {
+      parts.add('磁力链接 info-hash 不完整 ${invalidMagnets.length} 条');
+    }
+    if (droppedTexts.isNotEmpty) {
+      parts.add('非链接文本 ${droppedTexts.length} 条');
+    }
+    return parts.join('、');
+  }
+}
+
+/// 从盘搜条目中收集可提交给 115 离线下载的链接。
+///
+/// 盘搜会把资源名、编号、分享码等非链接文本混在 `urls` 里。这些文本绝不能
+/// 原样当作 `url` 提交给 115 的离线下载接口——115 会把整段文本落成一个
+/// 以该文本命名的 txt 文件（资源名会变成文件名，链接变成文件内容）。
+OfflineUrlCollection collectOfflineUrls(Iterable<String?> candidates) {
+  final validUrls = <String>[];
+  final invalidMagnets = <String>[];
+  final droppedTexts = <String>[];
+  final seen = <String>{};
+
+  for (final raw in candidates) {
+    if (raw == null) continue;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) continue;
+
+    if (trimmed.contains('magnet:?') || trimmed.contains('ed2k://')) {
+      for (final m in _offlineLinkPattern.allMatches(trimmed)) {
+        final link = (m.group(0) ?? '').trim();
+        if (link.isEmpty || !seen.add(link)) continue;
+        if (link.startsWith('magnet:?') && !isValidMagnetLink(link)) {
+          invalidMagnets.add(link);
+        } else {
+          validUrls.add(link);
+        }
+      }
+      continue;
+    }
+
+    if (isOfflineFileUrl(trimmed)) {
+      if (seen.add(trimmed)) validUrls.add(trimmed);
+    } else if (seen.add(trimmed)) {
+      droppedTexts.add(trimmed);
+    }
+  }
+
+  return OfflineUrlCollection(validUrls, invalidMagnets, droppedTexts);
+}
+
 class Pan115Service extends GetxService {
   static Pan115Service get to {
     if (!Get.isRegistered<Pan115Service>()) {
@@ -245,39 +338,25 @@ class Pan115Service extends GetxService {
     }
 
     // 汇总收集所有有效的离线下载链接 (支持 ed2k、magnet 等多链接批量)
-    final effectiveOfflineUrls = <String>[];
-    final seen = <String>{};
-    void addOffline(String? u) {
-      if (u == null) return;
-      final trimmed = u.trim();
-      if (trimmed.isEmpty) return;
-      if (trimmed.contains('ed2k://') || trimmed.contains('magnet:?')) {
-        final matches = RegExp(r'(ed2k://[^\s\r\n]+|magnet:\?[^\s\r\n]+)').allMatches(trimmed);
-        if (matches.isNotEmpty) {
-          for (final m in matches) {
-            final link = m.group(0)?.trim() ?? '';
-            if (link.isNotEmpty && seen.add(link)) {
-              effectiveOfflineUrls.add(link);
-            }
-          }
-          return;
-        }
-      }
-      if (seen.add(trimmed)) {
-        effectiveOfflineUrls.add(trimmed);
-      }
-    }
+    final collected = collectOfflineUrls([
+      if (magnetUrls != null) ...magnetUrls,
+      magnetUrl,
+      if (item != null) ...item.urls,
+    ]);
+    final effectiveOfflineUrls = collected.validUrls;
 
-    if (magnetUrls != null) {
-      for (final u in magnetUrls) {
-        addOffline(u);
-      }
-    }
-    addOffline(magnetUrl);
-    if (item != null && item.urls.isNotEmpty) {
-      for (final u in item.urls) {
-        addOffline(u);
-      }
+    // 没有任何可提交的离线链接时不要退化到把原始文本当 url 发出去
+    if (effectiveOfflineUrls.isEmpty &&
+        (shareUrl == null || shareUrl.trim().isEmpty)) {
+      final note = collected.rejectedNote;
+      return {
+        'success': false,
+        'target_folder': targetFolder,
+        'cid': effectiveCid,
+        'msg': note.isEmpty
+            ? '未提供有效的 115 链接或磁力链接'
+            : '未提交离线任务：$note（盘搜返回的数据不完整，请复制完整链接重试）',
+      };
     }
 
     final dianService = Dian115Service.to;
@@ -292,8 +371,6 @@ class Pan115Service extends GetxService {
       if (effectiveOfflineUrls.isNotEmpty) ...{
         'magnet_url': effectiveOfflineUrls.first,
         'magnet_urls': effectiveOfflineUrls,
-      } else if (magnetUrl != null && magnetUrl.isNotEmpty) ...{
-        'magnet_url': magnetUrl,
       },
     };
 
@@ -344,7 +421,7 @@ class Pan115Service extends GetxService {
             shareUrl: shareUrl,
             receiveCode: receiveCode,
             effectiveOfflineUrls: effectiveOfflineUrls,
-            singleMagnetUrl: magnetUrl,
+            rejectedNote: collected.rejectedNote,
           );
           if (directRes['success'] == true) {
             return directRes;
@@ -371,7 +448,7 @@ class Pan115Service extends GetxService {
       shareUrl: shareUrl,
       receiveCode: receiveCode,
       effectiveOfflineUrls: effectiveOfflineUrls,
-      singleMagnetUrl: magnetUrl,
+      rejectedNote: collected.rejectedNote,
     );
   }
 
@@ -382,7 +459,7 @@ class Pan115Service extends GetxService {
     String? shareUrl,
     String? receiveCode,
     List<String> effectiveOfflineUrls = const [],
-    String? singleMagnetUrl,
+    String? rejectedNote,
   }) async {
     final directDio = Dio(
       BaseOptions(
@@ -401,11 +478,7 @@ class Pan115Service extends GetxService {
 
     try {
       // 1. 离线磁力/电驴批量下载
-    final targetUrls = effectiveOfflineUrls.isNotEmpty
-        ? effectiveOfflineUrls
-        : (singleMagnetUrl != null && singleMagnetUrl.trim().isNotEmpty
-            ? [singleMagnetUrl.trim()]
-            : <String>[]);
+    final targetUrls = effectiveOfflineUrls;
 
     if (targetUrls.isNotEmpty) {
       var successCount = 0;
@@ -471,13 +544,18 @@ class Pan115Service extends GetxService {
         }
       }
 
+      // 让被拦下的链接可见，否则用户只看到"成功"却少了任务
+      final rejectedSuffix = (rejectedNote != null && rejectedNote.isNotEmpty)
+          ? '（另有 $rejectedNote 未提交，115 无法处理）'
+          : '';
+
       return {
         'success': hasAnySuccess,
         'target_folder': targetFolder,
         'cid': effectiveCid,
         'total_count': total,
         'success_count': successCount,
-        'msg': msg,
+        'msg': msg + rejectedSuffix,
       };
     }
 
