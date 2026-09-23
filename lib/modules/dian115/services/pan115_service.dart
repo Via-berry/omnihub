@@ -17,17 +17,6 @@ class Pan115Service extends GetxService {
     return Get.find<Pan115Service>();
   }
 
-  /// 默认 115 Cookie 通过在构建期注入，不写入仓库：
-  ///   flutter build ... --dart-define=PAN115_COOKIE="UID=...; CID=...; SEID=...; KID=..."
-  /// 未注入时为空字符串，用户可在「癫影 115」设置面板中填写自己的 Cookie
-  /// （见 dian115_share_sheet.dart 的 updateConfig 入口），并持久化到本机。
-  ///
-  /// 注意：dart-define 的值会被编译进产物，可被逆向提取。
-  /// 如需真正的秘密，请勿使用共享 Cookie，改用服务端代理。
-  static const String defaultCookie = String.fromEnvironment(
-    'PAN115_COOKIE',
-    defaultValue: '',
-  );
   static const String defaultMovieCid = '3374319270869599334';
   static const String defaultTvCid = '3374342216908539463';
 
@@ -35,10 +24,9 @@ class Pan115Service extends GetxService {
   static const String _prefMovieCidKey = 'pan115_movie_cid';
   static const String _prefTvCidKey = 'pan115_tv_cid';
 
-  final RxString cookie = defaultCookie.obs;
+  final RxString cookie = ''.obs;
   final RxString movieCid = defaultMovieCid.obs;
   final RxString tvCid = defaultTvCid.obs;
-  final RxBool isCustomCookie = false.obs;
   final Rx<One115CookieStatus> cookieStatus = One115CookieStatus.unknown.obs;
 
   late final Dio _dio;
@@ -65,10 +53,6 @@ class Pan115Service extends GetxService {
       final savedCookie = prefs.getString(_prefCookieKey);
       if (savedCookie != null && savedCookie.trim().isNotEmpty) {
         cookie.value = savedCookie.trim();
-        isCustomCookie.value = true;
-      } else {
-        cookie.value = defaultCookie;
-        isCustomCookie.value = false;
       }
 
       final savedMovieCid = prefs.getString(_prefMovieCidKey);
@@ -89,19 +73,16 @@ class Pan115Service extends GetxService {
     String? newCookie,
     String? newMovieCid,
     String? newTvCid,
-    bool resetCookieToDefault = false,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (resetCookieToDefault) {
-        cookie.value = defaultCookie;
-        isCustomCookie.value = false;
-        await prefs.remove(_prefCookieKey);
-      } else if (newCookie != null) {
+      if (newCookie != null) {
         final trimmed = newCookie.trim();
-        if (trimmed.isNotEmpty) {
+        if (trimmed.isEmpty) {
+          cookie.value = '';
+          await prefs.remove(_prefCookieKey);
+        } else {
           cookie.value = trimmed;
-          isCustomCookie.value = true;
           await prefs.setString(_prefCookieKey, trimmed);
         }
       }
@@ -119,7 +100,6 @@ class Pan115Service extends GetxService {
   }
 
   bool get hasConfiguredCookie => cookie.value.trim().isNotEmpty;
-  bool get hasDefaultCookie => defaultCookie.trim().isNotEmpty;
 
   /// 探测当前 Cookie 是否仍然有效（移植自 115scan one15-status.mjs）
   Future<void> refreshCookieStatus() async {
@@ -182,17 +162,15 @@ class Pan115Service extends GetxService {
   String get cookieSummary {
     final raw = cookie.value.trim();
     if (raw.isEmpty) return '未配置';
-    final isCustom = isCustomCookie.value;
-    final source = isCustom ? '自定义' : '内置注入';
 
     // 尝试提取 UID 简要显示
     final match = RegExp(r'UID=([^;]+)', caseSensitive: false).firstMatch(raw);
     if (match != null) {
       final uid = match.group(1)?.trim() ?? '';
       final maskedUid = uid.length > 5 ? '${uid.substring(0, 3)}***' : uid;
-      return '$source (UID: $maskedUid)';
+      return 'UID: $maskedUid';
     }
-    return '$source (已配置)';
+    return '已配置';
   }
 
   static bool isMovieType({String? mediaType, Dian115ShareItem? item}) {

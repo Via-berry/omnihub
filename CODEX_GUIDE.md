@@ -214,10 +214,6 @@ ANTHROPIC_API_KEY=...
 DEEPSEEK_API_KEY=...
 GOOGLE_API_KEY=...
 
-# 115 网盘 Cookie（「癫影 115」转存）
-# 建议留空，由用户在 App 内设置面板自行填写并保存在本机
-PAN115_COOKIE=
-
 # GitHub Actions 状态查询（建议 fine-grained，仅 Actions:Read + Contents:Read）
 GITHUB_ACTIONS_TOKEN=
 ```

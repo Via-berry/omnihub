@@ -116,5 +116,4 @@ jobs:
         run: |
           shorebird patch ios --no-codesign --release-version=latest --allow-native-diffs --allow-asset-diffs -- \
             --dart-define=FLUTTER_APP_ENV=release \
-            --dart-define=PAN115_COOKIE="${{ secrets.PAN115_COOKIE }}" \
             --dart-define=GITHUB_ACTIONS_TOKEN="${{ secrets.ACTIONS_TOKEN || secrets.GITHUB_ACTIONS_TOKEN }}"

@@ -96,7 +96,6 @@ jobs:
         run: |
           shorebird release ios --no-codesign -- \
             --dart-define=FLUTTER_APP_ENV=release \
-            --dart-define=PAN115_COOKIE="${{ secrets.PAN115_COOKIE }}" \
             --dart-define=GITHUB_ACTIONS_TOKEN="${{ secrets.ACTIONS_TOKEN || secrets.GITHUB_ACTIONS_TOKEN }}"
 
       - name: Package Base IPA

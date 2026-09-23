@@ -178,7 +178,6 @@ class _Dian115TransferConfirmSheetState
           Obx(() {
             final hasCookie = pan115.hasConfiguredCookie;
             final summary = pan115.cookieSummary;
-            final isCustom = pan115.isCustomCookie.value;
             final isOffline =
                 pan115.cookieStatus.value == One115CookieStatus.offline;
             final showOk = hasCookie && !isOffline;
@@ -213,47 +212,17 @@ class _Dian115TransferConfirmSheetState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Text(
-                              showOk
-                                  ? '115 账号凭证已就绪'
-                                  : (hasCookie
-                                      ? '115 凭证已离线，需重新登录'
-                                      : '未检测到 115 网盘凭证'),
-                              style: TextStyle(
-                                color: showOk
-                                    ? Colors.white
-                                    : const Color(0xFFFDE68A),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (hasCookie) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: (isCustom
-                                          ? const Color(0xFF6366F1)
-                                          : const Color(0xFF10B981))
-                                      .withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  isCustom ? '自定义' : 'Action默认',
-                                  style: TextStyle(
-                                    color: isCustom
-                                        ? const Color(0xFFA5B4FC)
-                                        : const Color(0xFF6EE7B7),
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
+                        Text(
+                          showOk
+                              ? '115 账号凭证已就绪'
+                              : (hasCookie
+                                  ? '115 凭证已离线，需重新登录'
+                                  : '未检测到 115 网盘凭证'),
+                          style: TextStyle(
+                            color: showOk ? Colors.white : const Color(0xFFFDE68A),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -660,24 +629,6 @@ class _Dian115TransferConfirmSheetState
                 placeholder: 'UID=...; CID=...; SEID=...',
                 style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
               ),
-              if (pan115.hasDefaultCookie && pan115.isCustomCookie.value) ...[
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: () async {
-                    await pan115.updateConfig(resetCookieToDefault: true);
-                    if (ctx.mounted) Navigator.of(ctx).pop();
-                    ToastUtil.success('已恢复 Action 构建注入的默认 Cookie');
-                  },
-                  child: const Text(
-                    '恢复 Action 构建注入的默认 Cookie',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF38BDF8),
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ),
