@@ -128,4 +128,32 @@ void main() {
       expect(item.offlineUrlCount, 1);
     });
   });
+  group('网盘分享链接不会被当成离线下载地址', () {
+    const shareUrl = 'https://115cdn.com/s/swsg4m13zrk?password=t58d';
+
+    test('looksLikePanShareUrl 识别网盘域名', () {
+      expect(looksLikePanShareUrl(shareUrl), isTrue);
+      expect(looksLikePanShareUrl('https://pan.quark.cn/s/abc'), isTrue);
+      expect(looksLikePanShareUrl('https://pan.baidu.com/s/abc'), isTrue);
+      expect(looksLikePanShareUrl('https://example.com/a.torrent'), isFalse);
+    });
+
+    test('分享链接被拦下，http 种子直链仍然放行', () {
+      final result = collectOfflineUrls([
+        shareUrl,
+        'https://example.com/a.torrent',
+      ]);
+
+      expect(result.panShareUrls, [shareUrl]);
+      expect(result.validUrls, ['https://example.com/a.torrent']);
+      expect(result.rejectedNote, contains('网盘分享链接 1 条'));
+    });
+
+    test('分享链接混在磁力里也会被拦下', () {
+      final result = collectOfflineUrls([shareUrl, validMagnet]);
+
+      expect(result.validUrls, [validMagnet]);
+      expect(result.panShareUrls, [shareUrl]);
+    });
+  });
 }

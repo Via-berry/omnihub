@@ -61,6 +61,22 @@ class OmniHubReleaseItem {
 class OmniHubReleaseHistory {
   static const List<OmniHubReleaseItem> releases = [
     OmniHubReleaseItem(
+      id: 'omnihub-20260923-shareoffline',
+      version: 'v1.2.5',
+      date: '2026-09-23',
+      title: '网盘分享链接被误当离线下载地址修复',
+      type: OmniHubReleaseType.hotPatch,
+      summary: '修复 115 等网盘分享链接被当作离线下载地址提交、被 115 下载成 txt 文件的严重问题',
+      tags: ['热更新', '115转存', '离线下载', 'PanSou', 'Dian115'],
+      highlights: [
+        '修复 115 等网盘分享链接被当作离线下载地址提交的严重问题——此前 115 会去下载该链接，把整个分享页存成一个 txt/html 文件，而不是转存分享里的资源',
+        '离线链接收集只接受磁力、电驴与 http(s) 种子直链，并明确排除网盘分享域名，网盘分享链接一律改走分享转存通道',
+        '转存不再把条目的全部 urls 无条件喂入离线收集器，只使用离线专用字段，避免分享条目与离线条目互相污染',
+        '被拦下的链接会在转存提示中明确回报类型与数量，不再静默生成垃圾文件',
+        '补上提取码回退：数据源只把提取码放在链接 query（?password= / ?pwd=）里时转存自动读取，避免测容正常但转存因缺提取码失败',
+      ],
+    ),
+    OmniHubReleaseItem(
       id: 'omnihub-20260923-magnetoffline',
       version: 'v1.2.5',
       date: '2026-09-23',

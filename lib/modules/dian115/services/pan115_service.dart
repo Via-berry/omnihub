@@ -18,6 +18,32 @@ bool isOfflineFileUrl(String url) {
   return lower.startsWith('http://') || lower.startsWith('https://');
 }
 
+/// 网盘分享链接特征域名。
+///
+/// 这类链接必须走分享转存（share/snap + share/receive）。一旦被当作离线下载
+/// 地址提交，115 会去"下载"这个 URL，把整个分享页存成一个 txt/html 文件。
+const List<String> _panShareHostHints = [
+  '115.com',
+  '115cdn.com',
+  'anxia.com',
+  'quark.cn',
+  'alipan.com',
+  'aliyundrive.com',
+  'baidu.com',
+  'xunlei.com',
+  'drive.uc.cn',
+  '189.cn',
+  '123pan.com',
+];
+
+bool looksLikePanShareUrl(String url) {
+  final lower = url.toLowerCase();
+  for (final host in _panShareHostHints) {
+    if (lower.contains(host)) return true;
+  }
+  return false;
+}
+
 /// 校验磁力链接的 info-hash 是否完整。
 ///
 /// 盘搜部分数据源会返回被截断的磁力（btih 只有三四十位而非完整的 40 位
@@ -46,13 +72,25 @@ class OfflineUrlCollection {
   final List<String> validUrls;
   final List<String> invalidMagnets;
   final List<String> droppedTexts;
+  final List<String> panShareUrls;
 
-  const OfflineUrlCollection(this.validUrls, this.invalidMagnets, this.droppedTexts);
+  const OfflineUrlCollection(
+    this.validUrls,
+    this.invalidMagnets,
+    this.droppedTexts,
+    this.panShareUrls,
+  );
 
-  bool get hasRejected => invalidMagnets.isNotEmpty || droppedTexts.isNotEmpty;
+  bool get hasRejected =>
+      panShareUrls.isNotEmpty ||
+      invalidMagnets.isNotEmpty ||
+      droppedTexts.isNotEmpty;
 
   String get rejectedNote {
     final parts = <String>[];
+    if (panShareUrls.isNotEmpty) {
+      parts.add('网盘分享链接 ${panShareUrls.length} 条');
+    }
     if (invalidMagnets.isNotEmpty) {
       parts.add('磁力链接 info-hash 不完整 ${invalidMagnets.length} 条');
     }
@@ -65,13 +103,15 @@ class OfflineUrlCollection {
 
 /// 从盘搜条目中收集可提交给 115 离线下载的链接。
 ///
-/// 盘搜会把资源名、编号、分享码等非链接文本混在 `urls` 里。这些文本绝不能
-/// 原样当作 `url` 提交给 115 的离线下载接口——115 会把整段文本落成一个
-/// 以该文本命名的 txt 文件（资源名会变成文件名，链接变成文件内容）。
+/// 两类内容绝不能进这个列表，否则 115 会把它落成垃圾文件：
+/// 1. 盘搜混在 urls 里的资源名、编号（如 "swsaoay36l0"）
+/// 2. 网盘分享链接——它必须走分享转存，当作离线地址提交会让 115 把整个
+///    分享页下载成一个 txt/html 文件，而不是转存分享里的资源
 OfflineUrlCollection collectOfflineUrls(Iterable<String?> candidates) {
   final validUrls = <String>[];
   final invalidMagnets = <String>[];
   final droppedTexts = <String>[];
+  final panShareUrls = <String>[];
   final seen = <String>{};
 
   for (final raw in candidates) {
@@ -93,13 +133,18 @@ OfflineUrlCollection collectOfflineUrls(Iterable<String?> candidates) {
     }
 
     if (isOfflineFileUrl(trimmed)) {
-      if (seen.add(trimmed)) validUrls.add(trimmed);
-    } else if (seen.add(trimmed)) {
-      droppedTexts.add(trimmed);
+      if (looksLikePanShareUrl(trimmed)) {
+        if (seen.add(trimmed)) panShareUrls.add(trimmed);
+      } else if (seen.add(trimmed)) {
+        validUrls.add(trimmed);
+      }
+      continue;
     }
+
+    if (seen.add(trimmed)) droppedTexts.add(trimmed);
   }
 
-  return OfflineUrlCollection(validUrls, invalidMagnets, droppedTexts);
+  return OfflineUrlCollection(validUrls, invalidMagnets, droppedTexts, panShareUrls);
 }
 
 class Pan115Service extends GetxService {
@@ -338,10 +383,11 @@ class Pan115Service extends GetxService {
     }
 
     // 汇总收集所有有效的离线下载链接 (支持 ed2k、magnet 等多链接批量)
+    // 只从离线专用字段收集，不喂 item.urls：115 分享条目的 urls 装的是
+    // 分享链接，一旦被当成离线地址提交，115 会把整个分享页下载成 txt 文件
     final collected = collectOfflineUrls([
       if (magnetUrls != null) ...magnetUrls,
       magnetUrl,
-      if (item != null) ...item.urls,
     ]);
     final effectiveOfflineUrls = collected.validUrls;
 
