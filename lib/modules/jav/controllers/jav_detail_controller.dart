@@ -79,6 +79,16 @@ class JavDetailController extends GetxController {
     Get.toNamed('/jav/player', parameters: {'url': url, 'title': detail.value?.title ?? code});
   }
 
+  void openHlsPlayer({required String hlsUrl, String? fallbackUrl}) {
+    if (hlsUrl.isEmpty) return;
+    Get.toNamed('/jav/hls-player', parameters: {
+      'url': hlsUrl,
+      'code': code,
+      'title': detail.value?.title ?? code,
+      'fallbackUrl': fallbackUrl ?? '',
+    });
+  }
+
   void exitJav() {
     Get.offAllNamed('/main', arguments: {'initialIndex': 0});
   }

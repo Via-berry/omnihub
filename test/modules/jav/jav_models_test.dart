@@ -146,5 +146,20 @@ void main() {
       expect(homeRec.segments.first.items.first.code, 'MKMP-522');
       expect(homeRec.source, 'missav_recombee');
     });
+
+    test('parses standalone JavStreams response payload properly', () {
+      final json = {
+        'hls_master': 'https://surrit.com/test-id/playlist.m3u8',
+        'source842': 'https://surrit.com/test-id/720p/video.m3u8',
+        'webpage': 'https://missav.ai/rctd-763/ja',
+      };
+
+      final streams = JavStreams.fromJson(json);
+
+      expect(streams.hlsMaster, 'https://surrit.com/test-id/playlist.m3u8');
+      expect(streams.hls720p, 'https://surrit.com/test-id/720p/video.m3u8');
+      expect(streams.webpage, 'https://missav.ai/rctd-763/ja');
+    });
   });
 }
+

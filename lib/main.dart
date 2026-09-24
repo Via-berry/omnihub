@@ -51,7 +51,9 @@ import 'modules/jav/controllers/jav_detail_controller.dart';
 import 'modules/jav/pages/jav_main_page.dart';
 import 'modules/jav/pages/jav_detail_page.dart';
 import 'modules/jav/pages/jav_player_page.dart';
+import 'modules/jav/pages/jav_hls_player_page.dart';
 import 'modules/jav/pages/jav_category_list_page.dart';
+import 'package:media_kit/media_kit.dart';
 import 'modules/jav/pages/jav_actress_list_page.dart';
 import 'modules/login/pages/login_page.dart';
 import 'theme/app_theme.dart';
@@ -163,6 +165,7 @@ List<GetMiddleware> permissionGuards([String? permissionRoute]) => [
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
   AppImageCacheManager.configureGlobalDecodedCache();
   try {
     Get.put(AppLog());
@@ -995,6 +998,10 @@ class MyApp extends StatelessWidget {
           GetPage(
             name: '/jav/player',
             page: () => const JavPlayerPage(),
+          ),
+          GetPage(
+            name: '/jav/hls-player',
+            page: () => const JavHlsPlayerPage(),
           ),
           GetPage(
             name: '/jav/category',

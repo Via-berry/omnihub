@@ -22,7 +22,7 @@ class JavApiService {
         receiveTimeout: const Duration(seconds: 25),
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'OmniHub-Mobile/1.2.3',
+          'User-Agent': 'OmniHub-Mobile/1.2.7',
         },
       ),
     );
@@ -228,6 +228,36 @@ class JavApiService {
       rethrow;
     }
   }
+
+  /// 换取最新流媒体 HLS 直链
+  Future<JavStreams?> fetchStreams(String code, {CancelToken? cancelToken}) async {
+    try {
+      final cleanCode = code.trim().toUpperCase();
+      final res = await _dio.get(
+        '/api/jav/streams/$cleanCode',
+        cancelToken: cancelToken,
+      );
+      var data = res.data;
+      if (data is String) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {}
+      }
+      if (res.statusCode == 200 && data != null && data is Map) {
+        if (data['streams'] is Map) {
+          return JavStreams.fromJson(Map<String, dynamic>.from(data['streams'] as Map));
+        }
+      }
+      return null;
+    } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        return null;
+      }
+      debugPrint('JavApiService.fetchStreams error for $code: $e');
+      return null;
+    }
+  }
+
 
   /// 获取女优列表 (支持分页与每页数量)
   Future<List<JavActress>> fetchActresses({

@@ -1,7 +1,7 @@
 name: moviepilot_mobile
 description: MoviePilot Flutter mobile client
 publish_to: none
-version: 1.2.6+37
+version: 1.2.7+38
 license: BSL-1.1
 environment:
   sdk: ^3.8.1
@@ -54,6 +54,9 @@ dependencies:
   native_glass_navbar:
     path: third_party/native_glass_navbar
   shorebird_code_push: ^2.0.7
+  media_kit: ^1.1.11
+  media_kit_video: ^1.2.5
+  media_kit_libs_video: ^1.0.6
 dev_dependencies:
   flutter_test:
     sdk: flutter

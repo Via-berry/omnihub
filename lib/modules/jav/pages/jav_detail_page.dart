@@ -665,6 +665,69 @@ class JavDetailPage extends GetView<JavDetailController> {
                 style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 14),
+              // 原生 HLS 高清直连线路 (阶段二原生播放器)
+              if (detail.streams?.hlsMaster != null && detail.streams!.hlsMaster!.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.cyan.shade900.withValues(alpha: 0.5),
+                        Colors.teal.shade900.withValues(alpha: 0.3),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.4)),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.cyanAccent.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.bolt_rounded, color: Colors.cyanAccent, size: 22),
+                    ),
+                    title: const Row(
+                      children: [
+                        Text(
+                          'MissAV 原生高清直连',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        SizedBox(width: 6),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.cyanAccent,
+                            borderRadius: BorderRadius.all(Radius.circular(4)),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            child: Text(
+                              '极速无广告',
+                              style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    subtitle: const Text(
+                      '原生硬件解码 · 免广告 · 支持倍速调节',
+                      style: TextStyle(color: Colors.cyanAccent, fontSize: 11),
+                    ),
+                    trailing: const Icon(CupertinoIcons.chevron_right, color: Colors.cyanAccent, size: 16),
+                    onTap: () {
+                      Navigator.pop(context);
+                      final fallback = detail.onlineWatchUrls['MissAV 全网片源'] ??
+                          detail.onlineWatchUrls.values.firstOrNull ??
+                          '';
+                      controller.openHlsPlayer(
+                        hlsUrl: detail.streams!.hlsMaster!,
+                        fallbackUrl: fallback,
+                      );
+                    },
+                  ),
+                ),
               ...(() {
                 final sortedEntries = detail.onlineWatchUrls.entries.toList();
                 sortedEntries.sort((a, b) {
