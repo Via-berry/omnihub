@@ -78,6 +78,12 @@ class _JavHlsPlayerPageState extends State<JavHlsPlayerPage> {
       return;
     }
 
+    var playUrl = streamUrl;
+    if (playUrl.contains('surrit.com') && !playUrl.contains('/api/jav/hls/proxy')) {
+      final encoded = Uri.encodeComponent(playUrl);
+      playUrl = '${_api.baseUrl}/api/jav/hls/proxy?url=$encoded';
+    }
+
     setState(() {
       _hasError = false;
       _errorMessage = '';
@@ -87,7 +93,7 @@ class _JavHlsPlayerPageState extends State<JavHlsPlayerPage> {
     try {
       await _player.open(
         Media(
-          streamUrl,
+          playUrl,
           httpHeaders: {
             'Referer': 'https://missav.ai/',
             'Origin': 'https://missav.ai',
