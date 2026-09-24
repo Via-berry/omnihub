@@ -150,11 +150,11 @@ class JavController extends GetxController {
       _fetchBackgroundCurations();
     } catch (e) {
       if (nowPlayingItems.isEmpty) {
-        errorMsg.value = '无法连接到局域网服务 (${api.baseUrl})\n\n'
+        errorMsg.value = '无法连接到纯内网服务 (${api.baseUrl})\n\n'
             '排查建议：\n'
-            '1. 手机当前若使用 5G 移动网络，请连接家庭 Wi-Fi\n'
-            '2. 若开启了代理/VPN，请确认局域网网段未被代理劫持\n'
-            '3. 可点击右上角齿轮修改为内网穿透或公网地址';
+            '1. 当前为纯内网直连模式（不走公网反代或端口转发），请确保手机已连接家庭 Wi-Fi 或开启家庭内网 VPN/WireGuard\n'
+            '2. 若开启了代理/分流软件，请确认 192.168.50.x 局域网段未被代理劫持\n'
+            '3. 可点击下方按钮重置为默认内网或配置内网 IP';
       }
       debugPrint('JavController.fetchInitialData error: $e');
     } finally {
@@ -351,6 +351,12 @@ class JavController extends GetxController {
     await api.saveBaseUrl(newUrl);
     await refreshData();
   }
+
+  Future<void> resetToDefaultLan() async {
+    await api.saveBaseUrl(JavApiService.defaultBaseUrl);
+    await refreshData();
+  }
+
 
   Future<void> refreshData() async {
     isRefreshing.value = true;

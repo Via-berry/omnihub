@@ -1,9 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:get/get.dart';
 import 'package:moviepilot_mobile/modules/jav/models/jav_models.dart';
-import 'package:moviepilot_mobile/services/app_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class JavApiService {
@@ -26,35 +24,31 @@ class JavApiService {
         },
       ),
     );
-    _initBaseUrlSync();
-  }
-
-  void _initBaseUrlSync() {
-    try {
-      if (Get.isRegistered<AppService>()) {
-        final appService = Get.find<AppService>();
-        final server = appService.baseUrl;
-        if (server != null && server.isNotEmpty) {
-          final uri = Uri.tryParse(server);
-          if (uri != null && uri.host.isNotEmpty) {
-            final scheme = uri.scheme.isNotEmpty ? uri.scheme : 'http';
-            updateBaseUrl('$scheme://${uri.host}:8923');
-          }
-        }
-      }
-    } catch (_) {}
   }
 
   Future<void> initBaseUrl() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString('jav_server_url');
-      if (saved != null && saved.trim().isNotEmpty) {
-        updateBaseUrl(saved.trim());
+      final saved = prefs.getString('jav_server_url')?.trim();
+      if (saved != null && saved.isNotEmpty) {
+        // 若缓存了历史的公网反代域名 (例如包含 215736296.xyz 或非内网 IP)，清除并强制重置为纯内网
+        final isPublic = saved.contains('215736296.xyz') ||
+            saved.startsWith('https://') ||
+            (!saved.contains('192.168.') &&
+                !saved.contains('10.') &&
+                !saved.contains('172.') &&
+                !saved.contains('127.0.0.1') &&
+                !saved.contains('localhost'));
+        if (isPublic) {
+          await prefs.remove('jav_server_url');
+          updateBaseUrl(defaultBaseUrl);
+          return;
+        }
+        updateBaseUrl(saved);
         return;
       }
     } catch (_) {}
-    _initBaseUrlSync();
+    updateBaseUrl(defaultBaseUrl);
   }
 
   Future<void> saveBaseUrl(String newUrl) async {

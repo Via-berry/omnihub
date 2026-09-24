@@ -486,11 +486,40 @@ class JavMainPage extends GetView<JavController> {
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 13, height: 1.4),
               ),
               const SizedBox(height: 20),
-              CupertinoButton.filled(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                borderRadius: BorderRadius.circular(12),
-                onPressed: controller.refreshData,
-                child: const Text('重试连接', style: TextStyle(fontSize: 13)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CupertinoButton.filled(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                    borderRadius: BorderRadius.circular(12),
+                    onPressed: controller.refreshData,
+                    child: const Text('重试连接', style: TextStyle(fontSize: 13)),
+                  ),
+                  const SizedBox(width: 10),
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    onPressed: () => _showServerConfigDialog(context),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(CupertinoIcons.slider_horizontal_3, color: Colors.white70, size: 14),
+                        SizedBox(width: 4),
+                        Text('内网配置', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: controller.resetToDefaultLan,
+                child: const Text(
+                  '恢复默认内网地址 (192.168.50.81:8923)',
+                  style: TextStyle(color: Colors.cyanAccent, fontSize: 12),
+                ),
               ),
             ],
           ),
@@ -498,4 +527,56 @@ class JavMainPage extends GetView<JavController> {
       ),
     );
   }
+
+  void _showServerConfigDialog(BuildContext context) {
+    final textController = TextEditingController(text: controller.api.baseUrl);
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) {
+        return CupertinoAlertDialog(
+          title: const Text('纯内网服务配置'),
+          content: Column(
+            children: [
+              const SizedBox(height: 8),
+              const Text(
+                'JAV 模块运行于纯内网环境，不使用反向代理或端口转发。请配置 NAS 的内网地址：',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              CupertinoTextField(
+                controller: textController,
+                placeholder: 'http://192.168.50.81:8923',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('恢复默认内网'),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                controller.resetToDefaultLan();
+              },
+            ),
+            CupertinoDialogAction(
+              child: const Text('取消'),
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              child: const Text('保存'),
+              onPressed: () {
+                final url = textController.text.trim();
+                Navigator.of(ctx).pop();
+                if (url.isNotEmpty) {
+                  controller.updateServerUrl(url);
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
+
