@@ -96,7 +96,7 @@ jobs:
           TYPHOEUS_HTTP_VERSION: CURL_HTTP_VERSION_1_1
         run: |
           cd ios
-          pod install
+          pod install || pod install --repo-update
 
       - name: Cache Xcode derived data
         uses: actions/cache@v4

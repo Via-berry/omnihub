@@ -110,7 +110,7 @@ jobs:
           TYPHOEUS_HTTP_VERSION: CURL_HTTP_VERSION_1_1
         run: |
           cd ios
-          pod install
+          pod install || pod install --repo-update
 
       - name: Publish Shorebird iOS Patch
         run: |
