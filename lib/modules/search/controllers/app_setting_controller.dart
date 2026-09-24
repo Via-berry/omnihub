@@ -301,36 +301,48 @@ class AppSettingController extends GetxController {
     if (isCheckingUpdate.value) return;
     isCheckingUpdate.value = true;
     try {
+      bool shorebirdUpToDate = false;
+      int? patchNum;
+
       if (Platform.isIOS && _updateService.isShorebirdAvailable) {
-        final status = await _updateService.checkShorebirdUpdate();
-        if (status == UpdateStatus.outdated) {
-          ToastUtil.info('发现新版本热补丁，正在自动拉取...');
-          await _updateService.downloadShorebirdUpdate();
-          await _updateService.loadPatchNumber();
-          ToastUtil.success('热补丁下载完成，下次重启应用生效！');
-          return;
-        } else if (status == UpdateStatus.restartRequired) {
-          ToastUtil.info('新版本热补丁已就绪，重启应用生效');
-          return;
-        } else if (status == UpdateStatus.upToDate) {
-          if (showUpToDate) {
-            final patch = await _updateService.loadPatchNumber();
-            final patchText = patch != null ? ' (当前补丁 #$patch)' : ' (底包)';
-            ToastUtil.success('当前已是最新版本$patchText');
+        try {
+          final status = await _updateService.checkShorebirdUpdate();
+          if (status == UpdateStatus.outdated) {
+            ToastUtil.info('发现新版本热补丁，正在自动拉取...');
+            await _updateService.downloadShorebirdUpdate();
+            patchNum = await _updateService.loadPatchNumber();
+            ToastUtil.success('热补丁下载完成，下次重启应用生效！');
+            return;
+          } else if (status == UpdateStatus.restartRequired) {
+            ToastUtil.info('新版本热补丁已就绪，重启应用生效');
+            return;
+          } else if (status == UpdateStatus.upToDate) {
+            shorebirdUpToDate = true;
+            patchNum = await _updateService.loadPatchNumber();
           }
-          return;
+        } catch (e) {
+          debugPrint('Shorebird 热更检查跳过: $e');
         }
       }
 
-      final info = await _updateService.fetchLatestRelease();
-      updateInfo.value = info;
-      if (!info.isNewer) {
-        if (Platform.isIOS) {
-          _showUpdateDialog(info);
+      AppUpdateInfo? info;
+      try {
+        info = await _updateService.fetchLatestRelease();
+        updateInfo.value = info;
+      } catch (e) {
+        if (shorebirdUpToDate && showUpToDate) {
+          final patchText = patchNum != null ? ' (当前补丁 #$patchNum)' : ' (底包)';
+          ToastUtil.success('当前已是最新版本$patchText');
           return;
         }
+        rethrow;
+      }
+
+      if (!info.isNewer) {
         if (showUpToDate) {
-          ToastUtil.success('当前已是最新版本');
+          final patch = patchNum ?? await _updateService.loadPatchNumber();
+          final patchText = patch != null ? ' (当前补丁 #$patch)' : '';
+          ToastUtil.success('当前已是最新版本$patchText');
         }
         return;
       }

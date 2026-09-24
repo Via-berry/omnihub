@@ -9,6 +9,7 @@ import 'package:moviepilot_mobile/modules/settings/models/system_env_model.dart'
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shorebird_code_push/shorebird_code_push.dart';
 
 class AppUpdateService extends GetxService {
@@ -64,16 +65,22 @@ class AppUpdateService extends GetxService {
     await _shorebirdUpdater.update();
   }
 
-  static const String releasesApi =
-      'https://api.github.com/repos/singleton-altman/MoviePilotLite/releases';
-  static const String releasesUrl =
-      'https://github.com/singleton-altman/MoviePilotLite/releases';
+  static const String owner = 'Via-berry';
+  static const String repo = 'omnihub';
+  static const String releasesUrl = 'https://github.com/$owner/$repo/releases';
   static const Duration cachedApkTtl = Duration(days: 7);
   static const String downloadProxyUrl = 'https://ghproxy.net/';
-  static final RegExp _androidReleaseTagPattern = RegExp(
-    r'^release-v\d+(?:\.\d+){1,3}-\d{4}-\d{2}-\d{2}$',
-    caseSensitive: false,
+
+  static const String _defaultToken = String.fromEnvironment(
+    'GITHUB_ACTIONS_TOKEN',
+    defaultValue: '',
   );
+
+  static List<String> _releaseApiUrls(String targetOwner, String targetRepo) => [
+    'https://api.github.com/repos/$targetOwner/$targetRepo/releases',
+    'https://gh-proxy.com/https://api.github.com/repos/$targetOwner/$targetRepo/releases',
+    'https://gh.llkk.cc/https://api.github.com/repos/$targetOwner/$targetRepo/releases',
+  ];
 
   static final BaseOptions _baseOptions = BaseOptions(
     connectTimeout: const Duration(seconds: 30),
@@ -83,7 +90,7 @@ class AppUpdateService extends GetxService {
     maxRedirects: 5,
     headers: const {
       'accept': 'application/vnd.github+json',
-      'user-agent': 'MoviePilotLite-Mobile',
+      'user-agent': 'OmniHub-Mobile-App',
     },
     validateStatus: (status) => status != null && status < 500,
   );
@@ -92,42 +99,95 @@ class AppUpdateService extends GetxService {
   final _log = Get.find<AppLog>();
   final _apiClient = Get.find<ApiClient>();
 
+  Future<String?> _resolveGithubToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final customToken = prefs.getString('custom_github_actions_token')?.trim();
+      if (customToken != null && customToken.isNotEmpty) return customToken;
+    } catch (_) {}
+
+    if (_defaultToken.isNotEmpty) {
+      return _defaultToken;
+    }
+
+    return await _loadConfiguredGithubToken();
+  }
+
+  Future<List<dynamic>> _fetchReleasesWithFallback({
+    String targetOwner = owner,
+    String targetRepo = repo,
+    int perPage = 30,
+  }) async {
+    final token = await _resolveGithubToken();
+    final headers = {
+      'accept': 'application/vnd.github+json',
+      'user-agent': 'OmniHub-Mobile-App',
+      if (token != null && token.isNotEmpty) 'authorization': 'Bearer $token',
+    };
+    final urls = _releaseApiUrls(targetOwner, targetRepo);
+
+    dynamic lastError;
+    for (final url in urls) {
+      try {
+        final response = await _dio.get<dynamic>(
+          url,
+          queryParameters: {'per_page': perPage},
+          options: Options(
+            headers: headers,
+            sendTimeout: const Duration(seconds: 8),
+            receiveTimeout: const Duration(seconds: 12),
+          ),
+        );
+        final status = response.statusCode ?? 0;
+        if (status >= 200 && status < 300) {
+          if (response.data is List) {
+            return response.data as List<dynamic>;
+          }
+        }
+        if (status == 403 && _isRateLimited(response.data)) {
+          _log.warning('GitHub 接口 [$url] 限流，切换备用线路');
+          continue;
+        }
+      } catch (e) {
+        lastError = e;
+        _log.warning('请求 GitHub 发布列表 [$url] 失败: $e，切换备用线路');
+      }
+    }
+
+    if (token == null &&
+        lastError != null &&
+        lastError.toString().contains('403')) {
+      throw AppUpdateException('GitHub API 已限流，请在设置中配置 Github Token 或稍后重试');
+    }
+    throw AppUpdateException('连接版本服务器失败，请检查网络设置');
+  }
+
   Future<AppUpdateInfo> fetchLatestRelease() async {
     final packageInfo = await PackageInfo.fromPlatform();
     final currentBuild = int.tryParse(packageInfo.buildNumber);
-    final githubToken = await _loadConfiguredGithubToken();
-    final response = await _dio.get<dynamic>(
-      releasesApi,
-      queryParameters: const {'per_page': 30},
-      options: Options(headers: _githubHeaders(githubToken)),
+
+    final releases = await _fetchReleasesWithFallback(
+      targetOwner: owner,
+      targetRepo: repo,
+      perPage: 30,
     );
-    final status = response.statusCode ?? 0;
-    if (status == 403 && _isRateLimited(response.data)) {
-      throw AppUpdateException(
-        githubToken == null
-            ? 'GitHub API 已限流，请先在系统基础设置中配置 Github Token'
-            : 'GitHub API 已限流，请检查 Github Token 是否有效',
-      );
-    }
-    final releases = response.data;
-    if (status < 200 || status >= 300 || releases is! List) {
-      throw AppUpdateException('获取最新版本失败');
+
+    final data = _selectLatestRelease(releases);
+    if (data == null) {
+      throw AppUpdateException('暂无已发布的版本信息');
     }
 
-    final data = _selectLatestAndroidRelease(releases);
-    if (data == null) {
-      throw AppUpdateException('未找到合法的安卓发布版本');
-    }
     final assets = data['assets'];
-    final apkAsset = assets is List
-        ? _selectApkAsset(assets.whereType<Map>().toList())
+    final asset = assets is List
+        ? _selectPlatformAsset(assets.whereType<Map>().toList())
         : null;
+
     final tagName = _stringValue(data['tag_name']);
     final releaseName = _stringValue(data['name']);
     final versionSource = [
       tagName,
       releaseName,
-      _stringValue(apkAsset?['name']),
+      _stringValue(asset?['name']),
     ].firstWhere((value) => value.trim().isNotEmpty, orElse: () => '0.0.0');
     final latestVersion = ParsedReleaseVersion.fromText(versionSource);
 
@@ -140,9 +200,9 @@ class AppUpdateService extends GetxService {
       releaseName: releaseName.isEmpty ? tagName : releaseName,
       releaseUrl: _stringValue(data['html_url'], fallback: releasesUrl),
       releaseNotes: _stringValue(data['body']),
-      apkDownloadUrl: _stringValue(apkAsset?['browser_download_url']),
-      apkAssetName: _stringValue(apkAsset?['name']),
-      apkSize: _intValue(apkAsset?['size']),
+      apkDownloadUrl: _stringValue(asset?['browser_download_url']),
+      apkAssetName: _stringValue(asset?['name']),
+      apkSize: _intValue(asset?['size']),
       publishedAt: DateTime.tryParse(_stringValue(data['published_at'])),
     );
   }
@@ -215,22 +275,50 @@ class AppUpdateService extends GetxService {
     }
   }
 
-  Map<dynamic, dynamic>? _selectApkAsset(List<Map<dynamic, dynamic>> assets) {
-    final apkAssets = assets.where((asset) {
+  Map<dynamic, dynamic>? _selectPlatformAsset(
+      List<Map<dynamic, dynamic>> assets) {
+    if (assets.isEmpty) return null;
+    if (Platform.isIOS) {
+      final ipaAssets = assets.where((asset) {
+        final name = _stringValue(asset['name']).toLowerCase();
+        return name.endsWith('.ipa');
+      }).toList();
+      if (ipaAssets.isNotEmpty) {
+        ipaAssets.sort((a, b) => _assetScore(b).compareTo(_assetScore(a)));
+        return ipaAssets.first;
+      }
+    } else {
+      final apkAssets = assets.where((asset) {
+        final name = _stringValue(asset['name']).toLowerCase();
+        return name.endsWith('.apk');
+      }).toList();
+      if (apkAssets.isNotEmpty) {
+        apkAssets.sort((a, b) => _assetScore(b).compareTo(_assetScore(a)));
+        return apkAssets.first;
+      }
+    }
+    for (final asset in assets) {
       final name = _stringValue(asset['name']).toLowerCase();
-      return name.endsWith('.apk');
-    }).toList();
-    if (apkAssets.isEmpty) return null;
-    apkAssets.sort((a, b) => _assetScore(b).compareTo(_assetScore(a)));
-    return apkAssets.first;
+      if (!name.endsWith('.sha256') &&
+          !name.endsWith('.md5') &&
+          !name.endsWith('.txt')) {
+        return asset;
+      }
+    }
+    return null;
   }
 
-  Map<dynamic, dynamic>? _selectLatestAndroidRelease(List<dynamic> releases) {
+  Map<dynamic, dynamic>? _selectLatestRelease(List<dynamic> releases) {
     final candidates = releases.whereType<Map>().where((release) {
+      if (release['draft'] == true) return false;
       final tagName = _stringValue(release['tag_name']);
-      return _androidReleaseTagPattern.hasMatch(tagName);
+      if (tagName.toLowerCase() == 'base-ios-latest') return false;
+      return true;
     }).toList();
-    if (candidates.isEmpty) return null;
+    if (candidates.isEmpty) {
+      final validMaps = releases.whereType<Map>();
+      return validMaps.isEmpty ? null : validMaps.first;
+    }
     candidates.sort((a, b) {
       final left = DateTime.tryParse(_stringValue(a['published_at']));
       final right = DateTime.tryParse(_stringValue(b['published_at']));
@@ -246,8 +334,12 @@ class AppUpdateService extends GetxService {
     final name = _stringValue(asset['name']).toLowerCase();
     var score = 0;
     if (name.contains('universal')) score += 8;
-    if (name.contains('android')) score += 6;
-    if (name.contains('release')) score += 4;
+    if (name.contains('base')) score += 6;
+    if (name.contains('release') ||
+        name.contains('ios') ||
+        name.contains('android')) {
+      score += 4;
+    }
     if (name.contains('arm64')) score += 2;
     if (name.contains('debug')) score -= 8;
     return score;
@@ -288,12 +380,6 @@ class AppUpdateService extends GetxService {
     return int.tryParse(value?.toString() ?? '');
   }
 
-  Map<String, String> _githubHeaders(String? token) {
-    final normalized = token?.trim();
-    if (normalized == null || normalized.isEmpty) return const {};
-    return {'authorization': 'Bearer $normalized'};
-  }
-
   Future<String?> _loadConfiguredGithubToken() async {
     try {
       final response = await _apiClient.get<Map<String, dynamic>>(
@@ -324,22 +410,17 @@ class AppUpdateService extends GetxService {
   Future<UpstreamCheckResult> checkUpstreamSync(
     UpstreamBaselineInfo baseline,
   ) async {
-    final githubToken = await _loadConfiguredGithubToken();
-    final response = await _dio.get<dynamic>(
-      releasesApi,
-      queryParameters: const {'per_page': 10},
-      options: Options(headers: _githubHeaders(githubToken)),
+    final parts = baseline.repo.split('/');
+    final targetOwner = parts.isNotEmpty ? parts[0] : 'singleton-altman';
+    final targetRepo = parts.length > 1 ? parts[1] : 'MoviePilotLite';
+
+    final releases = await _fetchReleasesWithFallback(
+      targetOwner: targetOwner,
+      targetRepo: targetRepo,
+      perPage: 10,
     );
-    final status = response.statusCode ?? 0;
-    if (status == 403 && _isRateLimited(response.data)) {
-      throw AppUpdateException(
-        githubToken == null
-            ? 'GitHub API 已限流，请先在系统基础设置中配置 Github Token'
-            : 'GitHub API 已限流，请检查 Github Token 是否有效',
-      );
-    }
-    final releases = response.data;
-    if (status < 200 || status >= 300 || releases is! List || releases.isEmpty) {
+
+    if (releases.isEmpty) {
       throw AppUpdateException('获取上游版本失败');
     }
 
@@ -351,12 +432,14 @@ class AppUpdateService extends GetxService {
     final tagName = _stringValue(latestRelease['tag_name']);
     final releaseName = _stringValue(latestRelease['name']);
     final notes = _stringValue(latestRelease['body']);
+    final upstreamRepoUrl = 'https://github.com/${baseline.repo}/releases';
     final htmlUrl =
-        _stringValue(latestRelease['html_url'], fallback: releasesUrl);
+        _stringValue(latestRelease['html_url'], fallback: upstreamRepoUrl);
     final publishedStr = _stringValue(latestRelease['published_at']);
     final publishedAt = DateTime.tryParse(publishedStr);
 
-    final hasUpdate = tagName.isNotEmpty && !_isSameTag(tagName, baseline.baselineTag);
+    final hasUpdate =
+        tagName.isNotEmpty && !_isSameTag(tagName, baseline.baselineTag);
 
     return UpstreamCheckResult(
       baseline: baseline,
