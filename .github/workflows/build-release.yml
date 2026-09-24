@@ -92,8 +92,8 @@ jobs:
           [ -z "${KEY_ALIAS:-}" ] && missing="${missing} KEY_ALIAS"
           [ -z "${KEY_PASSWORD:-}" ] && missing="${missing} KEY_PASSWORD"
           if [ -n "$missing" ]; then
-            echo "::error::缺少必要的 GitHub Secrets:${missing}"
-            exit 1
+            echo "::notice::未配置 Android 签名 secrets:${missing}，本次使用 debug 签名出包（可侧载，不影响 iOS 发布）"
+            exit 0
           fi
 
           if ! echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/moviepilot.keystore" 2>/dev/null; then
