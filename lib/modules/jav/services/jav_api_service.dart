@@ -136,12 +136,78 @@ class JavApiService {
     }
   }
 
-  /// 获取番号完整详情 (包含 12 张样张、磁链等)
-  Future<JavDetail?> fetchDetail(String code, {CancelToken? cancelToken}) async {
+  /// 获取 JAV 模块系统与安全配置 (如允许放行 host、MissAV 主站域名等)
+  Future<JavSettings?> fetchSettings({CancelToken? cancelToken}) async {
+    try {
+      final res = await _dio.get('/api/jav/settings', cancelToken: cancelToken);
+      var data = res.data;
+      if (data is String) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {}
+      }
+      if (res.statusCode == 200 && data != null && data is Map) {
+        return JavSettings.fromJson(Map<String, dynamic>.from(data));
+      }
+      return null;
+    } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        return null;
+      }
+      debugPrint('JavApiService.fetchSettings error: $e');
+      return null;
+    }
+  }
+
+  /// 获取 MissAV 首页推荐与分段题材推荐
+  Future<JavHomeRecommendations?> fetchMissavHome({
+    int count = 12,
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      final res = await _dio.get(
+        '/api/jav/missav/home',
+        queryParameters: {'count': count},
+        cancelToken: cancelToken,
+      );
+      var data = res.data;
+      if (data is String) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {}
+      }
+      if (res.statusCode == 200 && data != null && data is Map) {
+        return JavHomeRecommendations.fromJson(Map<String, dynamic>.from(data));
+      }
+      return null;
+    } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        return null;
+      }
+      debugPrint('JavApiService.fetchMissavHome error: $e');
+      return null;
+    }
+  }
+
+  /// 获取番号完整详情 (支持 MissAV 主数据源与 JavBus 回退)
+  Future<JavDetail?> fetchDetail(
+    String code, {
+    String? source,
+    String? locale,
+    CancelToken? cancelToken,
+  }) async {
     try {
       final cleanCode = code.trim().toUpperCase();
+      final queryParams = <String, dynamic>{};
+      if (source != null && source.isNotEmpty) {
+        queryParams['source'] = source;
+      }
+      if (locale != null && locale.isNotEmpty) {
+        queryParams['locale'] = locale;
+      }
       final res = await _dio.get(
         '/api/jav/detail/$cleanCode',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
         cancelToken: cancelToken,
       );
       var data = res.data;
@@ -284,15 +350,20 @@ class JavApiService {
     }
   }
 
-  /// 获取母库分类题材标签列表
+  /// 获取母库分类题材标签列表 (默认使用 MissAV 自建题材索引)
   Future<List<JavGenre>> fetchGenres({
     String category = 'censored',
+    String? source,
     CancelToken? cancelToken,
   }) async {
     try {
+      final queryParams = <String, dynamic>{'category': category};
+      if (source != null && source.isNotEmpty) {
+        queryParams['source'] = source;
+      }
       final res = await _dio.get(
         '/api/jav/genres',
-        queryParameters: {'category': category},
+        queryParameters: queryParams,
         cancelToken: cancelToken,
       );
       var data = res.data;

@@ -61,6 +61,23 @@ class OmniHubReleaseItem {
 class OmniHubReleaseHistory {
   static const List<OmniHubReleaseItem> releases = [
     OmniHubReleaseItem(
+      id: 'omnihub-20260924-missav',
+      version: 'v1.2.6',
+      patchNumber: 1,
+      date: '2026-09-24',
+      title: 'JAV 模块改版为 MissAV 主数据源',
+      type: OmniHubReleaseType.hotPatch,
+      summary: 'JAV 模块主数据源切换为 MissAV，原生支持中文剧情简介、制作/发行厂牌与推荐引擎动态题材流，JavBus 降级为磁链与未收录兜底',
+      tags: ['热更新', 'JAV', 'MissAV', '体验升级'],
+      highlights: [
+        '主数据源全面升级为 MissAV，详情页支持繁体中文剧情简介、制作/发行厂牌与原站结构化题材',
+        '接入 MissAV 官方推荐引擎算法，首页精选与分段题材流（巨乳、中出、熟女等）动态异步加载',
+        '详情页播放弹窗前置置顶 MissAV 全网片源直达，并动态同步服务端安全放行域名',
+        'JavBus 降级为独占磁链与无码/冷门片目兜底数据源，未收录自动静默回退，零白屏',
+        '图片代理适配 MissAV 动态来源鉴权头部并落盘加密缓存，脱敏模式全面覆盖新图源',
+      ],
+    ),
+    OmniHubReleaseItem(
       id: 'omnihub-20260923-securecookie',
       version: 'v1.2.6',
       date: '2026-09-23',

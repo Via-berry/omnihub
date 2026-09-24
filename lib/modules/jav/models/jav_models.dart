@@ -127,6 +127,86 @@ class JavMagnet {
   }
 }
 
+class JavStreams {
+  final String? hlsMaster;
+  final String? hls720p;
+  final String? webpage;
+  final String? source;
+
+  JavStreams({
+    this.hlsMaster,
+    this.hls720p,
+    this.webpage,
+    this.source,
+  });
+
+  factory JavStreams.fromJson(Map<String, dynamic> json) {
+    return JavStreams(
+      hlsMaster: json['hls_master']?.toString(),
+      hls720p: (json['hls_720p'] ?? json['source842'] ?? json['source1280'])?.toString(),
+      webpage: json['webpage']?.toString(),
+      source: json['source']?.toString(),
+    );
+  }
+}
+
+class JavGenreRef {
+  final String id;
+  final String name;
+
+  JavGenreRef({required this.id, required this.name});
+
+  factory JavGenreRef.fromJson(dynamic json) {
+    if (json is Map) {
+      return JavGenreRef(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+      );
+    }
+    return JavGenreRef(id: '', name: json?.toString() ?? '');
+  }
+}
+
+class JavStarRef {
+  final String id;
+  final String name;
+
+  JavStarRef({required this.id, required this.name});
+
+  factory JavStarRef.fromJson(dynamic json) {
+    if (json is Map) {
+      return JavStarRef(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+      );
+    }
+    return JavStarRef(id: '', name: json?.toString() ?? '');
+  }
+}
+
+class JavSettings {
+  final String missavBase;
+  final String missavLocale;
+  final List<String> allowedHosts;
+  final String version;
+
+  JavSettings({
+    required this.missavBase,
+    required this.missavLocale,
+    required this.allowedHosts,
+    required this.version,
+  });
+
+  factory JavSettings.fromJson(Map<String, dynamic> json) {
+    return JavSettings(
+      missavBase: json['missav_base']?.toString() ?? 'https://missav.ai',
+      missavLocale: json['missav_locale']?.toString() ?? 'ja',
+      allowedHosts: (json['allowed_hosts'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      version: json['version']?.toString() ?? '2.4.0',
+    );
+  }
+}
+
 class JavDetail {
   final String code;
   final String title;
@@ -145,6 +225,15 @@ class JavDetail {
   final int magnetCount;
   final Map<String, String> onlineWatchUrls;
   final String? trailerPlayerUrl;
+  final String? synopsis;
+  final String? studio;
+  final String? label;
+  final String? previewUrl;
+  final JavStreams? streams;
+  final List<JavGenreRef> structuredGenres;
+  final List<JavStarRef> stars;
+  final bool isMissavAvailable;
+  final String? source;
 
   JavDetail({
     required this.code,
@@ -164,17 +253,55 @@ class JavDetail {
     this.magnetCount = 0,
     required this.onlineWatchUrls,
     this.trailerPlayerUrl,
+    this.synopsis,
+    this.studio,
+    this.label,
+    this.previewUrl,
+    this.streams,
+    this.structuredGenres = const [],
+    this.stars = const [],
+    this.isMissavAvailable = false,
+    this.source,
   });
 
   factory JavDetail.fromJson(Map<String, dynamic> json) {
-    final genresList = (json['genres'] as List?)
-            ?.map((e) => e.toString())
+    final rawGenres = json['genres'] as List?;
+    final genresList = <String>[];
+    final structGenres = <JavGenreRef>[];
+    if (rawGenres != null) {
+      for (final g in rawGenres) {
+        if (g is Map) {
+          final name = g['name']?.toString() ?? '';
+          final id = g['id']?.toString() ?? '';
+          if (name.isNotEmpty) {
+            genresList.add(name);
+            structGenres.add(JavGenreRef(id: id, name: name));
+          }
+        } else if (g != null) {
+          final str = g.toString();
+          if (str.isNotEmpty) {
+            genresList.add(str);
+            structGenres.add(JavGenreRef(id: '', name: str));
+          }
+        }
+      }
+    }
+
+    final starsList = (json['stars'] as List?)
+            ?.whereType<Map>()
+            .map((e) => JavStarRef.fromJson(Map<String, dynamic>.from(e)))
             .toList() ??
         [];
+
     final actressesList = (json['actresses'] as List?)
             ?.map((e) => JavActressRef.fromJson(e))
             .toList() ??
         [];
+
+    if (actressesList.isEmpty && starsList.isNotEmpty) {
+      actressesList.addAll(starsList.map((s) => JavActressRef(name: s.name, starId: s.id)));
+    }
+
     final photosList = (json['sample_photos'] as List?)
             ?.map((e) => e.toString())
             .toList() ??
@@ -194,6 +321,28 @@ class JavDetail {
       });
     }
 
+    String? maker = json['maker']?.toString();
+    if ((maker == null || maker.isEmpty) && json['makers'] is List && (json['makers'] as List).isNotEmpty) {
+      final first = (json['makers'] as List).first;
+      if (first is Map) maker = first['name']?.toString();
+    }
+
+    String? label = json['label']?.toString();
+    if ((label == null || label.isEmpty) && json['labels'] is List && (json['labels'] as List).isNotEmpty) {
+      final first = (json['labels'] as List).first;
+      if (first is Map) label = first['name']?.toString();
+    }
+
+    JavStreams? streams;
+    if (json['streams'] is Map) {
+      streams = JavStreams.fromJson(Map<String, dynamic>.from(json['streams']));
+    }
+
+    bool isMissav = false;
+    if (json['missav'] is Map) {
+      isMissav = (json['missav'] as Map)['available'] == true;
+    }
+
     return JavDetail(
       code: json['code']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
@@ -202,7 +351,7 @@ class JavDetail {
       releaseDate: json['release_date']?.toString(),
       duration: json['duration']?.toString(),
       director: json['director']?.toString(),
-      maker: json['maker']?.toString(),
+      maker: maker,
       publisher: json['publisher']?.toString(),
       series: json['series']?.toString(),
       genres: genresList,
@@ -214,6 +363,15 @@ class JavDetail {
           : magnetsList.length,
       onlineWatchUrls: watchUrls,
       trailerPlayerUrl: json['trailer_player_url']?.toString(),
+      synopsis: json['synopsis']?.toString(),
+      studio: maker ?? json['studio']?.toString(),
+      label: label,
+      previewUrl: json['preview_url']?.toString(),
+      streams: streams,
+      structuredGenres: structGenres,
+      stars: starsList,
+      isMissavAvailable: isMissav,
+      source: json['_source']?.toString(),
     );
   }
 
@@ -282,6 +440,52 @@ class JavGenre {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       tag: json['tag']?.toString() ?? '',
+    );
+  }
+}
+
+class JavHomeSegment {
+  final String name;
+  final List<JavItem> items;
+
+  JavHomeSegment({required this.name, required this.items});
+
+  factory JavHomeSegment.fromJson(Map<String, dynamic> json) {
+    final rawList = json['items'] as List? ?? [];
+    return JavHomeSegment(
+      name: json['name']?.toString() ?? '',
+      items: rawList
+          .whereType<Map>()
+          .map((e) => JavItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+    );
+  }
+}
+
+class JavHomeRecommendations {
+  final List<JavItem> recommended;
+  final List<JavHomeSegment> segments;
+  final String? source;
+
+  JavHomeRecommendations({
+    required this.recommended,
+    required this.segments,
+    this.source,
+  });
+
+  factory JavHomeRecommendations.fromJson(Map<String, dynamic> json) {
+    final rawRec = json['recommended'] as List? ?? [];
+    final rawSeg = json['segments'] as List? ?? [];
+    return JavHomeRecommendations(
+      recommended: rawRec
+          .whereType<Map>()
+          .map((e) => JavItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      segments: rawSeg
+          .whereType<Map>()
+          .map((e) => JavHomeSegment.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      source: json['_source']?.toString(),
     );
   }
 }

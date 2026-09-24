@@ -252,7 +252,7 @@ class JavRecommendView extends StatelessWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
-                              'DMM',
+                              'HOT',
                               style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -392,6 +392,28 @@ class JavRecommendView extends StatelessWidget {
           if (list.isEmpty) return const SizedBox.shrink();
           return _buildActressesSection(context, list);
         }),
+
+        // 板块 6：MissAV 推荐题材流 (动态分段)
+        Obx(() {
+          final segments = controller.recombeeSegments;
+          if (segments.isEmpty) return const SizedBox.shrink();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final seg in segments)
+                if (seg.items.isNotEmpty)
+                  _buildHorizontalCardSection(
+                    title: '${seg.name} 精选',
+                    items: seg.items,
+                    onMore: () => controller.navigateToCategory(
+                      title: '${seg.name} 精选专区',
+                      categoryType: 'censored',
+                      genre: seg.name,
+                    ),
+                  ),
+            ],
+          );
+        }),
       ],
     );
   }
@@ -488,7 +510,7 @@ class JavRecommendView extends StatelessWidget {
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.4)),
                         ),
-                        child: const Text('TMDB', style: TextStyle(color: Colors.greenAccent, fontSize: 9, fontWeight: FontWeight.bold)),
+                        child: const Text('TOP', style: TextStyle(color: Colors.greenAccent, fontSize: 9, fontWeight: FontWeight.bold)),
                       ),
                       Text(
                         title,

@@ -15,6 +15,7 @@ class JavController extends GetxController {
   static final List<JavItem> _cachedSubtitled = [];
   static final List<JavActress> _cachedActresses = [];
   static final List<JavTagPrompt> _cachedTags = [];
+  static final List<JavHomeSegment> _cachedRecombeeSegments = [];
 
   final RxBool isLoading = true.obs;
   final RxBool isRefreshing = false.obs;
@@ -35,6 +36,7 @@ class JavController extends GetxController {
   final RxList<JavItem> popularItems = <JavItem>[].obs;
   final RxList<JavItem> subtitledItems = <JavItem>[].obs;
   final RxList<JavActress> actresses = <JavActress>[].obs;
+  final RxList<JavHomeSegment> recombeeSegments = <JavHomeSegment>[].obs;
 
   // 全量影库 Tab 专属状态
   final RxString libraryCategory = 'censored'.obs; // censored (有码) 或 uncensored (无码)
@@ -82,6 +84,7 @@ class JavController extends GetxController {
       if (_cachedSubtitled.isNotEmpty) subtitledItems.assignAll(_cachedSubtitled);
       if (_cachedActresses.isNotEmpty) actresses.assignAll(_cachedActresses);
       if (_cachedTags.isNotEmpty) recommendationTags.assignAll(_cachedTags);
+      if (_cachedRecombeeSegments.isNotEmpty) recombeeSegments.assignAll(_cachedRecombeeSegments);
       isLoading.value = false;
     }
 
@@ -162,18 +165,20 @@ class JavController extends GetxController {
 
   Future<void> _fetchBackgroundCurations() async {
     try {
-      // 后台静默并行拉取无码专区、人气排行与中字推荐
+      // 后台静默并行拉取无码专区、人气排行、中字推荐与 MissAV 推荐引擎数据
       final results = await Future.wait([
         api.fetchCategoryExplore(category: 'uncensored', page: 1, cancelToken: _fetchCancelToken),
         api.fetchCategoryExplore(category: 'popular', page: 1, cancelToken: _fetchCancelToken),
         api.fetchCategoryExplore(category: 'subtitled', page: 1, cancelToken: _fetchCancelToken),
         api.fetchCategoryExplore(category: 'censored', page: 2, cancelToken: _fetchCancelToken),
+        api.fetchMissavHome(count: 12, cancelToken: _fetchCancelToken),
       ]);
 
-      final uncen = results[0];
-      final pop = results[1];
-      final zh = results[2];
-      final p2 = results[3];
+      final uncen = results[0] as List<JavItem>;
+      final pop = results[1] as List<JavItem>;
+      final zh = results[2] as List<JavItem>;
+      final p2 = results[3] as List<JavItem>;
+      final missavHome = results[4] as JavHomeRecommendations?;
 
       if (uncen.isNotEmpty) {
         uncensoredItems.assignAll(uncen);
@@ -196,6 +201,23 @@ class JavController extends GetxController {
       if (hotItems.isEmpty && p2.isNotEmpty) {
         hotItems.assignAll(p2);
         _cachedHot.assignAll(p2);
+      }
+
+      if (missavHome != null) {
+        if (missavHome.segments.isNotEmpty) {
+          recombeeSegments.assignAll(missavHome.segments);
+          _cachedRecombeeSegments.assignAll(missavHome.segments);
+        }
+        if (missavHome.recommended.isNotEmpty) {
+          if (hotItems.isEmpty) {
+            hotItems.assignAll(missavHome.recommended);
+            _cachedHot.assignAll(missavHome.recommended);
+          }
+          if (bannerItems.length < 5) {
+            final combined = [...bannerItems, ...missavHome.recommended];
+            bannerItems.assignAll(combined.take(5));
+          }
+        }
       }
     } catch (_) {}
   }

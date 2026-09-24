@@ -320,6 +320,30 @@ class JavDetailPage extends GetView<JavDetailController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 剧情简介 (来自 MissAV 中文翻译)
+          if (detail.synopsis != null && detail.synopsis!.isNotEmpty) ...[
+            _buildSectionHeader('剧情简介'),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: Text(
+                detail.synopsis!,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  height: 1.6,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+
           // 简介与首发日期
           if (detail.releaseDate != null && detail.releaseDate!.isNotEmpty) ...[
             Container(
@@ -518,13 +542,19 @@ class JavDetailPage extends GetView<JavDetailController> {
         children: [
           _buildInfoRow('番号识别码', detail.code),
           const Divider(color: Colors.white12, height: 16),
-          _buildInfoRow('制作片商', detail.maker ?? '未知'),
+          _buildInfoRow('制作片商', detail.maker ?? detail.studio ?? '未知'),
           const Divider(color: Colors.white12, height: 16),
-          _buildInfoRow('发行片商', detail.publisher ?? '未知'),
+          _buildInfoRow('发行片商', detail.publisher ?? detail.label ?? '未知'),
+          if (detail.duration != null && detail.duration!.isNotEmpty) ...[
+            const Divider(color: Colors.white12, height: 16),
+            _buildInfoRow('影片时长', detail.duration!),
+          ],
           if (detail.series != null && detail.series!.isNotEmpty) ...[
             const Divider(color: Colors.white12, height: 16),
             _buildInfoRow('企划系列', detail.series!),
           ],
+          const Divider(color: Colors.white12, height: 16),
+          _buildInfoRow('数据来源', detail.isMissavAvailable ? 'MissAV (全网流媒体)' : 'JavBus 母库'),
         ],
       ),
     );
@@ -635,26 +665,37 @@ class JavDetailPage extends GetView<JavDetailController> {
                 style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 14),
-              ...detail.onlineWatchUrls.entries.map((entry) {
-                String title = entry.key;
-                String subtitle = '在线免下载流媒体播放';
-                IconData icon = Icons.play_circle_fill;
-                Color iconColor = Colors.cyanAccent;
+              ...(() {
+                final sortedEntries = detail.onlineWatchUrls.entries.toList();
+                sortedEntries.sort((a, b) {
+                  final aMiss = a.key.toLowerCase().contains('missav');
+                  final bMiss = b.key.toLowerCase().contains('missav');
+                  if (aMiss != bMiss) return aMiss ? -1 : 1;
+                  final aJable = a.key.toLowerCase().contains('jable');
+                  final bJable = b.key.toLowerCase().contains('jable');
+                  if (aJable != bJable) return aJable ? -1 : 1;
+                  return 0;
+                });
+                return sortedEntries.map((entry) {
+                  String title = entry.key;
+                  String subtitle = '在线免下载流媒体播放';
+                  IconData icon = Icons.play_circle_fill;
+                  Color iconColor = Colors.cyanAccent;
 
-                final keyLower = entry.key.toLowerCase();
-                if (keyLower.contains('jable')) {
-                  title = 'Jable 极速内嵌源 (推荐·广告少)';
-                  subtitle = '内嵌播放体验极佳，中文字幕完整';
-                  iconColor = Colors.greenAccent;
-                } else if (keyLower.contains('missav')) {
-                  title = 'MissAV 全网片源';
-                  subtitle = '全网收录最全，防劫持保护已开启';
-                  iconColor = Colors.pinkAccent;
-                } else if (keyLower.contains('dmm')) {
-                  title = 'DMM 官方高清预告片';
-                  subtitle = '官方 1080P 原画精彩剪辑，无任何广告';
-                  iconColor = Colors.amberAccent;
-                }
+                  final keyLower = entry.key.toLowerCase();
+                  if (keyLower.contains('missav')) {
+                    title = 'MissAV 全网片源 (推荐)';
+                    subtitle = '直连 CDN 高清串流，防劫持保护已开启';
+                    iconColor = Colors.pinkAccent;
+                  } else if (keyLower.contains('jable')) {
+                    title = 'Jable 极速内嵌源 (备用)';
+                    subtitle = '内嵌播放体验极佳，中文字幕完整';
+                    iconColor = Colors.greenAccent;
+                  } else if (keyLower.contains('dmm')) {
+                    title = 'DMM 官方高清预告片';
+                    subtitle = '官方 1080P 原画精彩剪辑，无任何广告';
+                    iconColor = Colors.amberAccent;
+                  }
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
@@ -671,8 +712,9 @@ class JavDetailPage extends GetView<JavDetailController> {
                     },
                   ),
                 );
-              }),
-            ],
+              });
+            })(),
+          ],
           ),
         );
       },

@@ -218,8 +218,8 @@ class JavDiscoverView extends StatelessWidget {
   // 来源切换胶囊栏（有码全库、无码全库、人气排行、精翻中字）
   Widget _buildSourceChipsBar(BuildContext context) {
     final sources = [
-      {'key': 'censored', 'label': 'JavBus 有码', 'color': Colors.cyanAccent, 'icon': Icons.grid_view_rounded},
-      {'key': 'uncensored', 'label': 'JavBus 无码', 'color': Colors.pinkAccent, 'icon': Icons.stars_rounded},
+      {'key': 'censored', 'label': '有码全库', 'color': Colors.cyanAccent, 'icon': Icons.grid_view_rounded},
+      {'key': 'uncensored', 'label': '无码全库', 'color': Colors.pinkAccent, 'icon': Icons.stars_rounded},
       {'key': 'popular', 'label': '人气排行', 'color': Colors.amberAccent, 'icon': Icons.local_fire_department_rounded},
       {'key': 'subtitled', 'label': '精翻中字', 'color': Colors.deepOrangeAccent, 'icon': Icons.subtitles_rounded},
     ];

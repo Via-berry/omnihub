@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:moviepilot_mobile/modules/jav/services/jav_api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -17,6 +18,7 @@ class _JavPlayerPageState extends State<JavPlayerPage> {
   String _title = '在线播放';
   String _initialUrl = '';
   String _allowedHost = '';
+  final Set<String> _dynamicAllowedHosts = {};
   bool _canGoBack = false;
   bool _canGoForward = false;
 
@@ -62,6 +64,8 @@ class _JavPlayerPageState extends State<JavPlayerPage> {
       _allowedHost = uri.host.toLowerCase();
     }
 
+    _loadDynamicSettings();
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
@@ -101,12 +105,14 @@ class _JavPlayerPageState extends State<JavPlayerPage> {
 
             final targetHost = targetUri.host.toLowerCase();
 
-            // 允许当前主站域名与视频流切片 CDN 域名放行
+            // 允许当前主站域名、服务端下发白名单与视频流切片 CDN 域名放行
             final isAllowed = _allowedHost.isEmpty ||
                 targetHost == _allowedHost ||
                 targetHost.endsWith('.$_allowedHost') ||
                 _allowedHost.endsWith(targetHost) ||
+                _dynamicAllowedHosts.any((h) => targetHost == h || targetHost.endsWith('.$h') || targetHost.contains(h)) ||
                 targetHost.contains('missav') ||
+                targetHost.contains('fourhoi') ||
                 targetHost.contains('jable') ||
                 targetHost.contains('dmm.co.jp') ||
                 targetHost.contains('surrit') ||
@@ -130,6 +136,16 @@ class _JavPlayerPageState extends State<JavPlayerPage> {
     if (_initialUrl.isNotEmpty) {
       _controller.loadRequest(Uri.parse(_initialUrl));
     }
+  }
+
+  void _loadDynamicSettings() {
+    JavApiService().fetchSettings().then((settings) {
+      if (settings != null && mounted) {
+        setState(() {
+          _dynamicAllowedHosts.addAll(settings.allowedHosts.map((h) => h.toLowerCase()));
+        });
+      }
+    }).catchError((_) {});
   }
 
   @override

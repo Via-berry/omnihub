@@ -72,3 +72,4 @@ app.*.map.json
 oh_modules/
 node_modules/
 .hvigor
+.tmp/
