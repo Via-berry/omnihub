@@ -1,5 +1,11 @@
 name: Build Release
 
+# 注意：自 2026-09-24 起本流程只构建 iOS（未签名 IPA）。
+# omnihub 的分发模型是「iOS 底包 + Shorebird 热更新」，Android 从未成功
+# 发布过（缺签名 secrets）且不再需要，相关构建 job 已移除。若未来恢复
+# Android 发版，需补配 ANDROID_KEYSTORE_BASE64 / KEYSTORE_PASSWORD /
+# KEY_ALIAS / KEY_PASSWORD 四个 secrets 并恢复 build-android 作业。
+
 on:
   workflow_dispatch:
   schedule:
@@ -16,12 +22,8 @@ jobs:
       build_date: ${{ steps.meta.outputs.build_date }}
       release_name: ${{ steps.meta.outputs.release_name }}
       tag_name: ${{ steps.meta.outputs.tag_name }}
-      apk_name: ${{ steps.meta.outputs.apk_name }}
-      arm64_apk_name: ${{ steps.meta.outputs.arm64_apk_name }}
       ipa_name: ${{ steps.meta.outputs.ipa_name }}
       ipa_sha_name: ${{ steps.meta.outputs.ipa_sha_name }}
-      apk_url: ${{ steps.meta.outputs.apk_url }}
-      arm64_apk_url: ${{ steps.meta.outputs.arm64_apk_url }}
       ipa_url: ${{ steps.meta.outputs.ipa_url }}
     steps:
       - name: Checkout
@@ -40,129 +42,9 @@ jobs:
           echo "build_date=${BUILD_DATE}" >> "$GITHUB_OUTPUT"
           echo "release_name=${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
           echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
-          echo "apk_name=android-${RELEASE_NAME}.apk" >> "$GITHUB_OUTPUT"
-          echo "arm64_apk_name=android-arm64-v8a-${RELEASE_NAME}.apk" >> "$GITHUB_OUTPUT"
           echo "ipa_name=ios-${RELEASE_NAME}.ipa" >> "$GITHUB_OUTPUT"
           echo "ipa_sha_name=ios-${RELEASE_NAME}.ipa.sha256" >> "$GITHUB_OUTPUT"
-          echo "apk_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG_NAME}/android-${RELEASE_NAME}.apk" >> "$GITHUB_OUTPUT"
-          echo "arm64_apk_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG_NAME}/android-arm64-v8a-${RELEASE_NAME}.apk" >> "$GITHUB_OUTPUT"
           echo "ipa_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG_NAME}/ios-${RELEASE_NAME}.ipa" >> "$GITHUB_OUTPUT"
-
-  build-android:
-    runs-on: ubuntu-latest
-    needs: prepare
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.38.2"
-          channel: "stable"
-          cache: true
-
-      - name: Flutter precache
-        run: flutter precache --android
-
-      - name: Refresh altman_downloader_control
-        run: flutter pub upgrade altman_downloader_control
-
-      - name: Get dependencies
-        run: flutter pub get
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
-
-      - name: Validate and setup Android Keystore
-        shell: bash
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          missing=""
-          [ -z "${ANDROID_KEYSTORE_BASE64:-}" ] && missing="${missing} ANDROID_KEYSTORE_BASE64"
-          [ -z "${KEYSTORE_PASSWORD:-}" ] && missing="${missing} KEYSTORE_PASSWORD"
-          [ -z "${KEY_ALIAS:-}" ] && missing="${missing} KEY_ALIAS"
-          [ -z "${KEY_PASSWORD:-}" ] && missing="${missing} KEY_PASSWORD"
-          if [ -n "$missing" ]; then
-            echo "::notice::未配置 Android 签名 secrets:${missing}，本次使用 debug 签名出包（可侧载，不影响 iOS 发布）"
-            exit 0
-          fi
-
-          if ! echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/moviepilot.keystore" 2>/dev/null; then
-            echo "::error::ANDROID_KEYSTORE_BASE64 不是有效的 Base64 编码"
-            exit 1
-          fi
-
-          if ! keytool -list -keystore "$RUNNER_TEMP/moviepilot.keystore" \
-            -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" -keypass "$KEY_PASSWORD" \
-            -v 1>/dev/null 2>&1; then
-            echo "::error::Keystore 校验失败：请检查 KEYSTORE_PASSWORD、KEY_ALIAS、KEY_PASSWORD 是否正确"
-            exit 1
-          fi
-
-          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/moviepilot.keystore" >> "$GITHUB_ENV"
-          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
-
-      - name: Build universal APK
-        run: >-
-          flutter build apk
-          --release
-          --obfuscate
-          --split-debug-info=build/symbols/apk-universal
-          --dart-define=FLUTTER_APP_ENV=release
-          --dart-define=GITHUB_ACTIONS_TOKEN="${{ secrets.ACTIONS_TOKEN || secrets.GITHUB_ACTIONS_TOKEN }}"
-
-      - name: Package universal APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-release.apk "dist/${{ needs.prepare.outputs.apk_name }}"
-          ls -lh "dist/${{ needs.prepare.outputs.apk_name }}"
-
-      - name: Build arm64-v8a APK
-        run: >-
-          flutter build apk
-          --release
-          --target-platform android-arm64
-          --split-per-abi
-          --obfuscate
-          --split-debug-info=build/symbols/apk-arm64
-          --dart-define=FLUTTER_APP_ENV=release
-          --dart-define=GITHUB_ACTIONS_TOKEN="${{ secrets.ACTIONS_TOKEN || secrets.GITHUB_ACTIONS_TOKEN }}"
-
-      - name: Validate and package arm64-v8a APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK_PATH="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
-          ABI_LIST=$(unzip -Z1 "$APK_PATH" | sed -n 's#^lib/\([^/]*\)/.*#\1#p' | sort -u)
-          if [ "$ABI_LIST" != "arm64-v8a" ]; then
-            echo "::error::APK ABI 校验失败，期望仅包含 arm64-v8a，实际为: ${ABI_LIST:-无原生库}"
-            exit 1
-          fi
-
-          cp "$APK_PATH" "dist/${{ needs.prepare.outputs.arm64_apk_name }}"
-          ls -lh "dist/${{ needs.prepare.outputs.arm64_apk_name }}"
-
-      - name: Upload Android artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release
-          path: |
-            dist/${{ needs.prepare.outputs.apk_name }}
-            dist/${{ needs.prepare.outputs.arm64_apk_name }}
-          if-no-files-found: error
 
   build-ios:
     runs-on: macos-latest
@@ -257,7 +139,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - prepare
-      - build-android
       - build-ios
     steps:
       - name: Checkout
@@ -283,16 +164,14 @@ jobs:
 
             - Version: ${{ needs.prepare.outputs.version }}
             - Build Date: ${{ needs.prepare.outputs.build_date }}
-            - Android: Signed universal APK
-            - Android: Signed arm64-v8a APK
             - iOS: Unsigned IPA
 
             iOS 安装说明：
             - IPA 为未签名包
             - 请使用自己的 Apple Developer 账号通过 AltStore、Sideloadly 或 Xcode 进行签名安装
+
+            说明：自 2026-09-24 起仅发布 iOS，不再构建 Android 安装包。
           files: |
-            dist/${{ needs.prepare.outputs.apk_name }}
-            dist/${{ needs.prepare.outputs.arm64_apk_name }}
             dist/${{ needs.prepare.outputs.ipa_name }}
             dist/${{ needs.prepare.outputs.ipa_sha_name }}
           generate_release_notes: true
@@ -311,12 +190,10 @@ jobs:
             <b>版本:</b> ${{ needs.prepare.outputs.version }}
             <b>日期:</b> ${{ needs.prepare.outputs.build_date }}
 
-            <b>附件:</b> 已附带通用 APK、arm64-v8a APK 与 IPA 安装包。
-            <b>说明:</b> IPA 为未签名包，需自行签名安装。
+            <b>附件:</b> 已附带 iOS 未签名 IPA 安装包。
+            <b>说明:</b> IPA 为未签名包，需自行签名安装；自 2026-09-24 起仅发布 iOS。
 
             <a href="https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.tag_name }}">📦 查看 Release</a>
             <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">🔗 Workflow 运行</a>
           file_urls: |
-            ${{ needs.prepare.outputs.apk_url }}
-            ${{ needs.prepare.outputs.arm64_apk_url }}
             ${{ needs.prepare.outputs.ipa_url }}

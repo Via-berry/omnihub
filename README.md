@@ -35,16 +35,19 @@ OmniHub 是一款基于 [MoviePilot](https://github.com/jxxghp/MoviePilot) 生�
 
 | 平台 | 状态 | 说明 |
 |:---|:---:|:---|
-| **iOS** | 主力支持 | 集成 Shorebird 热推送；全能签自签一次底包后永久热更新 |
-| **Android** | 支持 | 支持原生编译与 APK 构建 |
+| **iOS** | 唯一发布目标 | 发布未签名 IPA（需 AltStore / Sideloadly / Xcode 自签安装），安装后通过 Shorebird 热更新 |
+| **Android** | 不再发版 | 自 2026-09-24 起不再构建 APK（仓库未配签名 secrets，且无发布需求），仅保留本地调试能力 |
 | **macOS** | 支持 | 桌面端调试与构建 |
+
+> 分发模型：**iOS 底包 + Shorebird 热更新**。日常改动只打补丁；含原生插件或 Info.plist 的改动
+> 必须重建底包 IPA（`flutter_secure_storage` 这类新插件无法通过补丁下发）。
 
 ---
 
 ## 开发与云端构建
 
 ### 本地环境
-- Flutter 3.38+ / Dart 3.10+
+- Flutter 3.38.2 / Dart 3.10+
 - iOS 调试工具链 / Android SDK
 - 准备可连接的 MoviePilot 服务端（API 文档：[api.movie-pilot.org](https://api.movie-pilot.org)）
 
@@ -59,8 +62,19 @@ flutter test
 ```
 
 ### GitHub Actions 流水线
-- **Shorebird Release (iOS Base 底包构建)**：手动触发构建最新的 iOS Base ipa 并自动发布 Release。
-- **Shorebird Patch (iOS 业务热更新)**：推送到 `main` / `master` 分支自动构建补丁并推送至 Shorebird 分发网络。
+- **Build Release（仅 iOS）**：手动或每周五定时触发，产出未签名 IPA + sha256 并发布 GitHub Release。
+  自 2026-09-24 起已移除 Android 构建；如需恢复，先补配
+  `ANDROID_KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` 四个 secrets，
+  再恢复 `build-android` 作业（Gradle 已在无 secrets 时退化为 debug 签名）。
+- **Shorebird Release（iOS Base 底包构建）**：手动触发，构建最新 iOS 底包并推送到 Shorebird。
+- **Shorebird Patch（iOS 业务热更新）**：推送到 `master` 分支自动打补丁并推送至 Shorebird。
+  仅监听 `master`（`main` 是上游原始代码，打出的补丁与底包不匹配）。
+  提交信息含 `[skip ci]` 会跳过流水线，含原生改动、只发完整包时用。
+- **upstream-sync**：对齐上游 MoviePilotLite 基线。
+
+> ⚠️ `paths-ignore` 含 `**/*.md`，只改 md 的推送不会触发补丁。CHANGELOG.md 必须与代码改动
+> 一起推送才会进设备。热更新前同时更新 `lib/modules/search/models/omnihub_release_log.dart`
+> 与 `CHANGELOG.md`，应用设置页才看得到记录。
 
 ---
 
