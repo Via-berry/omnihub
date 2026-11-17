@@ -25,6 +25,16 @@ import 'package:moviepilot_mobile/modules/subtitle/pages/subtitle_search_result_
 import 'package:moviepilot_mobile/middlewares/route_permission_middleware.dart';
 import 'package:moviepilot_mobile/utils/web_view_screen.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'package:moviepilot_mobile/modules/jav/controllers/jav_controller.dart';
+import 'package:moviepilot_mobile/modules/jav/controllers/jav_detail_controller.dart';
+import 'package:moviepilot_mobile/modules/jav/pages/jav_main_page.dart';
+import 'package:moviepilot_mobile/modules/jav/pages/jav_detail_page.dart';
+import 'package:moviepilot_mobile/modules/jav/pages/jav_player_page.dart';
+import 'package:moviepilot_mobile/modules/jav/pages/jav_hls_player_page.dart';
+import 'package:moviepilot_mobile/modules/jav/pages/jav_category_list_page.dart';
+import 'package:moviepilot_mobile/modules/jav/pages/jav_actress_list_page.dart';
+import 'package:moviepilot_mobile/modules/settings/controllers/workflow_status_controller.dart';
+import 'package:moviepilot_mobile/modules/settings/pages/workflow_status_page.dart';
 
 import 'package:moviepilot_mobile/modules/agent/controllers/agent_controller.dart';
 import 'package:moviepilot_mobile/modules/agent/pages/agent_chat_page.dart';
@@ -1031,5 +1041,43 @@ List<GetPage> buildAppPages() => [
     page: () =>
         TalkerScreen(talker: Get.find<AppLog>().talker, appBarTitle: 'App日志'),
     middlewares: permissionGuards('/app/log'),
+  ),
+  GetPage(
+    name: '/settings/app/workflow-status',
+    page: () => const WorkflowStatusPage(),
+    binding: BindingsBuilder(() {
+      Get.lazyPut(() => WorkflowStatusController());
+    }),
+    middlewares: permissionGuards('/settings/app/workflow-status'),
+  ),
+  GetPage(
+    name: '/jav',
+    page: () => const JavMainPage(),
+    binding: BindingsBuilder(() {
+      Get.lazyPut(() => JavController());
+    }),
+  ),
+  GetPage(
+    name: '/jav/detail',
+    page: () => const JavDetailPage(),
+    binding: BindingsBuilder(() {
+      Get.lazyPut(() => JavDetailController());
+    }),
+  ),
+  GetPage(
+    name: '/jav/player',
+    page: () => const JavPlayerPage(),
+  ),
+  GetPage(
+    name: '/jav/hls-player',
+    page: () => const JavHlsPlayerPage(),
+  ),
+  GetPage(
+    name: '/jav/category',
+    page: () => const JavCategoryListPage(),
+  ),
+  GetPage(
+    name: '/jav/actresses',
+    page: () => const JavActressListPage(),
   ),
 ];

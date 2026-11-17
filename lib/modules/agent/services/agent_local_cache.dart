@@ -62,7 +62,7 @@ class AgentLocalCache {
   }
 
   Future<List<AgentSession>> loadSessions() async {
-    if (!_canUseCache) return const [];
+    if (!_canUseCache || !_sessionBox.isOpen) return const [];
     return _sessionBox.keys
         .where(_matchesCurrentScope)
         .map(_sessionBox.get)
@@ -72,23 +72,26 @@ class AgentLocalCache {
   }
 
   Future<void> saveSessions(List<AgentSession> sessions) async {
-    if (!_canUseCache || sessions.isEmpty) return;
+    if (!_canUseCache || sessions.isEmpty || !_sessionBox.isOpen) return;
     final keepKeys = <String>{};
     for (final session in sessions) {
+      if (!_sessionBox.isOpen) return;
       final key = _scopedKey(session.sessionId);
       keepKeys.add(key);
       await _sessionBox.put(key, AgentSessionCache.fromModel(session));
     }
+    if (!_sessionBox.isOpen) return;
     final staleKeys = _sessionBox.keys
         .where(_matchesCurrentScope)
         .map((key) => key.toString())
         .where((key) => !keepKeys.contains(key))
         .toList(growable: false);
+    if (!_sessionBox.isOpen) return;
     await _sessionBox.deleteAll(staleKeys);
   }
 
   Future<List<AgentChatMessage>> loadMessages(String sessionKey) async {
-    if (!_canUseCache || sessionKey.isEmpty) return const [];
+    if (!_canUseCache || sessionKey.isEmpty || !_messagesBox.isOpen) return const [];
     final entry = _messagesBox.get(_scopedKey(sessionKey));
     if (entry == null || entry.messages.isEmpty) return const [];
     return entry.messages.map((item) => item.toModel()).toList(growable: false);
@@ -98,7 +101,7 @@ class AgentLocalCache {
     String sessionKey,
     List<AgentChatMessage> messages,
   ) async {
-    if (!_canUseCache || sessionKey.isEmpty) return;
+    if (!_canUseCache || sessionKey.isEmpty || !_messagesBox.isOpen) return;
     final key = _scopedKey(sessionKey);
     if (messages.isEmpty) {
       await _messagesBox.delete(key);
@@ -115,14 +118,15 @@ class AgentLocalCache {
   }
 
   Future<void> migrateMessages(String fromKey, String toKey) async {
-    if (!_canUseCache || fromKey.isEmpty || toKey.isEmpty || fromKey == toKey) {
+    if (!_canUseCache || fromKey.isEmpty || toKey.isEmpty || fromKey == toKey || !_messagesBox.isOpen) {
       return;
     }
     final scopedFromKey = _scopedKey(fromKey);
     final scopedToKey = _scopedKey(toKey);
     final entry = _messagesBox.get(scopedFromKey);
-    if (entry == null) return;
+    if (entry == null || !_messagesBox.isOpen) return;
     await _messagesBox.put(scopedToKey, entry);
+    if (!_messagesBox.isOpen) return;
     await _messagesBox.delete(scopedFromKey);
   }
 
@@ -130,14 +134,15 @@ class AgentLocalCache {
     required String serverSessionId,
     required String clientSessionId,
   }) async {
-    if (!_canUseCache) return;
+    if (!_canUseCache || !_metaBox.isOpen) return;
     await _metaBox.put(_scopedKey(lastServerSessionKey), serverSessionId);
+    if (!_metaBox.isOpen) return;
     await _metaBox.put(_scopedKey(lastClientSessionKey), clientSessionId);
   }
 
   Future<({String serverSessionId, String clientSessionId})?>
   loadLastSession() async {
-    if (!_canUseCache) return null;
+    if (!_canUseCache || !_metaBox.isOpen) return null;
     final serverSessionId = _metaBox.get(_scopedKey(lastServerSessionKey));
     if (serverSessionId == null || serverSessionId.isEmpty) return null;
     return (

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 import 'package:flutter/widgets.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:moviepilot_mobile/applog/app_log.dart';
 import 'package:moviepilot_mobile/modules/media_detail/controllers/media_detail_service.dart';
 import 'package:moviepilot_mobile/modules/media_detail/services/danmaku_display_settings_service.dart';
@@ -40,6 +41,7 @@ import 'package:moviepilot_mobile/modules/dynamic_form/widgets/VueStyle/vuequark
 
 /// 启动期依赖注册与插件适配器注册。
 Future<void> bootstrapApp() async {
+  MediaKit.ensureInitialized();
   AppImageCacheManager.configureGlobalDecodedCache();
   try {
     Get.put(AppLog());

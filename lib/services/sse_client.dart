@@ -12,14 +12,18 @@ class SseClient {
   final String baseUrl;
   final Map<String, String>? headers;
 
+  final bool _ownsDio;
+
   CancelToken? _cancelToken;
   StreamController<SseEvent>? _streamController;
 
   SseClient({required this.baseUrl, this.headers, Dio? dio})
-    : _dio = dio ?? Dio();
+      : _dio = dio ?? Dio(),
+        _ownsDio = dio == null;
 
   /// 连接 SSE 端点并返回事件流
   Stream<SseEvent> connect(String endpoint) {
+    disconnect();
     _cancelToken = CancelToken();
     _streamController = StreamController<SseEvent>.broadcast(
       onCancel: () {
@@ -76,7 +80,7 @@ class SseClient {
       return;
     }
 
-    String buffer = '';
+    final buffer = StringBuffer();
 
     responseBody.stream
         .cast<List<int>>()
@@ -89,16 +93,16 @@ class SseClient {
             // SSE 格式: 空行表示一个事件结束
             if (line.isEmpty) {
               if (buffer.isNotEmpty) {
-                final event = _parseEvent(buffer);
+                final event = _parseEvent(buffer.toString());
                 if (event != null) {
                   _streamController?.add(event);
                 }
-                buffer = '';
+                buffer.clear();
               }
               return;
             }
 
-            buffer += '$line\n';
+            buffer.writeln(line);
           },
           onError: (error) {
             _log.error('SSE stream error: $error');
@@ -173,6 +177,14 @@ class SseClient {
       _streamController?.close();
     }
     _streamController = null;
+  }
+
+  /// 彻底关闭客户端并释放底层连接池
+  void close() {
+    disconnect();
+    if (_ownsDio) {
+      _dio.close();
+    }
   }
 
   /// 检查是否已连接

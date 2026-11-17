@@ -30,6 +30,7 @@ dependencies:
   syncfusion_flutter_charts: ^31.1.25
   intl: ^0.20.2
   shared_preferences: ^2.3.2
+  flutter_secure_storage: ^9.2.4
   skeletonizer: ^2.1.2
   url_launcher: ^6.3.2
   path_provider: ^2.1.5
@@ -54,6 +55,10 @@ dependencies:
     path: third_party/native_glass_navbar
   lanplayer_player:
     path: third_party/lanplayer_player
+  shorebird_code_push: ^2.0.7
+  media_kit: ^1.1.11
+  media_kit_video: ^1.2.5
+  media_kit_libs_video: ^1.0.6
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -69,7 +74,9 @@ flutter:
   generate: true
   uses-material-design: true
   assets:
+  - shorebird.yaml
   - CHANGELOG.md
+  - upstream_baseline.json
   - assets/logo.svg
   - assets/app_icons/
   - assets/images/avatars/

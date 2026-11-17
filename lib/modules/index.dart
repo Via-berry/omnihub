@@ -31,21 +31,15 @@ class Index extends StatefulWidget {
 class _IndexState extends State<Index> {
   final _appService = Get.find<AppService>();
   final _widgetNavigationService = Get.find<IosWidgetNavigationService>();
-  // Stable key so the tab body's element (and its page states/contexts) is
-  // reparented rather than torn down when the Scaffold body swaps between the
-  // floating bottom bar and the bare stack (e.g. when hiding the nav bar).
-  final _tabBodyKey = GlobalKey();
   late final List<ScrollController> _tabScrollControllers;
   int _selectedIndex = 0;
   bool _initialIndexApplied = false;
   bool _restoreSuppressed = false;
   ScrollController? _activeScrollController;
-  late final Future<bool> _supportsNativeGlassNavBar;
+  bool _supportsNativeGlassNavBar = false;
+  final Set<int> _loadedTabs = <int>{0};
 
-  /// 已经构建过的 Tab 下标：IndexedStack 会同时 build 与 layout 所有子页，
-  /// 只把访问过的 Tab 真正放进去，其余用占位，避免启动时五个页面一起拉数据。
-  final Set<int> _builtTabs = {};
-
+  final dashboardController = Get.put(DashboardController());
   List<String> get _labels => ['仪表盘', '推荐', '探索', '更多', '搜索'];
   List<IconData> get _icons => [
     Icons.home_outlined,
@@ -73,7 +67,11 @@ class _IndexState extends State<Index> {
   @override
   void initState() {
     super.initState();
-    _supportsNativeGlassNavBar = LiquidGlassHelper.isLiquidGlassSupported();
+    LiquidGlassHelper.isLiquidGlassSupported().then((supported) {
+      if (mounted && supported) {
+        setState(() => _supportsNativeGlassNavBar = true);
+      }
+    });
     _tabScrollControllers = List.generate(
       kIndexMaxTab + 1,
       (_) => ScrollController(),
@@ -82,9 +80,6 @@ class _IndexState extends State<Index> {
     if (!_initialIndexApplied) {
       _restoreSelectedIndex();
     }
-    // 控制器按需创建：首次构建对应 Tab 页（或别处首次 find）时才初始化，
-    // 它们的 onInit/onReady 都会立刻发请求，不能在启动时一起跑。
-    Get.lazyPut(() => DashboardController(), fenix: true);
     Get.lazyPut(() => RecommendController(), fenix: true);
     Get.lazyPut(() => DiscoverController(), fenix: true);
     Get.lazyPut(() => MultifunctionController(), fenix: true);
@@ -119,12 +114,14 @@ class _IndexState extends State<Index> {
     final raw = widget.initialIndex;
     if (raw != null) {
       _selectedIndex = raw.clamp(0, kIndexMaxTab);
+      _loadedTabs.add(_selectedIndex);
       _initialIndexApplied = true;
       return;
     }
     final args = Get.arguments;
     if (args is Map && args['initialIndex'] is int) {
       _selectedIndex = (args['initialIndex'] as int).clamp(0, kIndexMaxTab);
+      _loadedTabs.add(_selectedIndex);
       _initialIndexApplied = true;
     }
   }
@@ -140,6 +137,7 @@ class _IndexState extends State<Index> {
       if (!mounted) return;
       setState(() {
         _selectedIndex = clamped;
+        _loadedTabs.add(clamped);
       });
     } catch (_) {
       // ignore restore failures
@@ -213,6 +211,7 @@ class _IndexState extends State<Index> {
       }
       return;
     }
+    _loadedTabs.add(index);
     setState(() => _selectedIndex = index);
     _persistSelectedIndex(index);
     if (index == 3 && Get.isRegistered<MultifunctionController>()) {
@@ -228,35 +227,54 @@ class _IndexState extends State<Index> {
     }
   }
 
-  Widget _buildTabBody(int coercedIndex) {
-    _activeScrollController = _tabScrollControllers[coercedIndex];
-    _builtTabs.add(coercedIndex);
-    return IndexedStack(
-      key: _tabBodyKey,
-      index: coercedIndex,
-      children: List.generate(
-        kIndexMaxTab + 1,
-        (index) => _builtTabs.contains(index)
-            ? _buildTabPage(index)
-            : const SizedBox.shrink(),
-      ),
-    );
-  }
-
-  Widget _buildTabPage(int index) {
-    final scrollController = _tabScrollControllers[index];
+  Widget _buildTab(int index) {
+    if (!_loadedTabs.contains(index)) {
+      return const SizedBox.shrink();
+    }
     switch (index) {
       case 0:
-        return DashboardPage(scrollController: scrollController);
+        return DashboardPage(
+          key: const PageStorageKey<String>('tab_dashboard'),
+          scrollController: _tabScrollControllers[0],
+        );
       case 1:
-        return RecommendPage(scrollController: scrollController);
+        return RecommendPage(
+          key: const PageStorageKey<String>('tab_recommend'),
+          scrollController: _tabScrollControllers[1],
+        );
       case 2:
-        return DiscoverPage(scrollController: scrollController);
+        return DiscoverPage(
+          key: const PageStorageKey<String>('tab_discover'),
+          scrollController: _tabScrollControllers[2],
+        );
       case 3:
-        return MultifunctionPage(scrollController: scrollController);
+        return MultifunctionPage(
+          key: const PageStorageKey<String>('tab_multifunction'),
+          scrollController: _tabScrollControllers[3],
+        );
+      case 4:
+        return SearchIndexPage(
+          key: const PageStorageKey<String>('tab_search'),
+          scrollController: _tabScrollControllers[4],
+        );
       default:
-        return SearchIndexPage(scrollController: scrollController);
+        return const SizedBox.shrink();
     }
+  }
+
+  Widget _buildTabBody(int coercedIndex) {
+    _loadedTabs.add(coercedIndex);
+    _activeScrollController = _tabScrollControllers[coercedIndex];
+    return IndexedStack(
+      index: coercedIndex,
+      children: [
+        _buildTab(0),
+        _buildTab(1),
+        _buildTab(2),
+        _buildTab(3),
+        _buildTab(4),
+      ],
+    );
   }
 
   Widget _buildFloatingBottomBar(Widget body) {
@@ -318,45 +336,32 @@ class _IndexState extends State<Index> {
         if (!mounted) return;
         setState(() {
           _selectedIndex = coercedIndex;
+          _loadedTabs.add(coercedIndex);
         });
         _persistSelectedIndex(coercedIndex);
       });
     }
 
-    return FutureBuilder<bool>(
-      future: _supportsNativeGlassNavBar,
-      builder: (context, snapshot) {
-        final tabBody = _buildTabBody(coercedIndex);
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: Colors.transparent,
-            extendBody: true,
-            body: tabBody,
-          );
-        }
+    final tabBody = _buildTabBody(coercedIndex);
 
-        final useNativeGlass = snapshot.data == true;
-
-        return Obx(() {
-          final hideNav = _appService.hideBottomNavBar.value;
-          return Scaffold(
-            backgroundColor: Colors.transparent,
-            extendBody: true,
-            body: useNativeGlass || hideNav
-                ? tabBody
-                : _buildFloatingBottomBar(tabBody),
-            bottomNavigationBar: useNativeGlass && !hideNav
-                ? NativeGlassNavBar(
-                    tabs: _nativeTabs,
-                    currentIndex: _selectedIndex,
-                    tintColor: Theme.of(context).primaryColor,
-                    onTap: _onTabTap,
-                  )
-                : null,
-          );
-        });
-      },
-    );
+    return Obx(() {
+      final hideNav = _appService.hideBottomNavBar.value;
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        extendBody: true,
+        body: _supportsNativeGlassNavBar || hideNav
+            ? tabBody
+            : _buildFloatingBottomBar(tabBody),
+        bottomNavigationBar: _supportsNativeGlassNavBar && !hideNav
+            ? NativeGlassNavBar(
+                tabs: _nativeTabs,
+                currentIndex: _selectedIndex,
+                tintColor: Theme.of(context).primaryColor,
+                onTap: _onTabTap,
+              )
+            : null,
+      );
+    });
   }
 }
 

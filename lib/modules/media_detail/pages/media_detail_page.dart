@@ -16,6 +16,9 @@ import 'package:moviepilot_mobile/modules/media_detail/services/danmaku_display_
 import 'package:moviepilot_mobile/modules/media_detail/widgets/media_detail_season_card.dart';
 import 'package:moviepilot_mobile/modules/media_detail/widgets/media_danmaku_overlay.dart';
 import 'package:moviepilot_mobile/modules/search/pages/search_mid_sheet.dart';
+import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_share_sheet.dart';
+import 'package:moviepilot_mobile/modules/pansou/widgets/pansou_share_sheet.dart';
+import 'package:moviepilot_mobile/modules/media_detail/widgets/search_source_select_sheet.dart';
 import 'package:moviepilot_mobile/modules/recommend/models/recommend_api_item.dart';
 import 'package:moviepilot_mobile/modules/subscribe/models/subscribe_models.dart';
 import 'package:moviepilot_mobile/modules/subscribe/widgets/subscribe_tv_season_sheet.dart';
@@ -2807,13 +2810,48 @@ class MediaDetailPage extends GetWidget<MediaDetailController> {
       ToastUtil.info('当前帐号无资源搜索权限');
       return;
     }
+    final detail = controller.mediaDetail.value;
+    final sourceType = await SearchSourceSelectSheet.show(context);
+    if (sourceType == null) return;
+
+    if (sourceType == SearchSourceType.dian115) {
+      if (context.mounted) {
+        final rawType = detail?.type ?? '';
+        final isMovie = rawType.contains('电影') ||
+            rawType.toLowerCase().contains('movie') ||
+            rawType.isEmpty;
+        Dian115ShareSheet.show(
+          context,
+          tmdbId: detail?.tmdb_id,
+          mediaType: isMovie ? 'movie' : 'tv',
+          mediaTitle: detail?.title ?? '',
+        );
+      }
+      return;
+    }
+
+    if (sourceType == SearchSourceType.pansou) {
+      if (context.mounted) {
+        final rawType = detail?.type ?? '';
+        final isMovie = rawType.contains('电影') ||
+            rawType.toLowerCase().contains('movie') ||
+            rawType.isEmpty;
+        PansouShareSheet.show(
+          context,
+          tmdbId: detail?.tmdb_id,
+          mediaType: isMovie ? 'movie' : 'tv',
+          mediaTitle: detail?.title ?? '',
+        );
+      }
+      return;
+    }
+
     // path 为 tmdb:xxx 等媒体标识时,改用标题作为搜索关键字
     final searchKey = _isMediaIdPath(controller.args.path)
         ? (controller.mediaDetail.value?.title ??
               controller.mediaDetail.value?.en_title ??
               '')
         : controller.args.path;
-    final detail = controller.mediaDetail.value;
     final result = await Get.bottomSheet<({String area, List<int> sites})>(
       SiteSelectSheet(
         hasSegment: true,

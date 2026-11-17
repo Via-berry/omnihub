@@ -1,0 +1,15 @@
+{
+  "upstream_repo": "singleton-altman/MoviePilotLite",
+  "baseline_tag": "release-v1.3.3-2026-11-13",
+  "baseline_commit": "dc1fe93",
+  "last_synced_at": "2026-11-17T17:50:00+08:00",
+  "features": [
+    "内置 lanplayer 播放器、媒体库直连播放与 ISO 原盘播放",
+    "飞牛私有云 (trimemedia) 深度适配与字幕原生轨直切",
+    "豆瓣评论与弹幕系统（媒体详情页浮动弹幕与长评列表）",
+    "MoviePilot v3 架构深度对齐（信封解封、MFA 认证、多服务器隔离）",
+    "Android 订阅日历多尺寸桌面小组件与自适应刷新",
+    "新增 PVE 守护神/爱快路由/豆瓣档案/随机图床等动态表单插件",
+    "详情页扁平轻量排版改版与下载弹层体验重构"
+  ]
+}

@@ -305,9 +305,8 @@ class AuthRepository extends GetxService {
       _api.setToken(profile.accessToken);
       final currentUser = await getUserInfoByRole(role: userLookupKey);
       if (currentUser == null) {
-        _talker.warning('自动登录失败: 当前用户信息为空');
-        _appService.clearLoginState();
-        return false;
+        _talker.warning('自动登录获取最新用户信息失败，保持已恢复的本地会话');
+        return true;
       }
       _syncSystemMessagePolling();
       await _iosSharedSessionService.syncSession(

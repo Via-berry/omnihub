@@ -1,0 +1,379 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import 'package:moviepilot_mobile/modules/dian115/models/dian115_models.dart';
+import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart';
+import 'package:moviepilot_mobile/modules/dian115/services/pan115_service.dart';
+import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_transfer_confirm_sheet.dart';
+import 'package:moviepilot_mobile/modules/dian115/widgets/dian115_verify_sheet.dart';
+import 'package:moviepilot_mobile/utils/toast_util.dart';
+
+class Dian115ShareController extends GetxController {
+  final int? tmdbId;
+  final String mediaType;
+  final int? initialSeason;
+  final String mediaTitle;
+
+  Dian115ShareController({
+    this.tmdbId,
+    this.mediaType = 'movie',
+    this.initialSeason,
+    this.mediaTitle = '',
+  });
+
+  final Dian115Service service = Dian115Service.to;
+
+  final RxBool isLoading = true.obs;
+  final RxString errorMsg = ''.obs;
+  final Rx<Dian115SharesResponse?> sharesResponse = Rx<Dian115SharesResponse?>(null);
+  final RxList<Dian115ShareItem> allShares = <Dian115ShareItem>[].obs;
+
+  final RxInt userPoints = 0.obs;
+  final RxBool isOnline = false.obs;
+  final RxBool isAuthenticated = false.obs;
+  final RxBool isTodaySigned = false.obs;
+  final RxBool isSigningIn = false.obs;
+  final RxBool isUnlocking = false.obs;
+
+  // 筛选器状态
+  final RxString filterResolution = 'all'.obs; // 'all', '4K', '1080P'
+  final RxString filterKind = 'all'.obs; // 'all', '115', 'offline'
+  final RxBool filterOnlyChineseSub = false.obs;
+  final RxInt filterSeason = (-1).obs; // -1 表示全部，>=0 表示指定季
+  final RxString sortBy = 'size_desc'.obs; // 'size_desc', 'use_desc', 'date_desc'
+
+  @override
+  void onInit() {
+    super.onInit();
+    if (initialSeason != null && initialSeason! >= 0) {
+      filterSeason.value = initialSeason!;
+    }
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    _refreshStatus();
+    await fetchShares();
+  }
+
+  Future<void> _refreshStatus() async {
+    try {
+      final status = await service.getStatus();
+      isOnline.value = status.service == 'online';
+      isAuthenticated.value = status.isAuthenticated;
+      userPoints.value = status.points;
+      isTodaySigned.value = status.isTodaySigned;
+    } catch (_) {
+      isOnline.value = false;
+      isAuthenticated.value = false;
+    }
+  }
+
+  /// 授权成功后自动重载全量状态与片源列表
+  Future<void> onReauthenticated() async {
+    await _refreshStatus();
+    await fetchShares();
+  }
+
+  Future<void> fetchShares() async {
+    isLoading.value = true;
+    errorMsg.value = '';
+    try {
+      int? effectiveTmdbId = tmdbId;
+
+      // 1. 如果没有 tmdb_id，先尝试用标题全局检索匹配 tmdb_id
+      if ((effectiveTmdbId == null || effectiveTmdbId <= 0) && mediaTitle.trim().isNotEmpty) {
+        try {
+          final searchResult = await service.searchMedia(mediaTitle.trim());
+          if (searchResult.results.isNotEmpty) {
+            effectiveTmdbId = searchResult.results.first.tmdbId;
+          }
+        } catch (_) {}
+      }
+
+      if (effectiveTmdbId == null || effectiveTmdbId <= 0) {
+        errorMsg.value = '未找到该影视对应的 TMDB 资源标识';
+        isLoading.value = false;
+        return;
+      }
+
+      final resp = await service.getShares(
+        tmdbId: effectiveTmdbId,
+        mediaType: mediaType,
+        season: filterSeason.value >= 0 ? filterSeason.value : null,
+      );
+
+      sharesResponse.value = resp;
+      allShares.assignAll(resp.shares);
+    } catch (e) {
+      if (e is DioException) {
+        if (e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.connectionTimeout) {
+          errorMsg.value = '连接网关超时，上游癫影服务响应缓慢，请稍后重试';
+        } else if (e.type == DioExceptionType.connectionError) {
+          errorMsg.value = '无法连接到癫影中转网关，请检查 NAS 容器与内网连接';
+        } else {
+          errorMsg.value = '获取网盘资源失败 (${e.response?.statusCode ?? e.message})';
+        }
+      } else {
+        errorMsg.value = '获取网盘资源失败：$e';
+      }
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  List<Dian115ShareItem> get filteredShares {
+    var list = allShares.toList();
+
+    // 1. 分辨率筛选
+    if (filterResolution.value != 'all') {
+      final target = filterResolution.value.toUpperCase();
+      list = list.where((item) {
+        final res = item.resolution.toUpperCase();
+        if (target == '4K') {
+          return res.contains('4K') || res.contains('2160');
+        } else if (target == '1080P') {
+          return res.contains('1080');
+        }
+        return res.contains(target);
+      }).toList();
+    }
+
+    // 2. 渠道类型筛选
+    if (filterKind.value != 'all') {
+      if (filterKind.value == '115') {
+        list = list.where((item) => item.is115).toList();
+      } else if (filterKind.value == 'offline') {
+        list = list.where((item) => item.isMagnet).toList();
+      }
+    }
+
+    // 3. 中文字幕筛选
+    if (filterOnlyChineseSub.value) {
+      list = list.where((item) => item.hasChineseSubtitle).toList();
+    }
+
+    // 4. 季度筛选 (当在客户端二次过滤时)
+    if (filterSeason.value >= 0) {
+      list = list.where((item) {
+        if (item.season == filterSeason.value) return true;
+        if (item.seasons.isNotEmpty) {
+          final parts = item.seasons.split(RegExp(r'[, -]'));
+          return parts.contains(filterSeason.value.toString());
+        }
+        return false;
+      }).toList();
+    }
+
+    // 5. 排序
+    if (sortBy.value == 'size_desc') {
+      list.sort((a, b) => b.totalSizeBytes.compareTo(a.totalSizeBytes));
+    } else if (sortBy.value == 'use_desc') {
+      list.sort((a, b) => b.useCount.compareTo(a.useCount));
+    } else if (sortBy.value == 'date_desc') {
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+
+    return list;
+  }
+
+  Future<Dian115UnlockResult?> unlock(
+    Dian115ShareItem item, {
+    BuildContext? context,
+  }) async {
+    // 1. 若本地已缓存或服务端已标明该资源的有效解锁凭据，直接返回
+    if (service.isUnlocked(item.id)) {
+      final cached = service.getUnlockedInfo(item.id);
+      if (cached != null && cached.isSuccess) {
+        return cached;
+      }
+    }
+    if (item.isUnlocked && (item.shareUrl.isNotEmpty || item.magnetUrl.isNotEmpty || item.urls.isNotEmpty)) {
+      final cached = Dian115UnlockResult(
+        code: 'ok',
+        shareUrl: item.shareUrl,
+        receiveCode: item.receiveCode,
+        magnetUrl: item.magnetUrl,
+        urls: item.urls,
+        pointsCost: item.unlockCost,
+      );
+      await service.saveUnlockedInfo(item.id, cached);
+      return cached;
+    }
+
+    isUnlocking.value = true;
+    try {
+      HapticFeedback.mediumImpact();
+      final targetSeason =
+          filterSeason.value >= 0 ? filterSeason.value : (initialSeason ?? 0);
+      // 2. 先尝试服务端直接静默解锁（若已解锁或可免检，服务端直接返回链接）
+      final result = await service.unlockShare(
+        item.id,
+        tmdbId: tmdbId,
+        mediaType: mediaType,
+        season: targetSeason,
+      );
+      if (result.isSuccess) {
+        await _refreshStatus();
+        ToastUtil.success('解锁成功！已获得转存链接');
+        return result;
+      }
+
+      // 3. 仅在服务端明确要求人机验证时，拉起应用内原生验证弹窗无缝过检
+      if (result.isTurnstileRequired && context != null && context.mounted) {
+        ToastUtil.info('此资源需进行安全验证，请在弹窗中轻触验证');
+        final verifiedResult = await Dian115VerifySheet.show(
+          context,
+          item: item,
+          tmdbId: tmdbId,
+          mediaType: mediaType,
+          season: filterSeason.value >= 0 ? filterSeason.value : (initialSeason ?? 0),
+        );
+        if (verifiedResult != null && verifiedResult.isSuccess) {
+          await service.saveUnlockedInfo(item.id, verifiedResult);
+          await _refreshStatus();
+          return verifiedResult;
+        }
+        ToastUtil.error('人机安全验证未完成');
+        return null;
+      }
+
+      ToastUtil.error('解锁失败：${result.code}');
+      return null;
+    } catch (e) {
+      ToastUtil.error('解锁请求异常：$e');
+      return null;
+    } finally {
+      isUnlocking.value = false;
+    }
+  }
+
+  /// 呼起转存确认与目录选择弹窗
+  Future<({String cid, String folderName})?> showTransferConfirmSheet({
+    required BuildContext context,
+    required Dian115ShareItem item,
+    required bool isUnlock,
+  }) async {
+    return Dian115TransferConfirmSheet.show(
+      context,
+      item: item,
+      mediaType: mediaType,
+      mediaTitle: mediaTitle,
+      userPoints: userPoints.value,
+      isUnlock: isUnlock,
+    );
+  }
+
+  /// 确认解锁并一键自动转存至 115 对应目录
+  Future<void> unlockAndTransfer(BuildContext context, Dian115ShareItem item) async {
+    // 1. 积分余额检查
+    if (item.unlockCost > 0 && userPoints.value < item.unlockCost) {
+      ToastUtil.error('积分不足！当前余额 ${userPoints.value} 分，需 ${item.unlockCost} 分，请先签到获取积分');
+      return;
+    }
+
+    // 2. 呼起支持自由切换目标目录（默认智能识别）的确认弹窗
+    final selection = await showTransferConfirmSheet(
+      context: context,
+      item: item,
+      isUnlock: true,
+    );
+    if (selection == null) return;
+    if (!context.mounted) return;
+
+    // 3. 执行解锁（含安全验证重试机制）
+    final unlockResult = await unlock(item, context: context);
+    if (unlockResult == null || !unlockResult.isSuccess) {
+      return;
+    }
+
+    // 4. 解锁成功后立即转存至用户指定或预选的 115 目录
+    final effectiveOfflineUrls = unlockResult.urls.isNotEmpty
+        ? unlockResult.urls
+        : (item.urls.isNotEmpty ? item.urls : null);
+
+    await transferToPan115(
+      shareUrl: unlockResult.shareUrl,
+      receiveCode: unlockResult.receiveCode,
+      magnetUrl: unlockResult.magnetUrl,
+      magnetUrls: effectiveOfflineUrls,
+      customCid: selection.cid,
+      customFolderName: selection.folderName,
+      item: item,
+    );
+  }
+
+  Future<bool> transferToPan115({
+    String? shareUrl,
+    String? receiveCode,
+    String? magnetUrl,
+    List<String>? magnetUrls,
+    String? customCid,
+    String? customFolderName,
+    Dian115ShareItem? item,
+  }) async {
+    try {
+      HapticFeedback.mediumImpact();
+      final totalUrls = magnetUrls?.length ?? item?.urls.length ?? (magnetUrl != null && magnetUrl.isNotEmpty ? 1 : 0);
+      if (totalUrls > 1) {
+        ToastUtil.info('正在请求 115 批量转存 ($totalUrls 个链接)...');
+      } else {
+        ToastUtil.info('正在请求 115 转存...');
+      }
+      final res = await Pan115Service.to.transfer(
+        mediaType: mediaType,
+        shareUrl: shareUrl,
+        receiveCode: receiveCode,
+        magnetUrl: magnetUrl,
+        magnetUrls: magnetUrls,
+        customCid: customCid,
+        customFolderName: customFolderName,
+        item: item,
+      );
+      final isSuccess = res['success'] == true;
+      final msg = res['msg']?.toString() ?? (isSuccess ? '转存成功' : '转存失败');
+      if (isSuccess) {
+        ToastUtil.success(msg);
+      } else {
+        ToastUtil.error(msg);
+      }
+      return isSuccess;
+    } catch (e) {
+      ToastUtil.error('转存发生异常: $e');
+      return false;
+    }
+  }
+
+  Future<void> signin() async {
+    if (isTodaySigned.value) {
+      ToastUtil.info('今日已完成签到');
+      return;
+    }
+    if (isSigningIn.value) return;
+    isSigningIn.value = true;
+    try {
+      HapticFeedback.selectionClick();
+      final res = await service.signin();
+      await _refreshStatus();
+      if (res['code'] == 'already_signed') {
+        ToastUtil.info('今日已完成签到');
+      } else {
+        final added = res['points_added'] as int? ?? 5;
+        ToastUtil.success('签到成功！积分 +$added，当前余额 ${userPoints.value}');
+      }
+    } catch (e) {
+      await _refreshStatus();
+      if (isTodaySigned.value) {
+        ToastUtil.info('今日已完成签到');
+      } else {
+        ToastUtil.error('签到失败，请稍后重试：$e');
+      }
+    } finally {
+      isSigningIn.value = false;
+    }
+  }
+}

@@ -1,0 +1,1027 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:moviepilot_mobile/modules/dian115/services/dian115_service.dart';
+import 'package:moviepilot_mobile/utils/toast_util.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
+
+/// 癫影账号移动端安全授权与网关会话续期弹窗
+/// 依托手机真实移动端环境完成人机验证与登录，自动将提取到的最新会话回传至 NAS 网关
+class Dian115LoginSheet extends StatefulWidget {
+  const Dian115LoginSheet({super.key});
+
+  static Future<bool?> show(BuildContext context) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: false,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const Dian115LoginSheet(),
+    );
+  }
+
+  @override
+  State<Dian115LoginSheet> createState() => _Dian115LoginSheetState();
+}
+
+class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
+  late final WebViewController _webController;
+  bool _isLoading = true;
+  bool _isSyncing = false;
+  String _statusText = '正在加载安全验证环境...';
+  String? _syncErrorMessage;
+  bool _hasAutoSyncTriggered = false;
+  Timer? _authPoller;
+  Timer? _loadingTimeoutTimer;
+
+  List<Map<String, dynamic>>? _cachedCookies;
+  Map<String, dynamic>? _cachedUserData;
+  String? _cachedCookieStr;
+
+  @override
+  void initState() {
+    super.initState();
+    _initWebViewController();
+  }
+
+  @override
+  void dispose() {
+    _loadingTimeoutTimer?.cancel();
+    _loadingTimeoutTimer = null;
+    _authPoller?.cancel();
+    _authPoller = null;
+    try {
+      _webController.loadRequest(Uri.parse('about:blank'));
+    } catch (_) {}
+    super.dispose();
+  }
+
+  Future<void> _initWebViewController() async {
+    late final PlatformWebViewControllerCreationParams params;
+    if (WebViewPlatform.instance is WebKitWebViewPlatform) {
+      params = WebKitWebViewControllerCreationParams(
+        allowsInlineMediaPlayback: true,
+        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+      );
+    } else {
+      params = const PlatformWebViewControllerCreationParams();
+    }
+
+    final controller = WebViewController.fromPlatformCreationParams(params);
+
+    controller
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0xFF11151F))
+      ..setUserAgent(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1',
+      )
+      ..addJavaScriptChannel(
+        'DianLoginBridge',
+        onMessageReceived: (JavaScriptMessage message) {
+          _handleLoginMessage(message.message);
+        },
+      )
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (url) {
+            if (mounted) {
+              setState(() {
+                _isLoading = true;
+                _statusText = '正在连接登录页面...';
+              });
+            }
+            _loadingTimeoutTimer?.cancel();
+            _loadingTimeoutTimer = Timer(const Duration(seconds: 8), () {
+              if (mounted && _isLoading) {
+                setState(() {
+                  _isLoading = false;
+                  _statusText = '请轻触完成人机验证，再点击下方一键提交登录';
+                });
+              }
+            });
+          },
+          onPageFinished: (url) async {
+            _loadingTimeoutTimer?.cancel();
+            final uri = Uri.tryParse(url);
+            final isLogin = uri != null &&
+                (uri.path == '/login' || uri.path.endsWith('/login'));
+
+            if (!isLogin) {
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                  _statusText = '检测到已进入主页，准备同步至网关...';
+                });
+              }
+              if (!_hasAutoSyncTriggered) {
+                _hasAutoSyncTriggered = true;
+                _authPoller?.cancel();
+                _authPoller = null;
+                await _triggerSync(isManual: false);
+              }
+              return;
+            }
+
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _statusText = '请轻触完成人机验证，再点击下方一键提交登录';
+              });
+            }
+            await _injectLoginHelper(controller);
+            if (!_hasAutoSyncTriggered) {
+              _startAuthPoller(controller);
+            }
+          },
+          onWebResourceError: (error) {
+            debugPrint('Dian115 Login WebView error: ${error.description}');
+            _loadingTimeoutTimer?.cancel();
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _statusText = '网页连接缓慢或异常 (${error.description})，请检查代理';
+              });
+            }
+          },
+        ),
+      );
+
+    _webController = controller;
+    await controller.loadRequest(Uri.parse('https://m.dian115.com/login'));
+  }
+
+  /// 注入自动填充脚本、排版优化及登录状态监听器
+  Future<void> _injectLoginHelper(WebViewController controller) async {
+    const helperJs = """
+      (() => {
+        // 1. 如果在登录页，先清理旧的本地会话数据，防止误触导致提前报错
+        if (window.location.pathname.includes('/login')) {
+          try {
+            localStorage.removeItem('portal_user');
+            sessionStorage.removeItem('portal_user');
+          } catch(e) {}
+        }
+
+        // 2. 注入 CSS 确保网页容器可滚动，同时大幅缩小顶部海报留白，让登录框上移
+        const style = document.createElement('style');
+        style.innerHTML = `
+          html, body, #portal-app, #app {
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            height: auto !important;
+            min-height: 100% !important;
+          }
+          /* 紧凑化顶部的巨大海报与多余留白 */
+          img[src*="splash"], img[src*="backdrop"], div:has(> img[alt]) {
+            max-height: 80px !important;
+            object-fit: cover !important;
+          }
+          .relative.w-full.h-64, .relative.w-full.h-72, .relative.w-full.h-80 {
+            height: 80px !important;
+          }
+          form, .space-y-4 {
+            margin-bottom: 24px !important;
+          }
+        `;
+        document.head.appendChild(style);
+
+        // 3. 自动轻微下滚，居中展示人机验证与登录按钮
+        //    （账号密码由用户手动填写，不在客户端注入任何凭据）
+        function scrollToLogin() {
+          const btn = document.querySelector('button[type="submit"]') ||
+                      Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('登录') || b.textContent.includes('登 录'));
+          if (btn) {
+            btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+        setTimeout(scrollToLogin, 700);
+
+        // 4. 监听 Turnstile 验证完成
+        let turnstileHandled = false;
+        const turnstileWatcher = setInterval(() => {
+          const respInput = document.querySelector('[name="cf-turnstile-response"]');
+          if (respInput && respInput.value && respInput.value.length > 20 && !turnstileHandled) {
+            turnstileHandled = true;
+            clearInterval(turnstileWatcher);
+            scrollToLogin();
+            // 验证通过后 600ms 尝试自动触发网页的登录按钮
+            setTimeout(() => {
+              const btn = document.querySelector('button[type="submit"]') ||
+                          Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('登录') || b.textContent.includes('登 录'));
+              if (btn) {
+                btn.click();
+              }
+            }, 600);
+          }
+        }, 400);
+
+        // 5. 登录状态检测并通知 App
+        function checkAndNotify() {
+          try {
+            const userStr = localStorage.getItem('portal_user');
+            if (userStr && userStr !== 'null' && userStr !== '""') {
+              DianLoginBridge.postMessage(JSON.stringify({
+                event: 'login_success',
+                user: JSON.parse(userStr),
+                cookie: document.cookie || ''
+              }));
+              return true;
+            }
+          } catch(e) {}
+          return false;
+        }
+
+        window.addEventListener('storage', (e) => {
+          if (e.key === 'portal_user') checkAndNotify();
+        });
+      })();
+    """;
+    try {
+      await controller.runJavaScript(helperJs);
+    } catch (_) {}
+  }
+
+  /// 轮询检测是否已登录成功
+  void _startAuthPoller(WebViewController controller) {
+    _authPoller?.cancel();
+    if (_hasAutoSyncTriggered) return;
+    _authPoller = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      if (_isSyncing || _hasAutoSyncTriggered || !mounted) return;
+      try {
+        final res = await controller.runJavaScriptReturningResult(
+          "localStorage.getItem('portal_user') || ''",
+        );
+        final raw = res.toString();
+        if (raw.isNotEmpty && raw != 'null' && raw != '""') {
+          _authPoller?.cancel();
+          _authPoller = null;
+          _hasAutoSyncTriggered = true;
+          _triggerSync(isManual: false);
+        }
+      } catch (_) {}
+    });
+  }
+
+  void _handleLoginMessage(String message) {
+    try {
+      final data = jsonDecode(message) as Map<String, dynamic>;
+      if (data['event'] == 'login_success') {
+        _authPoller?.cancel();
+        _authPoller = null;
+        if (!_hasAutoSyncTriggered) {
+          _hasAutoSyncTriggered = true;
+          _triggerSync(
+            userData: data['user'] as Map<String, dynamic>?,
+            isManual: false,
+          );
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// 触发表单登录提交
+  Future<void> _submitWebLogin() async {
+    if (_isSyncing) return;
+    setState(() {
+      _statusText = '正在提交登录并同步网关...';
+    });
+    try {
+      await _webController.runJavaScript("""
+        (() => {
+          const btn = document.querySelector('button[type="submit"]') ||
+                      Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('登录') || b.textContent.includes('登 录'));
+          if (btn) {
+            btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            btn.click();
+            return;
+          }
+          const form = document.querySelector('form');
+          if (form) {
+            form.requestSubmit ? form.requestSubmit() : form.submit();
+          }
+        })();
+      """);
+
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted && !_isSyncing) {
+          _triggerSync(isManual: true);
+        }
+      });
+    } catch (_) {}
+  }
+
+  /// 提取 Cookie 与用户数据并同步至 NAS 网关
+  Future<void> _triggerSync({
+    Map<String, dynamic>? userData,
+    bool isManual = false,
+  }) async {
+    if (_isSyncing) return;
+    _authPoller?.cancel();
+    _authPoller = null;
+
+    setState(() {
+      _isSyncing = true;
+      _syncErrorMessage = null;
+      _statusText = '已获取登录会话，正在向 NAS 网关同步...';
+    });
+
+    try {
+      // 1. 缓存传入的用户数据
+      if (userData != null) {
+        _cachedUserData = userData;
+      }
+      if (_cachedUserData == null) {
+        try {
+          final res = await _webController.runJavaScriptReturningResult(
+            "localStorage.getItem('portal_user') || ''",
+          );
+          String raw = res.toString();
+          if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
+            raw = jsonDecode(raw);
+          }
+          if (raw.isNotEmpty && raw != 'null' && raw != '""') {
+            try {
+              _cachedUserData = jsonDecode(raw) as Map<String, dynamic>?;
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      // 2. 多次重试提取全量有效 Cookie（利用 WebKit/Android 底层 CookieManager 穿透 HttpOnly 沙箱）
+      Map<String, Map<String, dynamic>> cookieMap = {};
+      for (int attempt = 0; attempt < 4; attempt++) {
+        if (attempt > 0) {
+          await Future.delayed(const Duration(milliseconds: 400));
+        }
+        cookieMap = await _extractCookies();
+        if (cookieMap.isNotEmpty) {
+          // 只要捕获到核心鉴权 cookie（包含 portal、session、browser、token 等），即可立即继续
+          final hasAuthCookie = cookieMap.keys.any((k) {
+            final lower = k.toLowerCase();
+            return lower.contains('portal') ||
+                lower.contains('session') ||
+                lower.contains('browser') ||
+                lower.contains('token') ||
+                lower.contains('auth');
+          });
+          if (hasAuthCookie) {
+            break;
+          }
+        }
+      }
+
+      if (cookieMap.isNotEmpty) {
+        _cachedCookies = cookieMap.values.toList();
+        _cachedCookieStr = _cachedCookies!
+            .map((c) => '${c['name']}=${c['value']}')
+            .join('; ');
+      }
+
+      // 如果未提取到任何有效 Cookie，前置拦截并提示，避免提交空 Cookie 引发网关 400 错误
+      if (_cachedCookies == null || _cachedCookies!.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _isSyncing = false;
+            _hasAutoSyncTriggered = false;
+            _statusText = '未捕获到登录 Cookie，请先在下方完成人机验证与登录';
+            _syncErrorMessage = '未检测到有效登录 Cookie。请在网页中轻触人机验证（绿勾）并点击登录，待页面登录成功后再重试。';
+          });
+          if (isManual) {
+            ToastUtil.error('未检测到登录状态，请先在网页中完成登录');
+          }
+        }
+        return;
+      }
+
+      final success = await Dian115Service.to.importSession(
+        cookies: _cachedCookies ?? [],
+        userData: _cachedUserData,
+        cookieString: _cachedCookieStr,
+      );
+
+      if (success) {
+        if (mounted) {
+          setState(() {
+            _isSyncing = false;
+            _statusText = '网关会话同步成功！';
+          });
+          ToastUtil.success('癫影会话授权成功！网关已恢复在线');
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        if (mounted) {
+          final errDetail = Dian115Service.to.lastSyncError.value;
+          final errorMsg = errDetail.isNotEmpty
+              ? errDetail
+              : '同步未完成：无法连接到网关 ${Dian115Service.to.host.value}';
+          setState(() {
+            _isSyncing = false;
+            _hasAutoSyncTriggered = false;
+            _syncErrorMessage = errorMsg;
+            _statusText = '网关连接失败，请查看下方提示';
+          });
+          ToastUtil.error(errorMsg);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _hasAutoSyncTriggered = false;
+          _syncErrorMessage = '同步发生异常: $e';
+          _statusText = '同步异常: $e';
+        });
+        ToastUtil.error('同步异常: $e');
+      }
+    }
+  }
+
+  /// 提取全量 Cookie（优先利用原生平台底层 CookieManager 穿透 HttpOnly 安全沙箱）
+  Future<Map<String, Map<String, dynamic>>> _extractCookies() async {
+    final cookieMap = <String, Map<String, dynamic>>{};
+
+    // 1. 原生平台底层 CookieManager (iOS WKHTTPCookieStore / Android CookieManager)
+    try {
+      final cookieManager = WebViewCookieManager();
+      final urlsToTry = [
+        Uri.parse('https://m.dian115.com'),
+        Uri.parse('https://dian115.com'),
+      ];
+      for (final u in urlsToTry) {
+        try {
+          final nativeCookies = await cookieManager.platform.getCookies(u);
+          for (final c in nativeCookies) {
+            final name = c.name.trim();
+            final value = c.value.trim();
+            if (name.isNotEmpty && value.isNotEmpty) {
+              cookieMap[name] = {
+                'name': name,
+                'value': value,
+                'domain': c.domain.isNotEmpty ? c.domain : 'm.dian115.com',
+                'path': c.path.isNotEmpty ? c.path : '/',
+              };
+            }
+          }
+        } catch (e) {
+          debugPrint('Platform getCookies for $u error: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('WebViewCookieManager instance error: $e');
+    }
+
+    // 2. JavaScript document.cookie 补充合并
+    try {
+      final cookieResult = await _webController.runJavaScriptReturningResult(
+        "document.cookie || ''",
+      );
+      String cookieStr = cookieResult.toString();
+      if (cookieStr.startsWith('"') &&
+          cookieStr.endsWith('"') &&
+          cookieStr.length >= 2) {
+        cookieStr = jsonDecode(cookieStr);
+      }
+
+      if (cookieStr.isNotEmpty) {
+        final parts = cookieStr.split(';');
+        for (final p in parts) {
+          final trimmed = p.trim();
+          if (trimmed.isEmpty) continue;
+          final kv = trimmed.split('=');
+          if (kv.length >= 2) {
+            final name = kv[0].trim();
+            final val = kv.sublist(1).join('=').trim();
+            if (name.isNotEmpty && val.isNotEmpty && !cookieMap.containsKey(name)) {
+              cookieMap[name] = {
+                'name': name,
+                'value': val,
+                'domain': 'm.dian115.com',
+                'path': '/',
+              };
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    return cookieMap;
+  }
+
+  void _showHostSettingsDialog(BuildContext context) {
+    final hostController =
+        TextEditingController(text: Dian115Service.to.host.value);
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) {
+        return CupertinoAlertDialog(
+          title: const Text('癫影中转网关地址'),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '配置 omnihubapi 网关服务地址。处于移动蜂窝网络 (5G/4G) 时，局域网 IP (192.168.x.x) 无法直连，请连接家庭 WiFi、开启回家代理，或填写公网解析地址。',
+                  style: TextStyle(fontSize: 12, color: Colors.black87),
+                ),
+                const SizedBox(height: 10),
+                CupertinoTextField(
+                  controller: hostController,
+                  placeholder: '如 http://192.168.50.81:8924',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('取消'),
+            ),
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              onPressed: () async {
+                final newHost = hostController.text.trim();
+                if (newHost.isNotEmpty) {
+                  await Dian115Service.to.updateHost(newHost);
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                  }
+                  if (mounted) {
+                    if (Dian115Service.to.isInsecurePublicHost) {
+                      ToastUtil.warning('网关为公网明文 HTTP 地址，账号会话将明文传输，建议改用 HTTPS 或回家代理');
+                    } else {
+                      ToastUtil.success('网关地址已更新');
+                    }
+                    _triggerSync(isManual: true);
+                  }
+                }
+              },
+              child: const Text('保存并重试'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final sheetHeight =
+        (mediaQuery.size.height - mediaQuery.padding.top - 12).clamp(520.0, 950.0);
+
+    return Container(
+      height: sheetHeight,
+      decoration: const BoxDecoration(
+        color: Color(0xFF11151F),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF161C26),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border(
+                bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+            ),
+            child: Column(
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        CupertinoIcons.lock_shield_fill,
+                        color: Color(0xFFFBBF24),
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '癫影网关账号授权续期',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _statusText,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: 10,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minSize: 26,
+                      onPressed: () {
+                        setState(() {
+                          _isLoading = true;
+                          _statusText = '正在刷新网页...';
+                        });
+                        _webController.reload();
+                      },
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          CupertinoIcons.arrow_clockwise,
+                          color: Colors.white70,
+                          size: 13,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minSize: 26,
+                      onPressed: () => _showHostSettingsDialog(context),
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          CupertinoIcons.gear_alt,
+                          color: Colors.white70,
+                          size: 13,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    if (_isSyncing)
+                      const CupertinoActivityIndicator(radius: 8)
+                    else
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minSize: 26,
+                        onPressed: () => _triggerSync(isManual: true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            '手动同步',
+                            style: TextStyle(
+                                color: Color(0xFFFBBF24), fontSize: 11),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minSize: 26,
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          CupertinoIcons.clear,
+                          size: 12,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (_syncErrorMessage != null)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(CupertinoIcons.exclamationmark_triangle_fill,
+                          size: 16, color: Color(0xFFF87171)),
+                      const SizedBox(width: 6),
+                      const Expanded(
+                        child: Text(
+                          '网页已登录，但同步 NAS 网关未成功',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minSize: 20,
+                        onPressed: () {
+                          setState(() {
+                            _syncErrorMessage = null;
+                          });
+                        },
+                        child: const Icon(CupertinoIcons.clear,
+                            size: 14, color: Colors.white60),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _syncErrorMessage!,
+                    style: const TextStyle(
+                      color: Color(0xFFFCA5A5),
+                      fontSize: 11,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minSize: 28,
+                        onPressed:
+                            _isSyncing ? null : () => _triggerSync(isManual: true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(CupertinoIcons.arrow_clockwise,
+                                  size: 12, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                '重试同步',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minSize: 28,
+                        onPressed: () => _showHostSettingsDialog(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(CupertinoIcons.gear_alt,
+                                  size: 12, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                '修改网关地址',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+              child: const Row(
+                children: [
+                  Icon(CupertinoIcons.info_circle,
+                      size: 12, color: Color(0xFFFBBF24)),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '因官方安全防护机制，请轻触完成人机验证（绿勾），再点击下方一键提交登录。',
+                      style: TextStyle(color: Color(0xFFFBBF24), fontSize: 10),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: Stack(
+              children: [
+                WebViewWidget(
+                  controller: _webController,
+                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                    Factory<VerticalDragGestureRecognizer>(
+                        () => VerticalDragGestureRecognizer()),
+                    Factory<PanGestureRecognizer>(
+                        () => PanGestureRecognizer()),
+                    Factory<TapGestureRecognizer>(
+                        () => TapGestureRecognizer()),
+                  },
+                ),
+                if (_isLoading)
+                  Positioned.fill(
+                    child: Container(
+                      color: const Color(0xFF11151F).withValues(alpha: 0.88),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CupertinoActivityIndicator(radius: 12),
+                            const SizedBox(height: 12),
+                            const Text(
+                              '正在加载安全环境...',
+                              style:
+                                  TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                            const SizedBox(height: 16),
+                            CupertinoButton(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 6),
+                              color: Colors.white12,
+                              borderRadius: BorderRadius.circular(8),
+                              onPressed: () {
+                                setState(() {
+                                  _isLoading = false;
+                                });
+                              },
+                              child: const Text('直接查看页面',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 11)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_isSyncing)
+                  Container(
+                    color: Colors.black.withValues(alpha: 0.75),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CupertinoActivityIndicator(radius: 14),
+                          const SizedBox(height: 14),
+                          const Text(
+                            '正在向 NAS 网关激活登录会话...',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '网关: ${Dian115Service.to.host.value}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            onPressed: () {
+                              setState(() {
+                                _isSyncing = false;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.2)),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Text(
+                                '取消等待',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 11),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // 底部原生快捷登录操作栏
+          Container(
+            padding: EdgeInsets.fromLTRB(
+                16, 8, 16, mediaQuery.padding.bottom + 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF161C26),
+              border: Border(
+                top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: CupertinoButton(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    color: const Color(0xFFF59E0B),
+                    borderRadius: BorderRadius.circular(10),
+                    onPressed: _isSyncing ? null : () => _submitWebLogin(),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (_isSyncing)
+                          const CupertinoActivityIndicator(color: Colors.black)
+                        else ...[
+                          const Icon(CupertinoIcons.arrow_right_circle_fill,
+                              color: Colors.black, size: 18),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '一键提交登录 (验证通过后点击)',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

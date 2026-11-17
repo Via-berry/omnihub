@@ -1027,7 +1027,8 @@ class DownloadController extends GetxController {
       ),
     );
 
-    _log.info('发起第一跳 torrent 请求: ${request.describe()}');
+    try {
+      _log.info('发起第一跳 torrent 请求: ${request.describe()}');
     var response = await _sendTorrentRequest(
       dio: dio,
       request: request,
@@ -1096,6 +1097,9 @@ class DownloadController extends GetxController {
       throw Exception('empty torrent file');
     }
     return fileData;
+    } finally {
+      dio.close();
+    }
   }
 
   Future<Response<List<int>>> _sendTorrentRequest({

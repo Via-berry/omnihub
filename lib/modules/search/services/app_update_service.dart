@@ -4,24 +4,83 @@ import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:moviepilot_mobile/applog/app_log.dart';
 import 'package:moviepilot_mobile/modules/search/models/app_update_info.dart';
-import 'package:moviepilot_mobile/modules/search/models/update_mirror.dart';
+import 'package:moviepilot_mobile/modules/search/models/upstream_sync_info.dart';
 import 'package:moviepilot_mobile/modules/settings/models/system_env_model.dart';
 import 'package:moviepilot_mobile/services/api_client.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shorebird_code_push/shorebird_code_push.dart';
 
 class AppUpdateService extends GetxService {
   AppUpdateService() : _dio = Dio(_baseOptions);
 
-  static const String releasesApi =
-      'https://api.github.com/repos/singleton-altman/MoviePilotLite/releases';
-  static const String releasesUrl =
-      'https://github.com/singleton-altman/MoviePilotLite/releases';
+  final ShorebirdUpdater _shorebirdUpdater = ShorebirdUpdater();
+  final Rx<int?> currentPatchNumber = Rx<int?>(null);
+
+  bool get isShorebirdAvailable => _shorebirdUpdater.isAvailable;
+
+  Future<void> initShorebird() async {
+    if (!_shorebirdUpdater.isAvailable) return;
+    try {
+      final patch = await _shorebirdUpdater.readCurrentPatch();
+      currentPatchNumber.value = patch?.number;
+      _log.info('Shorebird 当前补丁: ${patch?.number ?? 'Base底包'}');
+
+      _shorebirdUpdater.checkForUpdate().then((status) {
+        if (status == UpdateStatus.outdated) {
+          _log.info('发现新版 Shorebird 热补丁，正在后台自动拉取...');
+          _shorebirdUpdater.update().then((_) {
+            _log.info('Shorebird 热补丁下载完成，下次启动应用即可生效');
+          }).catchError((e) {
+            _log.warning('Shorebird 补丁下载失败: $e');
+          });
+        }
+      }).catchError((e) {
+        _log.warning('Shorebird 检查补丁失败: $e');
+      });
+    } catch (e) {
+      _log.warning('初始化 Shorebird 失败: $e');
+    }
+  }
+
+  Future<int?> loadPatchNumber() async {
+    if (!_shorebirdUpdater.isAvailable) return null;
+    try {
+      final patch = await _shorebirdUpdater.readCurrentPatch();
+      currentPatchNumber.value = patch?.number;
+      return patch?.number;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<UpdateStatus> checkShorebirdUpdate() async {
+    if (!_shorebirdUpdater.isAvailable) return UpdateStatus.unavailable;
+    return await _shorebirdUpdater.checkForUpdate();
+  }
+
+  Future<void> downloadShorebirdUpdate() async {
+    if (!_shorebirdUpdater.isAvailable) return;
+    await _shorebirdUpdater.update();
+  }
+
+  static const String owner = 'Via-berry';
+  static const String repo = 'omnihub';
+  static const String releasesUrl = 'https://github.com/$owner/$repo/releases';
   static const Duration cachedApkTtl = Duration(days: 7);
-  static final RegExp _androidReleaseTagPattern = RegExp(
-    r'^release-v\d+(?:\.\d+){1,3}-\d{4}-\d{2}-\d{2}$',
-    caseSensitive: false,
+  static const String downloadProxyUrl = 'https://ghproxy.net/';
+
+  static const String _defaultToken = String.fromEnvironment(
+    'GITHUB_ACTIONS_TOKEN',
+    defaultValue: '',
   );
+
+  static List<String> _releaseApiUrls(String targetOwner, String targetRepo) => [
+    'https://api.github.com/repos/$targetOwner/$targetRepo/releases',
+    'https://gh-proxy.com/https://api.github.com/repos/$targetOwner/$targetRepo/releases',
+    'https://gh.llkk.cc/https://api.github.com/repos/$targetOwner/$targetRepo/releases',
+  ];
 
   static final BaseOptions _baseOptions = BaseOptions(
     connectTimeout: const Duration(seconds: 30),
@@ -31,7 +90,7 @@ class AppUpdateService extends GetxService {
     maxRedirects: 5,
     headers: const {
       'accept': 'application/vnd.github+json',
-      'user-agent': 'MoviePilotLite-Mobile',
+      'user-agent': 'OmniHub-Mobile-App',
     },
     validateStatus: (status) => status != null && status < 500,
   );
@@ -40,42 +99,95 @@ class AppUpdateService extends GetxService {
   final _log = Get.find<AppLog>();
   final _apiClient = Get.find<ApiClient>();
 
+  Future<String?> _resolveGithubToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final customToken = prefs.getString('custom_github_actions_token')?.trim();
+      if (customToken != null && customToken.isNotEmpty) return customToken;
+    } catch (_) {}
+
+    if (_defaultToken.isNotEmpty) {
+      return _defaultToken;
+    }
+
+    return await _loadConfiguredGithubToken();
+  }
+
+  Future<List<dynamic>> _fetchReleasesWithFallback({
+    String targetOwner = owner,
+    String targetRepo = repo,
+    int perPage = 30,
+  }) async {
+    final token = await _resolveGithubToken();
+    final headers = {
+      'accept': 'application/vnd.github+json',
+      'user-agent': 'OmniHub-Mobile-App',
+      if (token != null && token.isNotEmpty) 'authorization': 'Bearer $token',
+    };
+    final urls = _releaseApiUrls(targetOwner, targetRepo);
+
+    dynamic lastError;
+    for (final url in urls) {
+      try {
+        final response = await _dio.get<dynamic>(
+          url,
+          queryParameters: {'per_page': perPage},
+          options: Options(
+            headers: headers,
+            sendTimeout: const Duration(seconds: 8),
+            receiveTimeout: const Duration(seconds: 12),
+          ),
+        );
+        final status = response.statusCode ?? 0;
+        if (status >= 200 && status < 300) {
+          if (response.data is List) {
+            return response.data as List<dynamic>;
+          }
+        }
+        if (status == 403 && _isRateLimited(response.data)) {
+          _log.warning('GitHub 接口 [$url] 限流，切换备用线路');
+          continue;
+        }
+      } catch (e) {
+        lastError = e;
+        _log.warning('请求 GitHub 发布列表 [$url] 失败: $e，切换备用线路');
+      }
+    }
+
+    if (token == null &&
+        lastError != null &&
+        lastError.toString().contains('403')) {
+      throw AppUpdateException('GitHub API 已限流，请在设置中配置 Github Token 或稍后重试');
+    }
+    throw AppUpdateException('连接版本服务器失败，请检查网络设置');
+  }
+
   Future<AppUpdateInfo> fetchLatestRelease() async {
     final packageInfo = await PackageInfo.fromPlatform();
     final currentBuild = int.tryParse(packageInfo.buildNumber);
-    final githubToken = await _loadConfiguredGithubToken();
-    final response = await _dio.get<dynamic>(
-      releasesApi,
-      queryParameters: const {'per_page': 30},
-      options: Options(headers: _githubHeaders(githubToken)),
+
+    final releases = await _fetchReleasesWithFallback(
+      targetOwner: owner,
+      targetRepo: repo,
+      perPage: 30,
     );
-    final status = response.statusCode ?? 0;
-    if (status == 403 && _isRateLimited(response.data)) {
-      throw AppUpdateException(
-        githubToken == null
-            ? 'GitHub API 已限流，请先在系统基础设置中配置 Github Token'
-            : 'GitHub API 已限流，请检查 Github Token 是否有效',
-      );
-    }
-    final releases = response.data;
-    if (status < 200 || status >= 300 || releases is! List) {
-      throw AppUpdateException('获取最新版本失败');
+
+    final data = _selectLatestRelease(releases);
+    if (data == null) {
+      throw AppUpdateException('暂无已发布的版本信息');
     }
 
-    final data = _selectLatestAndroidRelease(releases);
-    if (data == null) {
-      throw AppUpdateException('未找到合法的安卓发布版本');
-    }
     final assets = data['assets'];
-    final apkAsset = assets is List
-        ? _selectApkAsset(assets.whereType<Map>().toList())
+    final asset = assets is List
+        ? _selectPlatformAsset(assets.whereType<Map>().toList())
         : null;
+
     final tagName = _stringValue(data['tag_name']);
     final releaseName = _stringValue(data['name']);
     final versionSource = [
       tagName,
       releaseName,
-      _stringValue(apkAsset?['name']),
+      _stringValue(asset?['name']),
     ].firstWhere((value) => value.trim().isNotEmpty, orElse: () => '0.0.0');
     final latestVersion = ParsedReleaseVersion.fromText(versionSource);
 
@@ -88,62 +200,22 @@ class AppUpdateService extends GetxService {
       releaseName: releaseName.isEmpty ? tagName : releaseName,
       releaseUrl: _stringValue(data['html_url'], fallback: releasesUrl),
       releaseNotes: _stringValue(data['body']),
-      apkDownloadUrl: _stringValue(apkAsset?['browser_download_url']),
-      apkAssetName: _stringValue(apkAsset?['name']),
-      apkSize: _intValue(apkAsset?['size']),
+      apkDownloadUrl: _stringValue(asset?['browser_download_url']),
+      apkAssetName: _stringValue(asset?['name']),
+      apkSize: _intValue(asset?['size']),
       publishedAt: DateTime.tryParse(_stringValue(data['published_at'])),
     );
   }
 
-  /// 按 [mirror] 指定的线路下载 APK。
-  ///
-  /// 加速源失败（网络错误或返回非安装包内容）时，若 [fallbackToDirect] 为真则
-  /// 自动改用直连重试一次，避免用户手动切换线路。
   Future<String> downloadApk(
     AppUpdateInfo info, {
-    UpdateMirror mirror = const UpdateMirror.direct(),
-    bool fallbackToDirect = true,
+    bool useProxy = false,
     required void Function(int received, int total) onProgress,
     CancelToken? cancelToken,
   }) async {
     if (!info.hasApk) {
       throw AppUpdateException('未找到 APK 安装包');
     }
-    final attempts = <UpdateMirror>[
-      mirror,
-      if (fallbackToDirect && !mirror.isDirect) const UpdateMirror.direct(),
-    ];
-    Object? lastError;
-    for (var index = 0; index < attempts.length; index++) {
-      final current = attempts[index];
-      try {
-        return await _downloadOnce(
-          info,
-          current,
-          onProgress: onProgress,
-          cancelToken: cancelToken,
-        );
-      } catch (e) {
-        if (e is DioException && CancelToken.isCancel(e)) rethrow;
-        lastError = e;
-        if (index < attempts.length - 1) {
-          _log.warning('经 ${current.label} 下载失败，改用直连重试: $e');
-          onProgress(0, 0);
-        }
-      }
-    }
-    if (lastError is AppUpdateException) throw lastError;
-    throw AppUpdateException(
-      lastError == null ? 'APK 下载失败' : 'APK 下载失败：$lastError',
-    );
-  }
-
-  Future<String> _downloadOnce(
-    AppUpdateInfo info,
-    UpdateMirror mirror, {
-    required void Function(int received, int total) onProgress,
-    CancelToken? cancelToken,
-  }) async {
     final updateDir = await _updateCacheDirectory(create: true);
     final fileName = _safeFileName(
       info.apkAssetName.isEmpty
@@ -156,7 +228,9 @@ class AppUpdateService extends GetxService {
     }
     try {
       await _dio.download(
-        mirror.resolve(info.apkDownloadUrl),
+        useProxy
+            ? '$downloadProxyUrl${info.apkDownloadUrl}'
+            : info.apkDownloadUrl,
         file.path,
         onReceiveProgress: onProgress,
         cancelToken: cancelToken,
@@ -169,39 +243,17 @@ class AppUpdateService extends GetxService {
           headers: const {'accept': 'application/octet-stream'},
         ),
       );
-      final exists = await file.exists();
-      final size = exists ? await file.length() : 0;
-      if (!exists || size <= 0) {
-        throw AppUpdateException('APK 下载失败');
-      }
-      if (!await _looksLikeApk(file)) {
-        throw AppUpdateException('${mirror.label} 返回的不是安装包，请更换加速源');
-      }
     } catch (_) {
       await _deleteFileIfExists(file);
       rethrow;
     }
-    _log.info('APK 下载完成（${mirror.label}）: ${file.path}');
-    return file.path;
-  }
-
-  /// APK 是 ZIP 容器，头部必须是 `PK\x03\x04`。加速源异常时常常返回 HTML 错误页。
-  Future<bool> _looksLikeApk(File file) async {
-    try {
-      final raf = await file.open();
-      try {
-        final header = await raf.read(4);
-        return header.length >= 4 &&
-            header[0] == 0x50 &&
-            header[1] == 0x4B &&
-            header[2] == 0x03 &&
-            header[3] == 0x04;
-      } finally {
-        await raf.close();
-      }
-    } catch (_) {
-      return false;
+    final exists = await file.exists();
+    final size = exists ? await file.length() : 0;
+    if (!exists || size <= 0) {
+      throw AppUpdateException('APK 下载失败');
     }
+    _log.info('APK 下载完成: ${file.path}');
+    return file.path;
   }
 
   Future<void> cleanupExpiredApkCache({Duration maxAge = cachedApkTtl}) async {
@@ -223,22 +275,50 @@ class AppUpdateService extends GetxService {
     }
   }
 
-  Map<dynamic, dynamic>? _selectApkAsset(List<Map<dynamic, dynamic>> assets) {
-    final apkAssets = assets.where((asset) {
+  Map<dynamic, dynamic>? _selectPlatformAsset(
+      List<Map<dynamic, dynamic>> assets) {
+    if (assets.isEmpty) return null;
+    if (Platform.isIOS) {
+      final ipaAssets = assets.where((asset) {
+        final name = _stringValue(asset['name']).toLowerCase();
+        return name.endsWith('.ipa');
+      }).toList();
+      if (ipaAssets.isNotEmpty) {
+        ipaAssets.sort((a, b) => _assetScore(b).compareTo(_assetScore(a)));
+        return ipaAssets.first;
+      }
+    } else {
+      final apkAssets = assets.where((asset) {
+        final name = _stringValue(asset['name']).toLowerCase();
+        return name.endsWith('.apk');
+      }).toList();
+      if (apkAssets.isNotEmpty) {
+        apkAssets.sort((a, b) => _assetScore(b).compareTo(_assetScore(a)));
+        return apkAssets.first;
+      }
+    }
+    for (final asset in assets) {
       final name = _stringValue(asset['name']).toLowerCase();
-      return name.endsWith('.apk');
-    }).toList();
-    if (apkAssets.isEmpty) return null;
-    apkAssets.sort((a, b) => _assetScore(b).compareTo(_assetScore(a)));
-    return apkAssets.first;
+      if (!name.endsWith('.sha256') &&
+          !name.endsWith('.md5') &&
+          !name.endsWith('.txt')) {
+        return asset;
+      }
+    }
+    return null;
   }
 
-  Map<dynamic, dynamic>? _selectLatestAndroidRelease(List<dynamic> releases) {
+  Map<dynamic, dynamic>? _selectLatestRelease(List<dynamic> releases) {
     final candidates = releases.whereType<Map>().where((release) {
+      if (release['draft'] == true) return false;
       final tagName = _stringValue(release['tag_name']);
-      return _androidReleaseTagPattern.hasMatch(tagName);
+      if (tagName.toLowerCase() == 'base-ios-latest') return false;
+      return true;
     }).toList();
-    if (candidates.isEmpty) return null;
+    if (candidates.isEmpty) {
+      final validMaps = releases.whereType<Map>();
+      return validMaps.isEmpty ? null : validMaps.first;
+    }
     candidates.sort((a, b) {
       final left = DateTime.tryParse(_stringValue(a['published_at']));
       final right = DateTime.tryParse(_stringValue(b['published_at']));
@@ -254,8 +334,12 @@ class AppUpdateService extends GetxService {
     final name = _stringValue(asset['name']).toLowerCase();
     var score = 0;
     if (name.contains('universal')) score += 8;
-    if (name.contains('android')) score += 6;
-    if (name.contains('release')) score += 4;
+    if (name.contains('base')) score += 6;
+    if (name.contains('release') ||
+        name.contains('ios') ||
+        name.contains('android')) {
+      score += 4;
+    }
     if (name.contains('arm64')) score += 2;
     if (name.contains('debug')) score -= 8;
     return score;
@@ -296,12 +380,6 @@ class AppUpdateService extends GetxService {
     return int.tryParse(value?.toString() ?? '');
   }
 
-  Map<String, String> _githubHeaders(String? token) {
-    final normalized = token?.trim();
-    if (normalized == null || normalized.isEmpty) return const {};
-    return {'authorization': 'Bearer $normalized'};
-  }
-
   Future<String?> _loadConfiguredGithubToken() async {
     try {
       final response = await _apiClient.get<Map<String, dynamic>>(
@@ -327,6 +405,60 @@ class AppUpdateService extends GetxService {
     if (data is! Map) return false;
     final message = _stringValue(data['message']).toLowerCase();
     return message.contains('rate limit');
+  }
+
+  Future<UpstreamCheckResult> checkUpstreamSync(
+    UpstreamBaselineInfo baseline,
+  ) async {
+    final parts = baseline.repo.split('/');
+    final targetOwner = parts.isNotEmpty ? parts[0] : 'singleton-altman';
+    final targetRepo = parts.length > 1 ? parts[1] : 'MoviePilotLite';
+
+    final releases = await _fetchReleasesWithFallback(
+      targetOwner: targetOwner,
+      targetRepo: targetRepo,
+      perPage: 10,
+    );
+
+    if (releases.isEmpty) {
+      throw AppUpdateException('获取上游版本失败');
+    }
+
+    final latestRelease = releases.firstWhere(
+      (item) => item is Map && item['prerelease'] != true,
+      orElse: () => releases.first,
+    );
+
+    final tagName = _stringValue(latestRelease['tag_name']);
+    final releaseName = _stringValue(latestRelease['name']);
+    final notes = _stringValue(latestRelease['body']);
+    final upstreamRepoUrl = 'https://github.com/${baseline.repo}/releases';
+    final htmlUrl =
+        _stringValue(latestRelease['html_url'], fallback: upstreamRepoUrl);
+    final publishedStr = _stringValue(latestRelease['published_at']);
+    final publishedAt = DateTime.tryParse(publishedStr);
+
+    final hasUpdate =
+        tagName.isNotEmpty && !_isSameTag(tagName, baseline.baselineTag);
+
+    return UpstreamCheckResult(
+      baseline: baseline,
+      latestTag: tagName.isEmpty ? baseline.baselineTag : tagName,
+      latestReleaseName: releaseName.isEmpty ? tagName : releaseName,
+      latestNotes: notes,
+      releaseUrl: htmlUrl,
+      hasUpdate: hasUpdate,
+      publishedAt: publishedAt,
+    );
+  }
+
+  bool _isSameTag(String a, String b) {
+    if (a.trim().toLowerCase() == b.trim().toLowerCase()) return true;
+    final cleanA =
+        a.replaceAll(RegExp(r'-\d{4}-\d{2}-\d{2}$'), '').trim().toLowerCase();
+    final cleanB =
+        b.replaceAll(RegExp(r'-\d{4}-\d{2}-\d{2}$'), '').trim().toLowerCase();
+    return cleanA.isNotEmpty && cleanA == cleanB;
   }
 }
 
