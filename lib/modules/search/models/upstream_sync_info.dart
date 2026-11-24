@@ -66,6 +66,6 @@ class UpstreamCheckResult {
   final DateTime? publishedAt;
 
   String get promptInstruction =>
-      "上游 MoviePilotLite 发布了新版本 $latestTag。请帮我同步上游最新代码到 OmniHub，并保留自研模块（Dian115/JAV/热更配置）！";
+      "上游 MoviePilotLite 发布了新版本 $latestTag。请帮我同步上游最新代码到 OmniHub，并保留自研模块（Dian115/热更配置）！";
 }
 

@@ -39,8 +39,6 @@ class DashboardPage extends GetView<DashboardController> {
   const DashboardPage({super.key, this.scrollController});
 
   final ScrollController? scrollController;
-  static int _secretTapCount = 0;
-  static DateTime? _lastSecretTapTime;
 
   @override
   Widget build(BuildContext context) {
@@ -136,28 +134,9 @@ class DashboardPage extends GetView<DashboardController> {
           ),
         ),
       ),
-      title: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          final now = DateTime.now();
-          if (_lastSecretTapTime == null ||
-              now.difference(_lastSecretTapTime!) > const Duration(seconds: 2)) {
-            _secretTapCount = 1;
-          } else {
-            _secretTapCount++;
-          }
-          _lastSecretTapTime = now;
-
-          if (_secretTapCount >= 5) {
-            _secretTapCount = 0;
-            HapticFeedback.heavyImpact();
-            Get.toNamed('/jav');
-          }
-        },
-        child: const Text(
-          'Dashboard',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
+      title: const Text(
+        'Dashboard',
+        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
       ),
       centerTitle: false,
       actions: [

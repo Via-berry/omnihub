@@ -61,23 +61,6 @@ class OmniHubReleaseItem {
 class OmniHubReleaseHistory {
   static const List<OmniHubReleaseItem> releases = [
     OmniHubReleaseItem(
-      id: 'omnihub-20260924-missav',
-      version: 'v1.2.6',
-      patchNumber: 1,
-      date: '2026-09-24',
-      title: 'JAV 模块改版为 MissAV 主数据源',
-      type: OmniHubReleaseType.hotPatch,
-      summary: 'JAV 模块主数据源切换为 MissAV，原生支持中文剧情简介、制作/发行厂牌与推荐引擎动态题材流，JavBus 降级为磁链与未收录兜底',
-      tags: ['热更新', 'JAV', 'MissAV', '体验升级'],
-      highlights: [
-        '主数据源全面升级为 MissAV，详情页支持繁体中文剧情简介、制作/发行厂牌与原站结构化题材',
-        '接入 MissAV 官方推荐引擎算法，首页精选与分段题材流（巨乳、中出、熟女等）动态异步加载',
-        '详情页播放弹窗前置置顶 MissAV 全网片源直达，并动态同步服务端安全放行域名',
-        'JavBus 降级为独占磁链与无码/冷门片目兜底数据源，未收录自动静默回退，零白屏',
-        '图片代理适配 MissAV 动态来源鉴权头部并落盘加密缓存，脱敏模式全面覆盖新图源',
-      ],
-    ),
-    OmniHubReleaseItem(
       id: 'omnihub-20260923-securecookie',
       version: 'v1.2.6',
       date: '2026-09-23',
@@ -180,16 +163,14 @@ class OmniHubReleaseHistory {
       id: 'omnihub-20260912-multitransfer',
       version: 'v1.2.5',
       date: '2026-09-12',
-      title: '多链接资源全量批量转存 & JAV 私有密文缓存',
+      title: '多链接资源全量批量转存',
       type: OmniHubReleaseType.hotPatch,
-      summary: '修复癫影与盘搜多分集批量转存遗漏，升级 JAV 本地封面私有加密与透明代理',
-      tags: ['热更新', '批量转存', 'JAV加密', 'Dian115', 'PanSou'],
+      summary: '修复癫影与盘搜多分集批量转存遗漏',
+      tags: ['热更新', '批量转存', 'Dian115', 'PanSou'],
       highlights: [
         '解决癫影与盘搜多分集（多 ed2k / 磁力链接）转存仅保存首条的问题，现支持完整提取与批量保存',
         '网关与直连 115 离线任务接口全面适配批量任务队列，增加智能间隔防风控截断与已存在容错',
         '卡片与转存弹层新增多链接数量胶囊标识与保存提示，支持一键快捷复制全部离线下载链接',
-        'JAV 封面缓存采用 OMNIPIC 魔数与 AES-256-CTR 磁盘密文存储，杜绝 NAS 共享目录明文裸露',
-        '服务端内置透明流式解密代理与存量图片平滑清洗迁移，无缝兼容客户端既有图片加载体系',
       ],
     ),
     OmniHubReleaseItem(

@@ -42,7 +42,7 @@ git diff --stat "HEAD...$UpstreamRemote/master"
 
 # 4. 检查自研敏感冲突区
 $conflictingFiles = git diff --name-only "HEAD...$UpstreamRemote/master" | Where-Object {
-    $_ -like "*dian115*" -or $_ -like "*jav*" -or $_ -like "*shorebird*" -or $_ -like "*app_setting*"
+    $_ -like "*dian115*" -or $_ -like "*shorebird*" -or $_ -like "*app_setting*"
 }
 if ($conflictingFiles) {
     Write-Host "`n[!] 注意：以下文件在上游变动中与 OmniHub 自研模块存在交集：" -ForegroundColor Yellow
