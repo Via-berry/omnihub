@@ -533,7 +533,7 @@ class _Dian115LoginSheetState extends State<Dian115LoginSheet> {
                 const SizedBox(height: 10),
                 CupertinoTextField(
                   controller: hostController,
-                  placeholder: '如 http://192.168.50.81:8924',
+                  placeholder: '如 https://mp.215736296.xyz/dian115',
                   style: const TextStyle(fontSize: 12),
                 ),
               ],

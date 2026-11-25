@@ -13,7 +13,8 @@ class PansouService extends GetxService {
     return Get.find<PansouService>();
   }
 
-  static const String defaultHost = 'http://192.168.50.81:8888';
+  static const String defaultHost = 'https://mp.215736296.xyz/pansou';
+  static const String _legacyDefaultHost = 'http://192.168.50.81:8888';
   static const String _hostPrefKey = 'pansou_server_host';
   static const String _tokenPrefKey = 'pansou_server_token';
 
@@ -43,7 +44,13 @@ class PansouService extends GetxService {
       final prefs = await SharedPreferences.getInstance();
       final savedHost = prefs.getString(_hostPrefKey);
       if (savedHost != null && savedHost.trim().isNotEmpty) {
-        host.value = savedHost.trim();
+        final trimmed = savedHost.trim();
+        if (trimmed == _legacyDefaultHost) {
+          host.value = defaultHost;
+          await prefs.setString(_hostPrefKey, defaultHost);
+        } else {
+          host.value = trimmed;
+        }
       }
       final savedToken = prefs.getString(_tokenPrefKey);
       if (savedToken != null && savedToken.trim().isNotEmpty) {

@@ -748,7 +748,7 @@ class _Dian115ShareSheetState extends State<Dian115ShareSheet> {
                   const SizedBox(height: 4),
                   CupertinoTextField(
                     controller: hostController,
-                    placeholder: '如 http://192.168.50.81:8924',
+                    placeholder: '如 https://mp.215736296.xyz/dian115',
                     style: const TextStyle(fontSize: 11),
                   ),
                   const SizedBox(height: 10),

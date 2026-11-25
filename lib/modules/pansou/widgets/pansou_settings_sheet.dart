@@ -146,7 +146,7 @@ class _PansouSettingsSheetState extends State<PansouSettingsSheet> {
               style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'monospace'),
               decoration: const InputDecoration(
                 border: InputBorder.none,
-                hintText: 'http://192.168.50.81:8888',
+                hintText: 'https://mp.215736296.xyz/pansou',
                 hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
               ),
             ),
