@@ -80,9 +80,7 @@ jobs:
       - name: Cache Xcode derived data
         uses: actions/cache@v4
         with:
-          path: |
-            ~/Library/Developer/Xcode/DerivedData
-            build
+          path: ~/Library/Developer/Xcode/DerivedData
           key: ${{ runner.os }}-xcode-${{ hashFiles('ios/Podfile.lock') }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-xcode-${{ hashFiles('ios/Podfile.lock') }}-
@@ -114,6 +112,7 @@ jobs:
 
       - name: Publish Shorebird iOS Patch
         run: |
+          rm -rf .dart_tool/flutter_build build
           shorebird patch ios --no-codesign --release-version=latest --allow-native-diffs --allow-asset-diffs -- \
             --dart-define=FLUTTER_APP_ENV=release \
             --dart-define=GITHUB_ACTIONS_TOKEN="${{ secrets.ACTIONS_TOKEN || secrets.GITHUB_ACTIONS_TOKEN }}"
